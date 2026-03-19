@@ -24,11 +24,81 @@ logger = logging.getLogger(__name__)
 
 # ── Sources ───────────────────────────────────────────
 RSS_SOURCES = [
-    ("BBC World",  "https://feeds.bbci.co.uk/news/world/rss.xml"),
-    ("Reuters",    "https://feeds.reuters.com/Reuters/worldNews"),
-    ("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"),
-    ("AP News",    "https://rsshub.app/apnews/topics/world-news"),
-    ("UN News",    "https://news.un.org/feed/subscribe/en/news/all/rss.xml"),
+("Reuters World","http://feeds.reuters.com/Reuters/worldNews"),
+("Reuters Europe","http://feeds.reuters.com/Reuters/europeNews"),
+("BBC World","http://feeds.bbci.co.uk/news/world/rss.xml"),
+("BBC Europe","http://feeds.bbci.co.uk/news/world/europe/rss.xml"),
+("BBC Asia","http://feeds.bbci.co.uk/news/world/asia/rss.xml"),
+("CNN World","http://rss.cnn.com/rss/edition_world.rss"),
+("CNN US","http://rss.cnn.com/rss/cnn_topstories.rss"),
+("Al Jazeera","http://www.aljazeera.com/xml/rss/all.xml"),
+("France 24","https://www.france24.com/en/rss"),
+("DW News","http://rss.dw.com/rdf/rss-en-world"),
+("Euronews","https://www.euronews.com/rss?level=theme&name=news"),
+("The Guardian World","https://www.theguardian.com/world/rss"),
+("NYTimes World","http://feeds.nytimes.com/nyt/rss/World"),
+("Washington Post World","http://feeds.washingtonpost.com/rss/world"),
+("Associated Press","https://apnews.com/apf-topnews?utm_source=rss"),
+("NPR World","https://feeds.npr.org/1004/rss.xml"),
+("CBS News","https://www.cbsnews.com/latest/rss/main"),
+("ABC News International","https://abcnews.go.com/abcnews/internationalheadlines"),
+("Sky News","https://feeds.skynews.com/feeds/rss/world.xml"),
+("Time Magazine","https://time.com/feed/"),
+("Bloomberg","https://www.bloomberg.com/feed/podcast/etf-report.xml"),
+("CNBC","https://www.cnbc.com/id/100003114/device/rss/rss.html"),
+("Yahoo News","https://news.yahoo.com/rss/"),
+("MarketWatch","http://feeds.marketwatch.com/marketwatch/topstories/"),
+("Financial Times","http://www.ft.com/rss/world"),
+("The Economist","https://www.economist.com/the-world-this-week/rss.xml"),
+
+# EUROPA (locale)
+("Le Monde International","https://www.lemonde.fr/en/international/rss_full.xml"),
+("El País","https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/internacional/portada"),
+("Corriere della Sera","https://xml2.corriereobjects.it/rss/homepage.xml"),
+("La Repubblica","https://www.repubblica.it/rss/homepage/rss2.0.xml"),
+("Der Spiegel","https://www.spiegel.de/international/index.rss"),
+("The Local Europe","https://www.thelocal.com/rss"),
+("EUobserver","https://euobserver.com/rss"),
+("Euractiv","https://www.euractiv.com/feed/"),
+("Politico Europe","https://www.politico.eu/feed/"),
+
+# AMERICA LATINA
+("Folha de S.Paulo","https://feeds.folha.uol.com.br/emcimadahora/rss091.xml"),
+("Clarín","https://www.clarin.com/rss/lo-ultimo/"),
+("La Nación Argentina","https://www.lanacion.com.ar/arc/outboundfeeds/rss/"),
+("Animal Politico","https://www.animalpolitico.com/feed/"),
+
+# MEDIO ORIENTE
+("Arab News","https://www.arabnews.com/rss.xml"),
+("Haaretz","https://www.haaretz.com/cmlink/1.628752"),
+("Jerusalem Post","https://www.jpost.com/rss/rssfeedsheadlines.aspx"),
+
+# AFRICA
+("AllAfrica","https://allafrica.com/tools/headlines/rdf/latest/headlines.rdf"),
+("News24 South Africa","https://feeds.news24.com/articles/news24/TopStories/rss"),
+("Premium Times Nigeria","https://www.premiumtimesng.com/feed"),
+
+# ASIA
+("South China Morning Post","https://www.scmp.com/rss/91/feed"),
+("Nikkei Asia","https://asia.nikkei.com/rss/feed/nar"),
+("The Japan Times","https://www.japantimes.co.jp/feed/"),
+("Yonhap News Korea","https://en.yna.co.kr/RSS/news.xml"),
+("The Hindu India","https://www.thehindu.com/news/international/feeder/default.rss"),
+("Times of India","https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms"),
+("VNExpress Vietnam","https://vnexpress.net/rss/news.rss"),
+
+# OCEANIA
+("ABC Australia","https://www.abc.net.au/news/feed/51120/rss.xml"),
+("Sydney Morning Herald","https://www.smh.com.au/rss/feed.xml"),
+
+# CANADA (locale)
+("CBC News","https://www.cbc.ca/cmlink/rss-topstories"),
+("Global News","https://globalnews.ca/feed/"),
+("CTV News","https://www.ctvnews.ca/rss/ctvnews-ca-top-stories-public-rss-1.822009"),
+
+# EXTRA / AGGREGATORI
+("Google News World","https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"),
+("World News International","https://www.worldnewsintl.org/feed")
 ]
 
 # ── Classification rules ──────────────────────────────
