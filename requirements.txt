@@ -51,5 +51,6 @@ anthropic>=0.25.0
 #networkx>=3.3
 
 # ── Data analysis (for advanced quant features) ────────────────
-# numpy>=1.26.0                      # optional: faster PCA/regression
-# pandas>=2.2.0                      # optional: data manipulation
+#
+numpy>=1.26.0                      # optional: faster PCA/regression
+pandas>=2.2.0                      # optional: data manipulation
