@@ -50,17 +50,17 @@ class Settings(BaseSettings):
     # ── FinBERT / ML models ───────────────────────────────────────────
     # When True: loads ProsusAI/finbert + spaCy on startup.
     # Models are downloaded on first use (~500MB). Set False to disable.
-    enable_finbert: bool = True
-    enable_spacy:   bool = True
+    enable_finbert: bool = False
+    enable_spacy:   bool = False
 
     # ── GDELT ─────────────────────────────────────────────────────────
     # Enable GDELT event ingestion alongside RSS feeds.
-    enable_gdelt: bool = True
+    enable_gdelt: bool = False
     gdelt_timespan: str = "6h"   # GDELT query window per scheduler cycle
 
     # ── Knowledge Graph ───────────────────────────────────────────────
     # NetworkX-based geopolitical impact propagation.
-    enable_knowledge_graph: bool = True
+    enable_knowledge_graph: bool = False
 
     class Config:
         env_file = ".env"
