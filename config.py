@@ -55,12 +55,12 @@ class Settings(BaseSettings):
 
     # ── GDELT ─────────────────────────────────────────────────────────
     # Enable GDELT event ingestion alongside RSS feeds.
-    enable_gdelt: bool = False
+    enable_gdelt: bool = True
     gdelt_timespan: str = "6h"   # GDELT query window per scheduler cycle
 
     # ── Knowledge Graph ───────────────────────────────────────────────
     # NetworkX-based geopolitical impact propagation.
-    enable_knowledge_graph: bool = False
+    enable_knowledge_graph: bool = True
 
     class Config:
         env_file = ".env"
