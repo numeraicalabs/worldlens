@@ -38,17 +38,17 @@ anthropic>=0.25.0
 # ── FinBERT / BERT sentiment ───────────────────────────────────
 # Downloads ProsusAI/finbert (~500MB) on first use.
 # CPU inference, no GPU required.
-#torch>=2.1.0                        # CPU build is sufficient
-#transformers>=4.40.0                # HuggingFace transformers
+torch>=2.1.0                        # CPU build is sufficient
+transformers>=4.40.0                # HuggingFace transformers
 # sentence-transformers>=2.7.0       # optional: richer embeddings (adds 300MB)
 
 # ── Named Entity Recognition (spaCy) ──────────────────────────
 # After installing, run: python -m spacy download en_core_web_sm
-#spacy>=3.7.0
+spacy>=3.7.0
 
 # ── Knowledge Graph ────────────────────────────────────────────
 # Pure-Python, lightweight.
-#networkx>=3.3
+networkx>=3.3
 
 # ── Data analysis (for advanced quant features) ────────────────
 #
