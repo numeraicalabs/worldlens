@@ -176,7 +176,8 @@ def _rule_sentiment(text: str, source: str, category: str) -> Dict:
 async def ai_sentiment(title: str, summary: str, category: str,
                        source: str = "") -> Dict:
     """
-    Multi-dimensional sentiment scoring:
+    Multi-dimensional sentiment scoring.
+    Pipeline: FinBERT (if available) → Gemini/Claude → rule-based fallback.
       score              float  -1..+1   overall polarity
       tone               str    Negative|Neutral|Positive
       intensity          str    Low|Medium|High|Extreme
@@ -188,6 +189,18 @@ async def ai_sentiment(title: str, summary: str, category: str,
     """
     text = (title + " " + (summary or ""))[:700]
     credibility = SOURCE_CREDIBILITY.get(source, DEFAULT_CREDIBILITY)
+
+    # ── Try FinBERT first ─────────────────────────────────────────────
+    try:
+        from config import settings as _s
+        if getattr(_s, "enable_finbert", False):
+            from analysis.finbert_engine import finbert_sentiment
+            result = await finbert_sentiment(title, summary, category, source)
+            if result and not result.get("fallback"):
+                logger.debug("Sentiment via FinBERT for '%s'", title[:40])
+                return result
+    except Exception as _fb_e:
+        logger.debug("FinBERT sentiment fallthrough: %s", _fb_e)
 
     if not _ai_available():
         return _rule_sentiment(text, source, category)
@@ -270,6 +283,21 @@ async def ai_ner(title: str, summary: str, category: str) -> List[Dict]:
     Returns: [{text, type, salience, sentiment_hint}]
     Types: Country | Company | Person | Commodity | Currency | Index | Organization | Sector
     """
+    # ── Try spaCy NER first ──────────────────────────────────────────
+    try:
+        from config import settings as _s
+        if getattr(_s, "enable_spacy", False):
+            from analysis.ner_engine import extract_entities
+            ner_result = await extract_entities(title, summary, category)
+            if ner_result:
+                # Convert to ai_layer schema (add sentiment_hint if missing)
+                for e in ner_result:
+                    e.setdefault("sentiment_hint", "Neutral")
+                logger.debug("NER via spaCy for '%s'", title[:40])
+                return ner_result
+    except Exception as _ner_e:
+        logger.debug("spaCy NER fallthrough: %s", _ner_e)
+
     if not _ai_available():
         return _rule_ner(title + " " + (summary or ""), category)
 
@@ -587,6 +615,19 @@ async def ai_show_impact(title: str, summary: str, category: str,
         "historical_precedent": analog,
         "fallback": True,
     }
+
+    # ── Try full impact engine (FinBERT + NER + KG) ─────────────────────
+    try:
+        from config import settings as _s
+        if getattr(_s, "enable_finbert", False) or getattr(_s, "enable_knowledge_graph", False):
+            from analysis.impact_engine import compute_full_impact
+            full = await compute_full_impact(
+                title, summary, category, country, severity, "", None)
+            if full and full.get("short_term"):
+                logger.debug("Impact via full engine (FinBERT+KG+NER)")
+                return full
+    except Exception as _imp_e:
+        logger.debug("Full impact engine fallthrough: %s", _imp_e)
 
     if not _ai_available():
         return rule_result

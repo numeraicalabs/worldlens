@@ -110,6 +110,22 @@ async def lifespan(app: FastAPI):
     await init_db()
     await _seed_admin()
     await _load_ai_settings()
+    # ── Start ML model pre-loading in background threads ──────────────
+    # Models are optional — app starts instantly even if ML unavailable.
+    if settings.enable_finbert:
+        try:
+            from analysis.finbert_engine import init_models as init_finbert
+            init_finbert()
+            logger.info("FinBERT pre-load initiated")
+        except Exception as e:
+            logger.info("FinBERT pre-load skipped: %s", e)
+    if settings.enable_spacy:
+        try:
+            from analysis.ner_engine import init_ner_models
+            init_ner_models()
+            logger.info("spaCy NER pre-load initiated")
+        except Exception as e:
+            logger.info("spaCy pre-load skipped: %s", e)
     scheduler.register_ws_callback(ws_broadcast_callback)
     scheduler.start()
     logger.info("World Lens started")

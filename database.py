@@ -88,6 +88,7 @@ async def init_db():
             ai_market_note TEXT DEFAULT '',
             ai_tags TEXT DEFAULT '[]',
             related_markets TEXT DEFAULT '[]',
+            sent_credibility REAL DEFAULT 0.75,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -199,6 +200,7 @@ async def migrate_sentiment_columns():
             "market_impact_cache":   "TEXT DEFAULT ''",    # full JSON from ai_show_impact
             # Dedup / source tracking
             "source_count":          "INTEGER DEFAULT 1",
+            "sent_credibility":      "REAL DEFAULT 0.75",  # source credibility
             "source_list":           "TEXT DEFAULT '[]'",
             # Narrative / topic embedding fingerprint (compressed)
             "topic_vector":          "TEXT DEFAULT ''",    # JSON array of 8 floats (topic fingerprint)
@@ -215,9 +217,9 @@ async def migrate_sentiment_columns():
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             source_id   TEXT NOT NULL,
             target_id   TEXT NOT NULL,
-            rel_type    TEXT NOT NULL,  -- 'causal','correlated','hierarchical','temporal'
+            rel_type    TEXT NOT NULL,
             weight      REAL DEFAULT 0.5,
-            direction   TEXT DEFAULT 'forward',  -- 'forward','backward','bidirectional'
+            direction   TEXT DEFAULT 'forward',
             confidence  REAL DEFAULT 0.5,
             created_at  TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (source_id) REFERENCES events(id),
@@ -230,7 +232,7 @@ async def migrate_sentiment_columns():
         CREATE TABLE IF NOT EXISTS narrative_clusters (
             cluster_id   INTEGER PRIMARY KEY,
             label        TEXT NOT NULL,
-            centroid     TEXT DEFAULT '[]',   -- JSON float array
+            centroid     TEXT DEFAULT '[]',
             event_count  INTEGER DEFAULT 0,
             avg_severity REAL DEFAULT 5.0,
             top_category TEXT DEFAULT '',

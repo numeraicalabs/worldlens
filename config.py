@@ -47,6 +47,21 @@ class Settings(BaseSettings):
     finance_interval_seconds: int = 300
     max_events: int = 500
 
+    # ── FinBERT / ML models ───────────────────────────────────────────
+    # When True: loads ProsusAI/finbert + spaCy on startup.
+    # Models are downloaded on first use (~500MB). Set False to disable.
+    enable_finbert: bool = True
+    enable_spacy:   bool = True
+
+    # ── GDELT ─────────────────────────────────────────────────────────
+    # Enable GDELT event ingestion alongside RSS feeds.
+    enable_gdelt: bool = True
+    gdelt_timespan: str = "6h"   # GDELT query window per scheduler cycle
+
+    # ── Knowledge Graph ───────────────────────────────────────────────
+    # NetworkX-based geopolitical impact propagation.
+    enable_knowledge_graph: bool = True
+
     class Config:
         env_file = ".env"
         extra    = "ignore"
