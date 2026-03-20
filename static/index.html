@@ -1891,6 +1891,38 @@ canvas.mkt-chart { width:100%; display:block; border-radius:var(--r8); }
 
 </style>
 </head>
+<script>
+// Stub: queue calls to functions that load after HTML
+(function(){
+  var _q = {};
+  function stub(name) {
+    return function() {
+      var args = arguments;
+      if (window[name] && window[name] !== stub(name)) {
+        window[name].apply(this, args);
+      } else {
+        (_q[name] = _q[name]||[]).push(args);
+      }
+    };
+  }
+  // Define stubs for all functions called from inline HTML onclick
+  var earlyFns = ['showAuth','atab','sv','closeAuth','logout',
+                  'setMktMode','selectMktAsset','setQuantTab',
+                  'toggleHistoricalEvents','setHevFilter'];
+  earlyFns.forEach(function(fn){ window[fn] = stub(fn); });
+  // Flush queue once real script loads
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(function(){
+      earlyFns.forEach(function(fn){
+        if (_q[fn] && window[fn]) {
+          _q[fn].forEach(function(a){ window[fn].apply(window,a); });
+          delete _q[fn];
+        }
+      });
+    }, 100);
+  });
+})();
+</script>
 <body>
 
 <!-- LOADER -->
