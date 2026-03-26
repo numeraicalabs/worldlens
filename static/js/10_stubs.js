@@ -1220,3 +1220,109 @@ function _renderMacroGrid(indicators) {
       + '</div>';
   }).join('');
 }
+
+// ════════════════════════════════════════════════════════
+// ADDITIONAL MISSING FUNCTIONS — runtime ReferenceErrors fix
+// ════════════════════════════════════════════════════════
+
+// ── renderMkts ────────────────────────────────────────
+// Called after finance data loads and on WebSocket updates.
+// Delegates to initMarkets/renderMktSidebar if markets view is active,
+// otherwise just updates the dashboard finance KPIs.
+function renderMkts() {
+  updateDashFin();
+  // If markets view is active, refresh its sidebar prices
+  var mktView = document.getElementById('view-markets');
+  if (mktView && mktView.classList.contains('on')) {
+    if (typeof renderMktSidebar === 'function') renderMktSidebar();
+  }
+}
+
+// ── loadDailyInsight ─────────────────────────────────
+// Loads a daily insight card for the user. The #d-insight element
+// was removed in the dashboard redesign, so this is a no-op stub
+// that prevents the ReferenceError.
+function loadDailyInsight() {
+  // Element removed in dashboard v2 redesign — safe no-op.
+  // If d-insight exists in future, uncomment:
+  // rq('/api/user/daily-insight').then(function(r) {
+  //   if (!r || !r.insight) return;
+  //   setEl('d-insight-txt', r.insight);
+  //   var el2 = el('d-insight');
+  //   if (el2) el2.style.display = 'block';
+  // });
+}
+
+// ── loadLayout ───────────────────────────────────────
+// Restores the user's saved layout preference (compact/default/wide).
+function loadLayout() {
+  var saved = G.userProfile && G.userProfile.layout;
+  if (saved && typeof setLayout === 'function') {
+    setLayout(saved);
+  }
+}
+
+// ── loadMacroBrief ───────────────────────────────────
+// Called on initial data load to pre-populate the AI macro briefing
+// on the dashboard. Reuses getMacroBrief logic but targets the
+// dashboard brief element instead of the macro view element.
+function loadMacroBrief() {
+  var briefEl = document.getElementById('d-brief-txt');
+  if (!briefEl) return;
+  // Check if already populated
+  if (briefEl.textContent && briefEl.textContent !== 'Loading AI briefing…') return;
+
+  rq('/api/intelligence/macro-brief').then(function(r) {
+    if (r && r.brief) {
+      briefEl.textContent = r.brief;
+    } else {
+      // Fallback: generate from events
+      rq('/api/events/ai/ask', {
+        method: 'POST',
+        body: { question: 'Give a concise 3-sentence macro intelligence briefing covering the most important global economic and geopolitical developments right now. Focus on market-moving events.' }
+      }).then(function(res) {
+        if (res && res.answer) briefEl.textContent = res.answer;
+        else briefEl.textContent = 'AI macro briefing unavailable. Check the AI Analyst tab for full analysis.';
+      }).catch(function() {
+        briefEl.textContent = 'Macro briefing loading…';
+      });
+    }
+  }).catch(function() {
+    briefEl.textContent = 'Macro briefing unavailable.';
+  });
+}
+
+// ── removeWL ─────────────────────────────────────────
+// Remove an item from the watchlist (called from renderProfile buttons).
+function removeWL(idOrValue) {
+  rq('/api/user/watchlist/' + encodeURIComponent(idOrValue), {
+    method: 'DELETE'
+  }).then(function(r) {
+    // Update local state
+    G.watchlist = (G.watchlist || []).filter(function(w) {
+      return w.id !== idOrValue && w.value !== idOrValue;
+    });
+    setEl('d-wl', G.watchlist.length);
+    renderProfile();
+    toast('Removed from watchlist', 's');
+  }).catch(function() {
+    // Optimistic: remove locally even if API fails
+    G.watchlist = (G.watchlist || []).filter(function(w) {
+      return w.id !== idOrValue && w.value !== idOrValue;
+    });
+    renderProfile();
+    toast('Removed', 's');
+  });
+}
+
+// ── startOnboarding ──────────────────────────────────
+// Show the onboarding overlay for new users.
+function startOnboarding() {
+  var overlay = document.getElementById('ob-overlay');
+  if (!overlay) return;
+  // Reset to step 1
+  OB.step = 1;
+  overlay.style.display = 'flex';
+  _obRender();
+  toast('Welcome to WorldLens! Complete setup to personalise your experience.', 'i');
+}
