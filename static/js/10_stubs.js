@@ -1009,3 +1009,214 @@ if (typeof loadData === 'function') {
     }) : (_origLoadData2(), setTimeout(checkBreakingNews, 500));
   };
 }
+
+// ════════════════════════════════════════════════════════
+// MISSING FUNCTIONS — added to fix ReferenceErrors
+// ════════════════════════════════════════════════════════
+
+// ── sentBadgeHtml ──────────────────────────────────────
+// Returns HTML badge for sentiment score on event cards
+function sentBadgeHtml(ev) {
+  if (ev.sentiment_score == null) return '';
+  var s   = ev.sentiment_score;
+  var col = sentBarColor(s);
+  var lbl = s > 0.3 ? 'Bullish' : s < -0.3 ? 'Bearish' : 'Neutral';
+  return '<span class="sent-badge" style="background:' + col + '22;color:' + col
+       + ';border:1px solid ' + col + '44;font-size:8px;font-weight:700;'
+       + 'padding:1px 6px;border-radius:100px;letter-spacing:.04em">' + lbl + '</span>';
+}
+
+// ── xpPop ─────────────────────────────────────────────
+// Show an XP gain popup near the nav
+function xpPop(amount, label) {
+  var pop = document.createElement('div');
+  pop.style.cssText = 'position:fixed;top:58px;right:20px;z-index:9000;'
+    + 'background:linear-gradient(135deg,rgba(139,92,246,.9),rgba(59,130,246,.9));'
+    + 'color:#fff;padding:7px 14px;border-radius:100px;font-size:12px;font-weight:700;'
+    + 'pointer-events:none;opacity:1;transition:all .8s ease;box-shadow:0 4px 16px rgba(139,92,246,.4)';
+  pop.textContent = '+' + amount + ' XP — ' + (label || 'Nice!');
+  document.body.appendChild(pop);
+  setTimeout(function() {
+    pop.style.opacity  = '0';
+    pop.style.transform = 'translateY(-20px)';
+  }, 1200);
+  setTimeout(function() {
+    if (pop.parentNode) pop.parentNode.removeChild(pop);
+  }, 2200);
+}
+
+// ── renderAlerts ──────────────────────────────────────
+// Render the alerts list in #view-alerts
+function renderAlerts() {
+  var listEl = el('allist');
+  if (!listEl) return;
+  var alerts = G.userProfile && G.userProfile.alerts ? G.userProfile.alerts : [];
+  if (!alerts.length) {
+    listEl.innerHTML = '<div style="color:var(--t3);font-size:12px;text-align:center;padding:24px 0">'
+      + '🔔 No alerts yet. Create one above.</div>';
+    return;
+  }
+  listEl.innerHTML = alerts.map(function(a, i) {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'
+      + 'background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r8)">'
+      + '<div style="flex:1">'
+      + '<div style="font-size:11px;font-weight:600;color:var(--t1)">' + (a.name || 'Alert '+(i+1)) + '</div>'
+      + '<div style="font-size:10px;color:var(--t3);margin-top:2px">' + (a.condition || 'Custom condition') + '</div>'
+      + '</div>'
+      + '<div style="width:8px;height:8px;border-radius:50%;background:' + (a.active ? 'var(--gr)' : 'var(--t4)') + ';flex-shrink:0"></div>'
+      + '<button onclick="deleteAlert(' + i + ')" style="background:none;border:none;color:var(--t3);'
+      + 'font-size:14px;padding:2px 6px;cursor:pointer;line-height:1">&times;</button>'
+      + '</div>';
+  }).join('');
+}
+
+function deleteAlert(i) {
+  if (!G.userProfile || !G.userProfile.alerts) return;
+  G.userProfile.alerts.splice(i, 1);
+  renderAlerts();
+  toast('Alert removed', 's');
+}
+
+// ── renderProfile ─────────────────────────────────────
+// Render watchlist and alerts in #view-profile
+function renderProfile() {
+  var p  = G.userProfile || {};
+  var wl = G.watchlist   || [];
+
+  // Watchlist
+  var profwl = el('profwl');
+  if (profwl) {
+    var filter = (el('wl-filter') || {}).value || 'all';
+    var items  = filter === 'all' ? wl : wl.filter(function(w){ return w.type === filter; });
+    if (!items.length) {
+      profwl.innerHTML = '<div style="color:var(--t3);font-size:11px;padding:12px 0">No watchlist items</div>';
+    } else {
+      profwl.innerHTML = items.map(function(w) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;'
+          + 'border-bottom:1px solid var(--bd)">'
+          + '<span style="font-size:10px;padding:1px 7px;border-radius:100px;background:rgba(59,130,246,.15);'
+          + 'color:var(--b4)">' + (w.type || 'item') + '</span>'
+          + '<span style="flex:1;font-size:11px;color:var(--t1)">' + (w.name || w.value || '') + '</span>'
+          + '<button onclick="removeWL(\'' + (w.id||w.value) + '\')" style="background:none;border:none;'
+          + 'color:var(--t3);font-size:13px;cursor:pointer;padding:2px 6px">&times;</button>'
+          + '</div>';
+      }).join('');
+    }
+  }
+
+  // Profile stats
+  setEl('ps-wl', wl.length);
+
+  // Profile alerts
+  var profalerts = el('profalerts');
+  if (profalerts) {
+    var alerts = p.alerts || [];
+    profalerts.innerHTML = alerts.length
+      ? alerts.map(function(a) {
+          return '<div style="padding:8px 10px;background:var(--bg2);border-radius:var(--r8);'
+            + 'font-size:11px;color:var(--t2)">' + (a.name || 'Alert') + '</div>';
+        }).join('')
+      : '<div style="color:var(--t3);font-size:11px;padding:8px 0">No alerts configured</div>';
+  }
+
+  // Avatar / name
+  setEl('pname',  G.user  ? G.user.username : 'User');
+  setEl('pemail', G.user  ? G.user.email    : '');
+  var pav = el('pav');
+  if (pav && G.user) {
+    pav.textContent = (G.user.username||'U').slice(0,2).toUpperCase();
+    pav.style.background = G.user.avatar_color || '#3B82F6';
+  }
+}
+
+// ── loadGamification ──────────────────────────────────
+// Load and render the gamification / XP view
+function loadGamification() {
+  rq('/api/gamification/stats').then(function(data) {
+    if (!data) return _renderGamFallback();
+    // XP bar
+    setEl('gam-level-name', data.level_name   || 'Intelligence Analyst');
+    setEl('gam-xp',         data.xp_total     || 0);
+    setEl('gam-next-level', data.xp_to_next   || 100);
+    var bar = el('gam-xp-bar');
+    if (bar) {
+      var pct = Math.min(100, Math.round(((data.xp_total||0) / Math.max(data.xp_next_threshold||100, 1)) * 100));
+      bar.style.width = pct + '%';
+    }
+    setEl('gam-badges-count', data.badges_earned || 0);
+    setEl('gam-ev-viewed',    data.events_viewed || 0);
+    setEl('gam-ev-scored',    data.events_scored || 0);
+    setEl('gam-ai-q',         data.ai_queries    || 0);
+    setEl('gam-pf-c',         data.portfolios    || 0);
+    // Badges
+    var badgesEl = el('gam-badges');
+    if (badgesEl && data.badges) {
+      badgesEl.innerHTML = data.badges.map(function(b) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
+          + 'background:var(--bg2);border-radius:var(--r8)">'
+          + '<span style="font-size:20px">' + (b.icon || '🏅') + '</span>'
+          + '<div><div style="font-size:11px;font-weight:600;color:var(--t1)">' + (b.name||'') + '</div>'
+          + '<div style="font-size:9px;color:var(--t3)">' + (b.description||'') + '</div></div></div>';
+      }).join('');
+    }
+  }).catch(function() { _renderGamFallback(); });
+}
+
+function _renderGamFallback() {
+  setEl('gam-level-name', 'Intelligence Analyst');
+  setEl('gam-xp',  0);
+  var bar = el('gam-xp-bar');
+  if (bar) bar.style.width = '0%';
+  var badgesEl = el('gam-badges');
+  if (badgesEl) badgesEl.innerHTML = '<div style="color:var(--t3);font-size:11px;padding:12px 0">'
+    + 'Complete actions to earn badges</div>';
+}
+
+// ── renderMacro ───────────────────────────────────────
+// Render macro dashboard grid
+function renderMacro() {
+  var grid = el('macro-grid');
+  if (!grid) return;
+  // Show loading state then fetch
+  grid.innerHTML = '<div style="color:var(--t3);font-size:12px;text-align:center;padding:32px;grid-column:1/-1">Loading macro indicators…</div>';
+  rq('/api/macro/indicators').then(function(data) {
+    if (!data || !data.indicators || !data.indicators.length) {
+      grid.innerHTML = '<div style="color:var(--t3);font-size:12px;text-align:center;padding:32px;grid-column:1/-1">No macro data available. Check back soon.</div>';
+      return;
+    }
+    _renderMacroGrid(data.indicators);
+  }).catch(function() {
+    // Fallback with known macro categories
+    var fallback = [
+      {name:'US GDP Growth',    value:'2.8%',  change:'+0.2',  trend:'up',   cat:'USA'},
+      {name:'US CPI Inflation', value:'3.2%',  change:'-0.1',  trend:'down', cat:'USA'},
+      {name:'Fed Funds Rate',   value:'5.25%', change:'0.00',  trend:'flat', cat:'USA'},
+      {name:'EUR/USD',          value:'1.085', change:'+0.003',trend:'up',   cat:'FX'},
+      {name:'10Y Treasury',     value:'4.42%', change:'+0.05', trend:'up',   cat:'Bonds'},
+      {name:'Brent Crude',      value:'82.4',  change:'-1.2',  trend:'down', cat:'Commodities'},
+      {name:'Gold',             value:'2340',  change:'+12',   trend:'up',   cat:'Commodities'},
+      {name:'China GDP',        value:'5.2%',  change:'+0.1',  trend:'up',   cat:'Asia'},
+    ];
+    _renderMacroGrid(fallback);
+  });
+}
+
+function _renderMacroGrid(indicators) {
+  var grid = el('macro-grid');
+  if (!grid) return;
+  grid.innerHTML = indicators.map(function(ind) {
+    var up  = (ind.trend === 'up' || parseFloat(ind.change) > 0);
+    var dn  = (ind.trend === 'down' || parseFloat(ind.change) < 0);
+    var col = up ? 'var(--gr)' : dn ? 'var(--re)' : 'var(--t2)';
+    var arr = up ? '▲' : dn ? '▼' : '—';
+    return '<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r12);'
+      + 'padding:14px;display:flex;flex-direction:column;gap:4px">'
+      + '<div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">'
+      + (ind.cat || '') + '</div>'
+      + '<div style="font-size:11px;color:var(--t2);margin-bottom:2px">' + (ind.name||'') + '</div>'
+      + '<div style="font-family:var(--fh);font-size:20px;font-weight:800;color:var(--t1)">'
+      + (ind.value||'—') + '</div>'
+      + '<div style="font-size:10px;color:' + col + '">' + arr + ' ' + (ind.change||'') + '</div>'
+      + '</div>';
+  }).join('');
+}
