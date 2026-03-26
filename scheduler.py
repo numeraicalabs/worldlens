@@ -100,7 +100,34 @@ async def _poll_events():
             new_count = await _persist_events(events, db)
             await db.commit()
 
-            # Trim to max_events most recent
+            # ── Category-aware trim ─────────────────────────────
+            # Keep max_events_per_category per category (weighted by priority),
+            # then trim overall to max_events.
+            # Financial/macro categories get more slots.
+            CATEGORY_SLOTS = {
+                "ECONOMICS":    settings.max_events_per_category,
+                "FINANCE":      settings.max_events_per_category,
+                "CONFLICT":     int(settings.max_events_per_category * 0.8),
+                "GEOPOLITICS":  int(settings.max_events_per_category * 0.8),
+                "POLITICS":     int(settings.max_events_per_category * 0.6),
+                "ENERGY":       int(settings.max_events_per_category * 0.6),
+                "TECHNOLOGY":   int(settings.max_events_per_category * 0.5),
+                "DISASTER":     int(settings.max_events_per_category * 0.5),
+                "HEALTH":       int(settings.max_events_per_category * 0.4),
+                "SECURITY":     int(settings.max_events_per_category * 0.4),
+                "HUMANITARIAN": int(settings.max_events_per_category * 0.3),
+                "EARTHQUAKE":   int(settings.max_events_per_category * 0.3),
+            }
+            default_slots = int(settings.max_events_per_category * 0.3)
+            for cat, slots in CATEGORY_SLOTS.items():
+                await db.execute(
+                    """DELETE FROM events WHERE category = ? AND id NOT IN (
+                           SELECT id FROM events WHERE category = ?
+                           ORDER BY severity DESC, timestamp DESC LIMIT ?
+                       )""",
+                    (cat, cat, slots),
+                )
+            # Final overall cap by recency
             await db.execute(
                 """DELETE FROM events WHERE id NOT IN (
                        SELECT id FROM events ORDER BY timestamp DESC LIMIT ?

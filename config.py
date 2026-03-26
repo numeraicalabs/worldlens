@@ -45,7 +45,9 @@ class Settings(BaseSettings):
     admin_password: str = "admin123"          # Change in production!
     update_interval_seconds: int  = 90
     finance_interval_seconds: int = 300
-    max_events: int = 500
+    max_events: int = 2000          # Total events kept in DB
+    max_events_per_category: int = 300  # Per-category cap to ensure diversity
+    financial_priority: bool = True     # Boost ECONOMICS/FINANCE visibility
 
     # ── FinBERT / ML models ───────────────────────────────────────────
     # When True: loads ProsusAI/finbert + spaCy on startup.

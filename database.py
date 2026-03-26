@@ -128,6 +128,8 @@ async def init_db():
         CREATE INDEX IF NOT EXISTS idx_ev_cat ON events(category);
         CREATE INDEX IF NOT EXISTS idx_ev_cc ON events(country_code);
         CREATE INDEX IF NOT EXISTS idx_ev_sev ON events(severity DESC);
+        CREATE INDEX IF NOT EXISTS idx_ev_cat_sev ON events(category, severity DESC);
+        CREATE INDEX IF NOT EXISTS idx_ev_cc_ts  ON events(country_code, timestamp DESC);
         """)
         await db.commit()
         await _seed_macro(db)
