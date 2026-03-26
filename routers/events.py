@@ -22,7 +22,8 @@ def _parse_ev(r: dict) -> dict:
 
 @router.get("")
 async def get_events(
-    limit: int = Query(200, le=500),
+    limit: int = Query(500, le=1000),
+    offset: int = Query(0, ge=0),
     category: str = Query(None),
     impact: str = Query(None),
     country: str = Query(None),
@@ -43,12 +44,17 @@ async def get_events(
     if search:
         where.append("(title LIKE ? OR summary LIKE ?)"); params.extend(["%" + search + "%"] * 2)
     params.append(limit)
+    params.append(offset)
 
     async with aiosqlite.connect(settings.db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT * FROM events WHERE " + " AND ".join(where) +
-            " ORDER BY severity DESC, timestamp DESC LIMIT ?", params
+            "SELECT *, CASE category "
+            "WHEN 'ECONOMICS' THEN 1.2 WHEN 'FINANCE' THEN 1.2 "
+            "WHEN 'CONFLICT' THEN 1.1 WHEN 'GEOPOLITICS' THEN 1.0 "
+            "WHEN 'ENERGY' THEN 1.0 ELSE 0.9 END AS cat_weight "
+            "FROM events WHERE " + " AND ".join(where) +
+            " ORDER BY (severity * cat_weight) DESC, timestamp DESC LIMIT ? OFFSET ?", params
         ) as cur:
             rows = await cur.fetchall()
 

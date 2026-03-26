@@ -14,40 +14,144 @@ router = APIRouter(prefix="/api/markets", tags=["markets"])
 logger = logging.getLogger(__name__)
 
 # ── Extended asset universe ───────────────────────────
+# ISIN → yfinance symbol mapping (for ISIN search)
+ISIN_MAP: Dict[str, str] = {
+    "US0378331005": "AAPL",  "US5949181045": "MSFT",  "US67066G1040": "NVDA",
+    "US88160R1014": "TSLA",  "US4592001014": "IBM",   "US0231351067": "AMZN",
+    "US02079K3059": "GOOGL", "US30303M1027": "META",  "US46625H1005": "JPM",
+    "US38141G1040": "GS",    "US9311421039": "WMT",   "US4781601046": "JNJ",
+    "GB0031348658": "BP.L",  "GB00B03MLX29": "SHEL.L","DE0007164600": "SAP",
+    "DE0005140008": "DBK.DE","FR0000131104": "BNP.PA","FR0000120271": "TOTF.PA",
+    "CH0012221716": "ABB",   "CH0012138605": "NOVN.SW",
+    "US0605051046": "BA",    "US3696041033": "GE",    "US2561631068": "DE",
+}
+
 EXTENDED_ASSETS = {
-    # Indices
-    "^GSPC":  ("S&P 500",     "index",     "US",  ["rates","inflation","earnings","geopolitics"]),
-    "^IXIC":  ("Nasdaq",      "index",     "US",  ["tech","rates","ai","earnings"]),
-    "^DJI":   ("Dow Jones",   "index",     "US",  ["earnings","rates","macro"]),
-    "^FTSE":  ("FTSE 100",    "index",     "UK",  ["UK economy","Brexit","rates"]),
-    "^DAX":   ("DAX",         "index",     "DE",  ["Europe","energy","rates"]),
-    "^N225":  ("Nikkei 225",  "index",     "JP",  ["BoJ","JPY","exports"]),
-    "^VIX":   ("VIX",         "index",     "US",  ["fear","volatility","risk"]),
-    "^HSI":   ("Hang Seng",   "index",     "HK",  ["China","geopolitics","property"]),
-    # Commodities
-    "GC=F":   ("Gold",        "commodity", "Global", ["inflation","USD","rates","geopolitics"]),
-    "CL=F":   ("Crude Oil",   "commodity", "Global", ["OPEC","supply","geopolitics","USD"]),
-    "NG=F":   ("Natural Gas", "commodity", "Global", ["winter","supply","Europe","LNG"]),
-    "SI=F":   ("Silver",      "commodity", "Global", ["industrial","inflation","USD"]),
-    "HG=F":   ("Copper",      "commodity", "Global", ["China","industry","EV","growth"]),
-    "ZW=F":   ("Wheat",       "commodity", "Global", ["Ukraine","weather","food"]),
-    # Forex
-    "EURUSD=X":("EUR/USD",    "forex",     "EU",  ["ECB","Fed","Germany","energy"]),
-    "GBPUSD=X":("GBP/USD",    "forex",     "UK",  ["BoE","UK economy","Brexit"]),
-    "JPY=X":   ("USD/JPY",    "forex",     "JP",  ["BoJ","carry","rates","risk"]),
-    "AUDUSD=X":("AUD/USD",    "forex",     "AU",  ["China","commodities","RBA"]),
-    "DX=F":    ("USD Index",  "forex",     "US",  ["Fed","rates","safe-haven"]),
-    # Crypto
-    "BTC-USD": ("Bitcoin",    "crypto",    "Global", ["adoption","regulation","ETF","halving"]),
-    "ETH-USD": ("Ethereum",   "crypto",    "Global", ["DeFi","staking","upgrade"]),
-    "SOL-USD": ("Solana",     "crypto",    "Global", ["DeFi","NFT","ecosystem"]),
-    # Stocks
-    "AAPL":    ("Apple",      "stock",     "US",  ["iPhone","supply chain","China","AI"]),
-    "MSFT":    ("Microsoft",  "stock",     "US",  ["cloud","AI","earnings"]),
-    "NVDA":    ("NVIDIA",     "stock",     "US",  ["AI","chips","semiconductors"]),
-    "TSLA":    ("Tesla",      "stock",     "US",  ["EV","China","rates","Musk"]),
-    "XOM":     ("ExxonMobil", "stock",     "US",  ["oil","energy","dividends"]),
-    "JPM":     ("JPMorgan",   "stock",     "US",  ["banking","rates","credit"]),
+    # ── US Indices ──────────────────────────────────────────────────────
+    "^GSPC":  ("S&P 500",          "index",     "US",      ["rates","inflation","earnings","geopolitics"]),
+    "^IXIC":  ("Nasdaq Composite", "index",     "US",      ["tech","rates","AI","earnings"]),
+    "^DJI":   ("Dow Jones",        "index",     "US",      ["earnings","rates","macro"]),
+    "^RUT":   ("Russell 2000",     "index",     "US",      ["small cap","rates","domestic"]),
+    "^VIX":   ("VIX Fear Index",   "index",     "US",      ["fear","volatility","risk","hedging"]),
+    "^SP500TR":("S&P 500 TR",      "index",     "US",      ["total return","dividends"]),
+    # ── European Indices ────────────────────────────────────────────────
+    "^FTSE":  ("FTSE 100",         "index",     "UK",      ["UK economy","rates","GBP","energy"]),
+    "^DAX":   ("DAX 40",           "index",     "DE",      ["Europe","manufacturing","energy","ECB"]),
+    "^CAC40": ("CAC 40",           "index",     "FR",      ["France","Europe","luxury","banks"]),
+    "^STOXX50E":("Euro Stoxx 50",  "index",     "EU",      ["Eurozone","ECB","macro"]),
+    "^IBEX":  ("IBEX 35",          "index",     "ES",      ["Spain","banks","tourism"]),
+    # ── Asia-Pacific Indices ────────────────────────────────────────────
+    "^N225":  ("Nikkei 225",       "index",     "JP",      ["BoJ","JPY","exports","semiconductors"]),
+    "^HSI":   ("Hang Seng",        "index",     "HK",      ["China","geopolitics","tech","property"]),
+    "000001.SS":("Shanghai Composite","index",  "CN",      ["China policy","PBOC","growth"]),
+    "^AXJO":  ("ASX 200",          "index",     "AU",      ["mining","RBA","China","commodities"]),
+    "^NSEI":  ("Nifty 50",         "index",     "IN",      ["India growth","RBI","tech","manufacturing"]),
+    "^BVSP":  ("Bovespa",          "index",     "BR",      ["Brazil","commodities","Lula","rates"]),
+    # ── US Sector ETFs ──────────────────────────────────────────────────
+    "XLF":    ("Financials ETF",   "etf",       "US",      ["banks","rates","credit","Fed"]),
+    "XLE":    ("Energy ETF",       "etf",       "US",      ["oil","gas","OPEC","energy transition"]),
+    "XLK":    ("Technology ETF",   "etf",       "US",      ["tech","AI","semiconductors","earnings"]),
+    "XLV":    ("Healthcare ETF",   "etf",       "US",      ["pharma","biotech","FDA","policy"]),
+    "XLI":    ("Industrials ETF",  "etf",       "US",      ["manufacturing","defense","infrastructure"]),
+    "XLU":    ("Utilities ETF",    "etf",       "US",      ["rates","dividends","power grid"]),
+    "XLB":    ("Materials ETF",    "etf",       "US",      ["metals","chemicals","mining"]),
+    "XLRE":   ("Real Estate ETF",  "etf",       "US",      ["rates","mortgage","REITs","housing"]),
+    "XLC":    ("Comm Services ETF","etf",       "US",      ["media","telecom","internet"]),
+    "IWM":    ("iShares Russell 2000","etf",    "US",      ["small cap","rates","domestic economy"]),
+    "EEM":    ("Emerging Markets ETF","etf",    "Global",  ["China","EM","USD","commodities"]),
+    "EWJ":    ("iShares Japan ETF","etf",       "JP",      ["BoJ","JPY","Japan","Nikkei"]),
+    "GLD":    ("SPDR Gold ETF",    "etf",       "Global",  ["inflation","rates","USD","safe-haven"]),
+    "TLT":    ("20yr Treasury ETF","etf",       "US",      ["Fed","rates","inflation","deficit"]),
+    "HYG":    ("High Yield Bond ETF","etf",     "US",      ["credit","spreads","default","recession"]),
+    "LQD":    ("Corp Bond ETF",    "etf",       "US",      ["IG credit","rates","earnings"]),
+    "SHY":    ("1-3yr Treasury ETF","etf",      "US",      ["short rates","Fed","liquidity"]),
+    "ARKK":   ("ARK Innovation ETF","etf",      "US",      ["disruptive tech","growth","AI","biotech"]),
+    "KWEB":   ("KraneShares China Internet","etf","CN",    ["China tech","regulation","ADR","PBOC"]),
+    "VNQ":    ("Vanguard REIT ETF","etf",       "US",      ["real estate","rates","housing","REITs"]),
+    # ── Bond / Rate Instruments ─────────────────────────────────────────
+    "^TNX":   ("US 10Y Treasury Yield","bond",  "US",      ["Fed","inflation","deficit","rates"]),
+    "^TYX":   ("US 30Y Treasury Yield","bond",  "US",      ["long rates","fiscal","inflation"]),
+    "^IRX":   ("US 3M T-Bill Yield",  "bond",   "US",      ["Fed funds","liquidity","short rates"]),
+    "^FVX":   ("US 5Y Treasury Yield","bond",   "US",      ["breakeven","real rates","Fed"]),
+    # ── Commodities ─────────────────────────────────────────────────────
+    "GC=F":   ("Gold Futures",     "commodity", "Global",  ["inflation","USD","rates","geopolitics"]),
+    "SI=F":   ("Silver Futures",   "commodity", "Global",  ["industrial","inflation","USD","solar"]),
+    "CL=F":   ("Crude Oil (WTI)",  "commodity", "Global",  ["OPEC","supply","geopolitics","USD"]),
+    "BZ=F":   ("Brent Crude",      "commodity", "Global",  ["OPEC","Europe","sanctions","supply"]),
+    "NG=F":   ("Natural Gas",      "commodity", "Global",  ["winter","LNG","Europe","supply"]),
+    "HG=F":   ("Copper Futures",   "commodity", "Global",  ["China","EV","infrastructure","growth"]),
+    "PA=F":   ("Palladium",        "commodity", "Global",  ["auto","catalysts","Russia","supply"]),
+    "PL=F":   ("Platinum",         "commodity", "Global",  ["hydrogen","auto","South Africa"]),
+    "ZW=F":   ("Wheat Futures",    "commodity", "Global",  ["Ukraine","weather","food security","Black Sea"]),
+    "ZC=F":   ("Corn Futures",     "commodity", "Global",  ["biofuel","weather","food","USD"]),
+    "ZS=F":   ("Soybean Futures",  "commodity", "Global",  ["China","weather","Argentina","biofuel"]),
+    "CC=F":   ("Cocoa Futures",    "commodity", "Global",  ["West Africa","weather","demand","Ghana"]),
+    "KC=F":   ("Coffee Futures",   "commodity", "Global",  ["Brazil","weather","demand","supply"]),
+    "CT=F":   ("Cotton Futures",   "commodity", "Global",  ["textiles","India","weather","China"]),
+    "SB=F":   ("Sugar Futures",    "commodity", "Global",  ["biofuel","Brazil","weather","India"]),
+    # ── Forex ────────────────────────────────────────────────────────────
+    "EURUSD=X":("EUR/USD",         "forex",     "EU",      ["ECB","Fed","Germany","energy","parity"]),
+    "GBPUSD=X":("GBP/USD",         "forex",     "UK",      ["BoE","UK economy","inflation","Brexit"]),
+    "JPY=X":   ("USD/JPY",         "forex",     "JP",      ["BoJ","carry trade","rates","intervention"]),
+    "AUDUSD=X":("AUD/USD",         "forex",     "AU",      ["China","commodities","RBA","iron ore"]),
+    "USDCAD=X":("USD/CAD",         "forex",     "CA",      ["oil","BoC","trade","CAD"]),
+    "USDCHF=X":("USD/CHF",         "forex",     "CH",      ["safe-haven","SNB","rates","geopolitics"]),
+    "NZDUSD=X":("NZD/USD",         "forex",     "NZ",      ["RBNZ","commodities","China"]),
+    "USDCNH=X":("USD/CNH",         "forex",     "CN",      ["PBOC","trade war","CNY","China policy"]),
+    "USDBRL=X":("USD/BRL",         "forex",     "BR",      ["Brazil","fiscal","Lula","commodities"]),
+    "USDINR=X":("USD/INR",         "forex",     "IN",      ["RBI","India growth","trade","oil"]),
+    "USDZAR=X":("USD/ZAR",         "forex",     "ZA",      ["South Africa","mining","load shedding"]),
+    "USDTRY=X":("USD/TRY",         "forex",     "TR",      ["Turkey","Erdogan","inflation","rates"]),
+    "DX=F":    ("US Dollar Index", "forex",     "US",      ["Fed","safe-haven","trade","rates"]),
+    # ── Crypto ───────────────────────────────────────────────────────────
+    "BTC-USD": ("Bitcoin",         "crypto",    "Global",  ["ETF","halving","regulation","adoption"]),
+    "ETH-USD": ("Ethereum",        "crypto",    "Global",  ["DeFi","staking","ETF","Layer2"]),
+    "SOL-USD": ("Solana",          "crypto",    "Global",  ["DeFi","NFT","ecosystem","Firedancer"]),
+    "XRP-USD": ("Ripple XRP",      "crypto",    "Global",  ["SEC","cross-border","banks","CBDC"]),
+    "BNB-USD": ("BNB",             "crypto",    "Global",  ["Binance","DeFi","regulation","BSC"]),
+    "ADA-USD": ("Cardano",         "crypto",    "Global",  ["smart contracts","Africa","Hoskinson"]),
+    # ── US Large Cap Stocks ──────────────────────────────────────────────
+    "AAPL":   ("Apple",            "stock",     "US",      ["iPhone","supply chain","China","AI","services"]),
+    "MSFT":   ("Microsoft",        "stock",     "US",      ["cloud","AI","Copilot","Azure","gaming"]),
+    "NVDA":   ("NVIDIA",           "stock",     "US",      ["AI GPUs","data center","semiconductors","CUDA"]),
+    "GOOGL":  ("Alphabet",         "stock",     "US",      ["search","AI","cloud","advertising","antitrust"]),
+    "AMZN":   ("Amazon",           "stock",     "US",      ["cloud","e-commerce","AI","logistics"]),
+    "META":   ("Meta Platforms",   "stock",     "US",      ["social media","AI","VR","advertising"]),
+    "TSLA":   ("Tesla",            "stock",     "US",      ["EV","China","robotics","Musk","rates"]),
+    "BRK-B":  ("Berkshire Hathaway","stock",    "US",      ["Buffett","value","insurance","banks"]),
+    "LLY":    ("Eli Lilly",        "stock",     "US",      ["GLP-1","obesity","diabetes","pharma"]),
+    "V":      ("Visa",             "stock",     "US",      ["payments","consumer","rates","fintech"]),
+    "JPM":    ("JPMorgan Chase",   "stock",     "US",      ["banking","rates","credit","M&A"]),
+    "WMT":    ("Walmart",          "stock",     "US",      ["retail","consumer","inflation","emerging markets"]),
+    "XOM":    ("ExxonMobil",       "stock",     "US",      ["oil","energy","dividends","capex"]),
+    "MA":     ("Mastercard",       "stock",     "US",      ["payments","consumer","global","fintech"]),
+    "HD":     ("Home Depot",       "stock",     "US",      ["housing","rates","consumer","construction"]),
+    "PG":     ("Procter & Gamble", "stock",     "US",      ["consumer staples","inflation","emerging markets"]),
+    "UNH":    ("UnitedHealth",     "stock",     "US",      ["healthcare","ACA","pharma","Medicare"]),
+    "GS":     ("Goldman Sachs",    "stock",     "US",      ["investment banking","M&A","rates","trading"]),
+    "BAC":    ("Bank of America",  "stock",     "US",      ["banking","rates","consumer credit","mortgages"]),
+    "AVGO":   ("Broadcom",         "stock",     "US",      ["AI","semiconductors","networking","VMware"]),
+    "AMD":    ("AMD",              "stock",     "US",      ["AI","semiconductors","data center","competition"]),
+    "INTC":   ("Intel",            "stock",     "US",      ["semiconductors","foundry","competition","PC"]),
+    "CRM":    ("Salesforce",       "stock",     "US",      ["cloud","CRM","AI","enterprise"]),
+    "BA":     ("Boeing",           "stock",     "US",      ["aerospace","defense","737 MAX","supply chain"]),
+    "CAT":    ("Caterpillar",      "stock",     "US",      ["infrastructure","China","commodities","capex"]),
+    "LMT":    ("Lockheed Martin",  "stock",     "US",      ["defense","Ukraine","NATO","F-35"]),
+    "RTX":    ("RTX (Raytheon)",   "stock",     "US",      ["defense","missiles","NATO","geopolitics"]),
+    # ── European Large Cap Stocks ────────────────────────────────────────
+    "ASML.AS":("ASML",             "stock",     "NL",      ["semiconductors","EUV","Taiwan","AI"]),
+    "LVMH.PA":("LVMH",             "stock",     "FR",      ["luxury","China","EUR","consumer"]),
+    "SAP.DE": ("SAP",              "stock",     "DE",      ["enterprise software","AI","cloud","ERP"]),
+    "SHEL.L": ("Shell",            "stock",     "UK",      ["oil","LNG","energy transition","dividends"]),
+    "NOVO-B.CO":("Novo Nordisk",   "stock",     "DK",      ["GLP-1","obesity","diabetes","pharma"]),
+    "NESN.SW":("Nestlé",           "stock",     "CH",      ["consumer staples","EM","food","pricing"]),
+    # ── Asian Stocks ─────────────────────────────────────────────────────
+    "9988.HK":("Alibaba",          "stock",     "CN",      ["China tech","regulation","PBOC","e-commerce"]),
+    "700.HK": ("Tencent",          "stock",     "CN",      ["China tech","gaming","WeChat","regulation"]),
+    "005930.KS":("Samsung",        "stock",     "KR",      ["semiconductors","DRAM","smartphones","China"]),
+    "7203.T": ("Toyota",           "stock",     "JP",      ["EV","hybrid","BoJ","JPY","supply chain"]),
+    "TCS.NS": ("Tata Consultancy", "stock",     "IN",      ["IT services","India","offshoring","AI"]),
+    "RELIANCE.NS":("Reliance",     "stock",     "IN",      ["India","conglomerate","telecom","refining"]),
 }
 
 # ── Correlation pairs for each asset category ─────────
@@ -346,11 +450,49 @@ async def _guided_analysis(
 
 @router.get("/universe")
 async def get_universe():
-    """Return extended asset universe with metadata."""
+    """Return extended asset universe with latest prices from cache."""
+    from scheduler import get_finance_cache
+    cache = {a["symbol"]: a for a in get_finance_cache()}
     assets = []
     for sym, (name, cat, region, drivers) in EXTENDED_ASSETS.items():
-        assets.append({"symbol": sym, "name": name, "category": cat, "region": region, "drivers": drivers})
+        cached = cache.get(sym, {})
+        assets.append({
+            "symbol":     sym,
+            "name":       name,
+            "category":   cat,
+            "region":     region,
+            "drivers":    drivers,
+            # Live price from scheduler cache (updated every 5 min)
+            "price":      cached.get("price"),
+            "change_pct": cached.get("change_pct"),
+            "change_abs": cached.get("change_abs"),
+        })
     return {"assets": assets}
+
+
+@router.get("/search")
+async def search_assets(q: str = Query(""), isin: str = Query("")):
+    """Search assets by symbol name or ISIN code."""
+    results = []
+    # ISIN lookup
+    if isin and len(isin) == 12:
+        sym = ISIN_MAP.get(isin.upper())
+        if sym and sym in EXTENDED_ASSETS:
+            n, cat, region, drivers = EXTENDED_ASSETS[sym]
+            results.append({"symbol": sym, "name": n, "category": cat,
+                            "region": region, "isin": isin.upper(), "drivers": drivers})
+        return JSONResponse({"results": results, "query": isin, "type": "isin"})
+
+    # Text search across symbol + name
+    ql = q.lower()
+    for sym, (name, cat, region, drivers) in EXTENDED_ASSETS.items():
+        if (ql in sym.lower() or ql in name.lower() or
+                any(ql in d.lower() for d in drivers)):
+            results.append({"symbol": sym, "name": name, "category": cat,
+                            "region": region, "drivers": drivers})
+        if len(results) >= 20:
+            break
+    return JSONResponse({"results": results, "query": q, "type": "text"})
 
 
 @router.get("/ticker/{symbol}")
@@ -400,30 +542,51 @@ async def get_ticker_data(symbol: str, period: str = Query("3mo")):
 
     meta = EXTENDED_ASSETS.get(sym, (sym, "unknown", "Global", []))
 
+    prev_close = prices[-2] if len(prices) >= 2 else cur
+    change_abs = round(cur - prev_close, 4)
+    change_pct = round((cur / prev_close - 1) * 100, 3) if prev_close else 0.0
+    high_52w   = round(max(prices[-min(252,len(prices)):]), 4) if prices else cur
+    low_52w    = round(min(prices[-min(252,len(prices)):]), 4) if prices else cur
+    # Volumes (if available from yfinance)
+    volumes      = _twd.get("volumes", []) if _twd else []
+    highs        = _twd.get("highs",   []) if _twd else []
+    lows         = _twd.get("lows",    []) if _twd else []
+
     return {
-        "symbol": sym,
-        "name": meta[0],
-        "category": meta[1],
-        "region": meta[2],
-        "drivers": meta[3] if len(meta) > 3 else [],
-        "price": cur,
-        "prices": prices[-90:],       # up to 90 days for chart
-        "prices_full": prices,
-        "price_dates": _price_dates[-90:] if _price_dates else [],
-        "price_dates_full": _price_dates,
-        "perf": perf,
+        "symbol":     sym,
+        "name":       meta[0],
+        "category":   meta[1],
+        "region":     meta[2],
+        "drivers":    meta[3] if len(meta) > 3 else [],
+        # Live price & change
+        "price":      cur,
+        "change_abs": change_abs,
+        "change_pct": change_pct,
+        "high_52w":   high_52w,
+        "low_52w":    low_52w,
+        # OHLCV history (aligned with dates)
+        "prices":          prices[-90:],
+        "prices_full":     prices,
+        "price_dates":     _price_dates[-90:] if _price_dates else [],
+        "price_dates_full":_price_dates,
+        "volumes":         volumes[-90:]      if volumes else [],
+        "volumes_full":    volumes,
+        "highs":           highs[-90:]        if highs else [],
+        "lows":            lows[-90:]         if lows else [],
+        "perf":       perf,
+        "rsi":        rsi_val,
         "technicals": {
-            "rsi": rsi_val,
-            "sma20": sma20,
-            "sma50": sma50,
-            "sma200": sma200,
-            "trend": trend,
+            "rsi":            rsi_val,
+            "sma20":          sma20,
+            "sma50":          sma50,
+            "sma200":         sma200,
+            "trend":          trend,
             "volatility_pct": vol,
-            "support": sr["support"],
-            "resistance": sr["resistance"],
-            "range_low": sr["range_low"],
-            "range_high": sr["range_high"],
-            "pivot": sr["pivot"],
+            "support":        sr["support"],
+            "resistance":     sr["resistance"],
+            "range_low":      sr["range_low"],
+            "range_high":     sr["range_high"],
+            "pivot":          sr["pivot"],
         },
     }
 
