@@ -135,40 +135,62 @@ var KEX_GENERIC_SOURCES = ['wikipedia','reuters','scholar'];
 // ══════════════════════════════════════════════════════
 
 function ngSwitchMode(mode, btn) {
-  // Update tab buttons
+  // ── Tab highlight ──────────────────────────────────────
   document.querySelectorAll('.ng-tab').forEach(function(b) {
     b.classList.toggle('on', b === btn);
   });
 
-  var graphSidebar  = document.getElementById('ng-mode-graph');
-  var explorerSidebar = document.getElementById('ng-mode-explorer');
-  var ngCanvas      = document.getElementById('ng-canvas-wrap');
-  var kexCanvas     = document.getElementById('kex-canvas-wrap');
-  var modeToggle    = document.getElementById('ng-mode-toggle');
-  var zoomCtrls     = document.getElementById('ng-zoom-ctrls');
+  // ── Element refs ───────────────────────────────────────
+  var modePanels = {
+    graph:    document.getElementById('ng-mode-graph'),
+    explorer: document.getElementById('ng-mode-explorer'),
+    timeline: document.getElementById('ng-mode-timeline'),
+  };
+  var ngCanvas  = document.getElementById('ng-canvas-wrap');
+  var kexCanvas = document.getElementById('kex-canvas-wrap');
+  var tlCanvas  = document.getElementById('tl-canvas-wrap');
+  var modeToggle= document.getElementById('ng-mode-toggle');
+  var zoomCtrls = document.getElementById('ng-zoom-ctrls');
+  var infoBar   = document.getElementById('ng-info-bar');
 
-  if (mode === 'explorer') {
-    if (graphSidebar)    graphSidebar.style.display    = 'none';
-    if (explorerSidebar) explorerSidebar.style.display = 'flex';
-    if (ngCanvas)        ngCanvas.style.display        = 'none';
-    if (kexCanvas)       kexCanvas.style.display       = 'flex';
-    if (modeToggle)      modeToggle.style.display      = 'none';
-    if (zoomCtrls)       zoomCtrls.style.display       = 'none';
-    // Stop 2D/3D animation
-    if (NG.animFrame) { cancelAnimationFrame(NG.animFrame); NG.animFrame = null; }
-    if (typeof NG3D !== 'undefined' && NG3D.active) ngSetMode && ngSetMode('2d', document.getElementById('ng-btn-2d'));
-    // Init SVG
-    _kexInitSVG();
-    // Show empty state if no query yet
-    if (!KEX.query) _kexShowEmpty();
-  } else {
-    if (graphSidebar)    graphSidebar.style.display    = 'block';
-    if (explorerSidebar) explorerSidebar.style.display = 'none';
-    if (kexCanvas)       kexCanvas.style.display       = 'none';
-    if (ngCanvas)        ngCanvas.style.display        = 'block';
-    if (zoomCtrls && NG.built) zoomCtrls.style.display = 'flex';
-    // Restart 2D if graph was built
+  // ── Hide ALL sidebar panels ─────────────────────────────
+  var casSidebar = document.getElementById('ng-mode-cascade');
+  if (casSidebar) casSidebar.style.display = 'none';
+  Object.values(modePanels).forEach(function(p) {
+    if (p) p.style.display = 'none';
+  });
+
+  // ── Hide ALL canvases ───────────────────────────────────
+  if (ngCanvas)  ngCanvas.style.display  = 'none';
+  if (kexCanvas) kexCanvas.style.display = 'none';
+  if (tlCanvas)  tlCanvas.style.display  = 'none';
+  if (modeToggle) modeToggle.style.display = 'none';
+  if (zoomCtrls)  zoomCtrls.style.display  = 'none';
+  if (infoBar)    infoBar.style.display     = 'none';
+
+  // ── Stop any running animation ──────────────────────────
+  if (NG.animFrame) { cancelAnimationFrame(NG.animFrame); NG.animFrame = null; }
+
+  // ── Activate requested mode ─────────────────────────────
+  if (mode === 'graph') {
+    if (modePanels.graph) modePanels.graph.style.display = 'flex';
+    if (ngCanvas)  ngCanvas.style.display  = 'flex';
+    if (modeToggle && NG.built) modeToggle.style.display = 'flex';
+    if (zoomCtrls  && NG.built) zoomCtrls.style.display  = 'flex';
+    if (infoBar    && NG.built) infoBar.style.display     = 'flex';
     if (NG.built && !NG.animFrame) ngAnimate();
+
+  } else if (mode === 'explorer') {
+    if (modePanels.explorer) modePanels.explorer.style.display = 'flex';
+    if (kexCanvas) kexCanvas.style.display = 'flex';
+    _kexInitSVG();
+    if (!KEX.query) _kexShowEmpty();
+
+  } else if (mode === 'timeline') {
+    if (modePanels.timeline) modePanels.timeline.style.display = 'flex';
+    if (tlCanvas)  tlCanvas.style.display  = 'flex';
+    _tlInitSVG();
+    if (!TL.built) tlBuild();
   }
 }
 
