@@ -28,7 +28,7 @@ from geocoder import COUNTRIES, COUNTRY_NAMES, find_country, get_coords, get_nam
 logger = logging.getLogger(__name__)
 
 # ══════════════════════════════════════════════════════════
-# 1. RSS SOURCE LIST  (25 feeds)
+# 1. RSS SOURCE LIST  (68 feeds)
 # ══════════════════════════════════════════════════════════
 
 RSS_SOURCES: List[Tuple[str, str, float]] = [
@@ -75,6 +75,43 @@ RSS_SOURCES: List[Tuple[str, str, float]] = [
     # ── Commodity & energy ──────────────────────────────────────
     ("OilPrice",         "https://oilprice.com/rss/main",                               0.80),
     ("Platts Energy",    "https://www.spglobal.com/commodityinsights/en/rss-feed/oil",  0.88),
+    # ── Policy think tanks ──────────────────────────────────
+    ("CFR",                "https://www.cfr.org/rss/blog_feed.xml",                           0.92),
+    ("Foreign Policy",     "https://foreignpolicy.com/feed/",                                 0.91),
+    ("Politico Intl",      "https://rss.politico.com/politics-news.xml",                      0.88),
+    ("Atlantic Council",   "https://www.atlanticcouncil.org/feed/",                           0.90),
+    ("Brookings",          "https://www.brookings.edu/feed/",                                  0.92),
+    ("Carnegie",           "https://carnegieendowment.org/rss/topic/all",                     0.91),
+    ("IISS",               "https://www.iiss.org/rss/online-analysis",                        0.90),
+    ("SIPRI",              "https://www.sipri.org/rss.xml",                                   0.93),
+    ("Vox EU",             "https://cepr.org/voxeu/rss.xml",                                  0.90),
+    ("Project Syndicate",  "https://www.project-syndicate.org/rss",                           0.89),
+    ("Defense News",       "https://www.defensenews.com/rss/",                                0.87),
+    # ── Expanded institutional ───────────────────────────────
+    ("WTO",                "https://www.wto.org/english/news_e/news_e.rss",                   0.97),
+    ("US Treasury",        "https://home.treasury.gov/system/files/126/ofac_rss.xml",         0.97),
+    # ── Expanded financial ───────────────────────────────────
+    ("WSJ World",          "https://feeds.a.dj.com/rss/RSSWorldNews.xml",                     0.93),
+    ("WSJ Markets",        "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",                   0.93),
+    ("Economist",          "https://www.economist.com/finance-and-economics/rss.xml",         0.94),
+    ("Bloomberg Tech",     "https://feeds.bloomberg.com/technology/news.rss",                 0.92),
+    ("Reuters Tech",       "https://feeds.reuters.com/reuters/technologyNews",                 0.94),
+    # ── Regional depth ────────────────────────────────────────
+    ("Nikkei Asia",        "https://asia.nikkei.com/rss/feed/nar",                            0.89),
+    ("Caixin Global",      "https://www.caixinglobal.com/rss/homepage.xml",                   0.86),
+    ("Dawn Pakistan",      "https://www.dawn.com/feeds/latest",                               0.82),
+    ("Hindustan Times",    "https://www.hindustantimes.com/feeds/rss/world-news/rssfeed.xml", 0.80),
+    ("Arab News",          "https://www.arabnews.com/rss.xml",                                0.81),
+    ("Jerusalem Post",     "https://www.jpost.com/rss/rssfeedsheadlines.aspx",                0.80),
+    ("Daily Sabah",        "https://www.dailysabah.com/rss",                                  0.78),
+    ("Africa Report",      "https://www.theafricareport.com/feed/",                           0.82),
+    ("AllAfrica",          "https://allafrica.com/tools/headlines/rdf/latest/headlines.rdf",  0.80),
+    # ── Commodity expanded ───────────────────────────────────
+    ("Agrimoney",          "https://www.agrimoney.com/rss.xml",                               0.78),
+    # ── Technology ───────────────────────────────────────────
+    ("Wired",              "https://www.wired.com/feed/rss",                                  0.83),
+    ("MIT Tech Review",    "https://www.technologyreview.com/feed/",                          0.88),
+    ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/",                 0.78),
 ]
 
 SOURCE_CREDIBILITY: Dict[str, float] = {
@@ -161,6 +198,146 @@ RELATED_MARKETS: Dict[str, List[str]] = {
     "SECURITY":     ["Defense ETF", "Gold", "Oil"],
     "HUMANITARIAN": ["Food Commodities", "Agriculture ETF"],
 }
+
+
+# ══════════════════════════════════════════════════════════
+# SENTIMENT ENGINE  (rule-based)
+# ══════════════════════════════════════════════════════════
+
+_POS_WORDS = {
+    "agreement","approve","boost","breakthrough","ceasefire","cooperate","deal",
+    "diplomacy","easing","gains","growth","improve","increase","invest","optimism",
+    "peace","progress","rally","recovery","reform","resolve","rise","stabilise",
+    "stabilize","success","summit","support","surge","talks","upgrade","aid",
+    "alliance","bilateral","commitment","cooperation","expansion","export","fund",
+    "historic","invest","joint","landmark","milestone","modernise","partnership",
+    "positive","profit","prosperity","raise","ratify","rebound","reconcile",
+    "reduce","reform","sign","strengthen","treaty","trust","unite","victory",
+}
+
+_NEG_WORDS = {
+    "attack","ban","blockade","bomb","breach","clash","collapse","conflict","coup",
+    "crash","crisis","cut","death","decline","default","deficit","destabilise",
+    "deteriorate","disaster","dispute","drought","embargo","escalate","explosion",
+    "fail","fallout","famine","flee","flood","freeze","halt","impose","inflation",
+    "instability","invasion","kill","loss","military","missile","panic","plunge",
+    "poverty","protest","recession","refugee","sanctions","seize","shooting",
+    "shrink","slump","starvation","strike","tension","terrorism","threat","unrest",
+    "violence","war","withdraw","worsen","condemn","accuse","arrest","casualty",
+    "contaminate","corrupt","crime","cyber","damage","danger","defeat","destroy",
+    "discrimination","displacement","earthquake","emergency","enemy","genocide",
+    "harm","hate","hostile","injustice","kidnap","massacre","militant","murder",
+    "opposition","oppression","persecution","plague","polarise","rebel","riot",
+    "sabotage","siege","slaughter","suppress","terror","torture","trafficking",
+    "tyranny","undermine","uprising","violation","volcano","weapon","wound",
+}
+
+_UNCERTAINTY_WORDS = {
+    "unclear","uncertain","could","might","possible","potential","may","risk",
+    "concern","worry","fear","warn","warning","caution","volatile","unpredictable",
+    "escalate","unknown","dispute","contested","alleged","reportedly","unconfirmed",
+}
+
+def compute_sentiment(text: str):
+    """Returns (score –1..+1, tone str, uncertainty 0..1)."""
+    words   = re.findall(r"\b\w+\b", text.lower())
+    n       = max(len(words), 1)
+    pos     = sum(1 for w in words if w in _POS_WORDS)
+    neg     = sum(1 for w in words if w in _NEG_WORDS)
+    unc     = sum(1 for w in words if w in _UNCERTAINTY_WORDS)
+    bigrams = [words[i]+" "+words[i+1] for i in range(len(words)-1)]
+    pos    += sum(1 for b in bigrams if b in _POS_WORDS)
+    neg    += sum(1 for b in bigrams if b in _NEG_WORDS)
+    raw     = (pos - neg) / math.sqrt(n)
+    score   = max(-1.0, min(1.0, raw * 3))
+    if score > 0.2:       tone = "positive"
+    elif score < -0.2:    tone = "negative"
+    elif pos > 0 and neg > 0: tone = "mixed"
+    else:                 tone = "neutral"
+    return round(score, 3), tone, round(min(1.0, unc / max(n*0.05,1)), 3)
+
+
+# ══════════════════════════════════════════════════════════
+# KEYWORD EXTRACTOR  (for timeline clustering)
+# ══════════════════════════════════════════════════════════
+
+_STOP_WORDS_KW = frozenset({
+    "the","a","an","and","or","but","in","on","at","to","for","of","is","are",
+    "was","were","be","been","have","has","had","will","would","could","should",
+    "this","that","with","from","by","as","not","says","said","after","amid",
+    "over","its","their","they","them","who","what","when","where","how","why",
+    "also","new","more","can","may","after","before","into","than","other",
+    "about","which","report","reports","update","latest","breaking","world",
+    "global","international","officials","government","country","countries",
+    "2024","2025","2026",
+})
+
+def extract_keywords(title: str, body: str, n: int = 6) -> List[str]:
+    """Extract top-n keywords via TF-IDF-lite."""
+    text  = f"{title} {title} {body}"
+    words = re.findall(r"\b[a-zA-Z]{4,}\b", text.lower())
+    freq: Dict[str, int] = {}
+    for w in words:
+        if w not in _STOP_WORDS_KW:
+            freq[w] = freq.get(w, 0) + 1
+    clean = [w for w in words if w not in _STOP_WORDS_KW]
+    for i in range(len(clean)-1):
+        bi = f"{clean[i]} {clean[i+1]}"
+        freq[bi] = freq.get(bi, 0) + 2
+    return [w for w,_ in sorted(freq.items(), key=lambda x:-x[1])[:n]]
+
+
+# ══════════════════════════════════════════════════════════
+# NARRATIVE ID + TIMELINE BAND
+# ══════════════════════════════════════════════════════════
+
+def narrative_id(title: str) -> str:
+    """Stable short hash — groups related stories on the timeline."""
+    t     = re.sub(r"[^a-z0-9 ]", "", title.lower())
+    words = [w for w in t.split() if w not in _STOP_WORDS_KW and len(w)>3]
+    words.sort()
+    return hashlib.md5(" ".join(words[:6]).encode()).hexdigest()[:8]
+
+
+_BAND_RULES_TL: List[Tuple[List[str], str]] = [
+    (["war","conflict","military","troops","airstrike","offensive","ceasefire",
+      "shelling","frontline","attack","bomb","missile","naval","drone"], "conflict"),
+    (["sanction","geopolit","diplomacy","summit","treaty","nuclear","nato",
+      "alliance","coup","election","protest","parliament"], "geopolitical"),
+    (["gdp","inflation","interest rate","fed","ecb","central bank","monetary",
+      "fiscal","recession","unemployment","cpi","pmi","tariff","trade war",
+      "rate hike","rate cut","fomc","quantitative"], "macro"),
+    (["stock","nasdaq","dow","s&p","bond","yield","crypto","bitcoin","ipo",
+      "earnings","market crash","rally","volatility","hedge fund","etf",
+      "forex","currency","liquidity"], "markets"),
+    (["oil","gas","opec","pipeline","lng","energy","solar","wind","nuclear power",
+      "brent","wti","natural gas","energy crisis"], "energy"),
+    (["earthquake","hurricane","typhoon","flood","wildfire","tsunami","volcano",
+      "cyclone","disaster","climate","drought","storm"], "disaster"),
+    (["ai","artificial intelligence","semiconductor","chip","cyber","hack",
+      "data breach","quantum","5g","space","launch","satellite","tech"], "tech"),
+    (["famine","refugee","displaced","humanitarian","aid","unicef","unhcr",
+      "food insecurity","starvation","cholera","pandemic","vaccine"], "humanitarian"),
+]
+
+def timeline_band(text: str) -> str:
+    tl = text.lower()
+    best = ("geopolitical", 0)
+    for keywords, band in _BAND_RULES_TL:
+        hits = sum(1 for kw in keywords if kw in tl)
+        if hits > best[1]:
+            best = (band, hits)
+    return best[0]
+
+
+def _recency_factor(ts_str: str) -> float:
+    try:
+        dt  = datetime.fromisoformat(ts_str)
+        age = (datetime.utcnow() - dt).total_seconds() / 3600
+        return round(max(0.4, math.exp(-age / 72)), 3)
+    except Exception:
+        return 0.7
+
 
 
 def classify(text: str) -> Tuple[str, float, List[str]]:
@@ -462,6 +639,7 @@ def build_event(item: Dict, source: str, credibility: float = 0.80) -> Optional[
 
         full_text = f"{title} {desc}"
         category, score, markets = classify(full_text)
+        sent_score, sent_tone, _ = compute_sentiment(full_text)
         cc  = find_country_enhanced(full_text)
         lat, lon = get_coords(cc)
 
@@ -496,6 +674,14 @@ def build_event(item: Dict, source: str, credibility: float = 0.80) -> Optional[
             "source_count":     1,
             "source_list":      [source],
             "sent_credibility": credibility,
+            # ── Enriched fields for Timeline Graph ──
+            "sentiment_score":  sent_score,
+            "sentiment_tone":   sent_tone,
+            "market_impact":    round(min(1.0, score / 10.0 * (abs(sent_score) + 0.1)), 3),
+            "keywords":         extract_keywords(title, desc, n=6),
+            "narrative_id":     narrative_id(title),
+            "timeline_band":    timeline_band(full_text),
+            "heat_index":       round(score * _recency_factor(ts), 2),
         }
     except Exception as e:
         logger.debug("build_event error (%s): %s", source, e)
@@ -681,6 +867,17 @@ def _dedup_events(events: List[Dict]) -> List[Dict]:
             rep["sent_credibility"] = max(
                 e.get("sent_credibility", 0.75) for e in group
             )
+            # Recalc heat with boosted severity
+            rec = _recency_factor(rep.get("timestamp",""))
+            rep["heat_index"] = round(rep["severity"] * rec, 2)
+            # Merge keywords
+            all_kw: List[str] = []
+            for e in group:
+                all_kw.extend(e.get("keywords", []))
+            kw_freq: Dict[str,int] = {}
+            for w in all_kw:
+                kw_freq[w] = kw_freq.get(w,0) + 1
+            rep["keywords"] = [w for w,_ in sorted(kw_freq.items(),key=lambda x:-x[1])[:6]]
             result.append(rep)
 
     return result
@@ -715,13 +912,22 @@ async def fetch_all_events() -> List[Dict]:
                 before = len(raw)
                 # Financial/institutional feeds: up to 40 items; others 20
                 FINANCIAL_SOURCES = {
-                    "Bloomberg Mkts", "Bloomberg Econ", "FT Headlines",
+                    "Bloomberg Mkts", "Bloomberg Econ", "Bloomberg Tech",
+                    "FT Headlines", "WSJ World", "WSJ Markets", "Economist",
                     "CNBC Finance", "CNBC World", "MarketWatch", "Investing.com",
                     "Yahoo Finance", "Seeking Alpha", "ECB Press", "IMF News",
-                    "World Bank", "BIS", "OECD", "Reuters Business",
-                    "Guardian Business", "Aljazeera Econ", "OilPrice", "Platts Energy",
+                    "World Bank", "BIS", "OECD", "WTO", "US Treasury",
+                    "Reuters Business", "Reuters Tech", "Guardian Business",
+                    "Aljazeera Econ", "OilPrice", "Platts Energy", "Agrimoney",
+                    "CoinDesk",
                 }
-                item_limit = 40 if source in FINANCIAL_SOURCES else 20
+                PREMIUM_SOURCES = {
+                    "CFR", "Foreign Policy", "Atlantic Council", "Brookings",
+                    "Carnegie", "IISS", "SIPRI", "Defense News", "Politico Intl",
+                    "Vox EU", "Project Syndicate", "Nikkei Asia", "Caixin Global",
+                    "Economist",
+                }
+                item_limit = 40 if source in FINANCIAL_SOURCES else 30 if source in PREMIUM_SOURCES else 20
                 for item in items[:item_limit]:
                     ev = build_event(item, source, credibility)
                     if ev:
@@ -775,6 +981,36 @@ async def fetch_all_events() -> List[Dict]:
     except Exception as e:
         logger.warning("EONET fetch error: %s", e)
 
+    # ── GDELT ─────────────────────────────────────────────
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as gdelt_client:
+            resp = await gdelt_client.get(
+                "https://api.gdeltproject.org/api/v2/doc/doc"
+                "?query=crisis+OR+conflict+OR+economy+OR+sanctions"
+                "&mode=artlist&maxrecords=60&sort=hybridrel&format=json"
+            )
+            resp.raise_for_status()
+            articles = resp.json().get("articles", [])
+            gdelt_added = 0
+            for art in articles:
+                title_g = (art.get("title") or "").strip()
+                url_g   = (art.get("url") or "").strip()
+                ts_g    = art.get("seendate","")
+                try:
+                    ts_g = datetime.strptime(ts_g, "%Y%m%dT%H%M%SZ").isoformat()
+                except Exception:
+                    ts_g = datetime.utcnow().isoformat()
+                if not title_g or len(title_g) < 8:
+                    continue
+                fake = {"title": title_g, "link": url_g, "pubDate": ts_g, "description":""}
+                ev = build_event(fake, art.get("domain","GDELT")[:30], credibility=0.78)
+                if ev:
+                    raw.append(ev)
+                    gdelt_added += 1
+            logger.info("GDELT: %d events added", gdelt_added)
+    except Exception as e:
+        logger.warning("GDELT fetch error: %s", e)
+
     logger.info("Total raw events before dedup: %d", len(raw))
 
     # ── Deduplicate ───────────────────────────────────────
@@ -788,10 +1024,19 @@ async def fetch_all_events() -> List[Dict]:
         cat_dist[ev.get("category", "?")] = cat_dist.get(ev.get("category", "?"), 0) + 1
     logger.info("Category distribution: %s", cat_dist)
 
-    # Log geo distribution
-    geo_xx = sum(1 for ev in deduped if ev.get("country_code") == "XX")
-    logger.info("Geo: %d/%d events geolocated (%.0f%%)",
-                len(deduped) - geo_xx, len(deduped),
-                100 * (len(deduped) - geo_xx) / max(len(deduped), 1))
-
+    # Distribution
+    cat_dist: Dict[str,int]  = {}
+    band_dist: Dict[str,int] = {}
+    geo_xx = 0
+    for ev in deduped:
+        c = ev.get("category","?")
+        cat_dist[c] = cat_dist.get(c, 0) + 1
+        b = ev.get("timeline_band","?")
+        band_dist[b] = band_dist.get(b, 0) + 1
+        if ev.get("country_code") == "XX":
+            geo_xx += 1
+    logger.info("Categories:    %s", cat_dist)
+    logger.info("Timeline bands:%s", band_dist)
+    logger.info("Geo:           %.0f%% geolocated",
+                100*(len(deduped)-geo_xx)/max(len(deduped),1))
     return deduped
