@@ -4397,3 +4397,114 @@ input[type="checkbox"], input[type="radio"] {
   .db-kpi-strip { grid-template-columns: repeat(2, 1fr); }
   .db-greeting-title { font-size: 18px; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   KNOWLEDGE EXPLORER — Graph view tab switcher + explorer UI
+═══════════════════════════════════════════════════════════ */
+
+/* ── Tab bar (replaces sidebar title) ───────────────────── */
+.ng-tab-bar {
+  display: flex;
+  gap: 3px;
+  padding: 10px 10px 0;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--bd);
+  flex-shrink: 0;
+}
+.ng-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 6px;
+  border-radius: var(--r8) var(--r8) 0 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--t3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all .15s;
+  border-bottom: 2px solid transparent;
+}
+.ng-tab:hover { color: var(--t1); background: var(--bg2); }
+.ng-tab.on {
+  color: var(--b4);
+  background: var(--bg2);
+  border-bottom-color: var(--b5);
+}
+.ng-tab span { font-size: 12px; }
+
+/* ── Explorer sidebar chip pills ────────────────────────── */
+.kex-chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 100px;
+  font-size: 9px;
+  font-weight: 600;
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  color: var(--t2);
+  cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap;
+}
+.kex-chip:hover {
+  background: rgba(59,130,246,.15);
+  border-color: var(--b5);
+  color: var(--b4);
+}
+
+/* ── Explorer sidebar node rows ─────────────────────────── */
+.kex-node-row {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 7px;
+  border-radius: var(--r8);
+  cursor: pointer;
+  transition: background .1s;
+  margin-bottom: 2px;
+}
+.kex-node-row:hover { background: rgba(255,255,255,.06); }
+
+/* ── Explorer canvas view-btn ───────────────────────────── */
+.kex-view-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r4);
+  border: 1px solid var(--bd);
+  background: var(--bg2);
+  color: var(--t3);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.kex-view-btn:hover { border-color: var(--b5); color: var(--b4); }
+.kex-view-btn.on {
+  background: rgba(59,130,246,.15);
+  border-color: var(--b5);
+  color: var(--b4);
+}
+
+/* ── SVG canvas ─────────────────────────────────────────── */
+#kex-svg-wrap {
+  cursor: grab;
+  background: var(--bg0);
+}
+#kex-svg-wrap:active { cursor: grabbing; }
+#kex-svg { display: block; }
+
+/* ── Node detail panel at bottom of explorer sidebar ────── */
+#kex-node-detail {
+  background: var(--bg2);
+}
+
+/* ── Topbar layout ──────────────────────────────────────── */
+#kex-topbar {
+  background: var(--bg1);
+  flex-shrink: 0;
+}
