@@ -12,11 +12,18 @@ router = APIRouter(prefix="/api/events", tags=["events"])
 
 def _parse_ev(r: dict) -> dict:
     ev = dict(r)
-    for field in ("related_markets", "ai_tags"):
+    for field in ("related_markets", "ai_tags", "keywords", "source_list", "ner_entities"):
         try:
             ev[field] = json.loads(ev.get(field) or "[]")
         except Exception:
             ev[field] = []
+    # Ensure new fields have defaults
+    ev.setdefault("sentiment_score",  0.0)
+    ev.setdefault("sentiment_tone",   "neutral")
+    ev.setdefault("timeline_band",    "geopolitical")
+    ev.setdefault("heat_index",       ev.get("severity", 5.0))
+    ev.setdefault("market_impact",    0.0)
+    ev.setdefault("narrative_id",     "")
     return ev
 
 
