@@ -207,6 +207,13 @@ async def migrate_sentiment_columns():
             # Narrative / topic embedding fingerprint (compressed)
             "topic_vector":          "TEXT DEFAULT ''",    # JSON array of 8 floats (topic fingerprint)
             "narrative_cluster":     "INTEGER DEFAULT -1", # cluster id (-1 = unassigned)
+            # Timeline Graph fields
+            "sentiment_tone":        "TEXT DEFAULT 'neutral'",
+            "keywords":              "TEXT DEFAULT '[]'",
+            "narrative_id":          "TEXT DEFAULT ''",
+            "timeline_band":         "TEXT DEFAULT 'geopolitical'",
+            "heat_index":            "REAL DEFAULT 0.0",
+            "market_impact":         "REAL DEFAULT 0.0",
         }
         for col, typedef in new_cols.items():
             if col not in cols:

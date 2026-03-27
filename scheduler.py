@@ -53,8 +53,10 @@ async def _persist_events(events, db) -> int:
                    (id, timestamp, title, summary, category, source,
                     latitude, longitude, country_code, country_name,
                     severity, impact, url, ai_impact_score, related_markets,
-                    topic_vector, source_count, source_list, sent_credibility)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    topic_vector, source_count, source_list, sent_credibility,
+                    sentiment_score, sentiment_tone, keywords, narrative_id,
+                    timeline_band, heat_index, market_impact)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     ev["id"],
                     ev["timestamp"],
@@ -75,6 +77,13 @@ async def _persist_events(events, db) -> int:
                     ev.get("source_count", 1),
                     json.dumps(ev.get("source_list", [ev.get("source", "")])),
                     ev.get("sent_credibility", 0.75),
+                    ev.get("sentiment_score", 0.0),
+                    ev.get("sentiment_tone", "neutral"),
+                    json.dumps(ev.get("keywords", [])),
+                    ev.get("narrative_id", ""),
+                    ev.get("timeline_band", "geopolitical"),
+                    ev.get("heat_index", 0.0),
+                    ev.get("market_impact", 0.0),
                 ),
             )
             new_count += 1
