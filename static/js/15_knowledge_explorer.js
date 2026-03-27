@@ -145,52 +145,83 @@ function ngSwitchMode(mode, btn) {
     graph:    document.getElementById('ng-mode-graph'),
     explorer: document.getElementById('ng-mode-explorer'),
     timeline: document.getElementById('ng-mode-timeline'),
+    cascade:  document.getElementById('ng-mode-cascade'),
   };
-  var ngCanvas  = document.getElementById('ng-canvas-wrap');
-  var kexCanvas = document.getElementById('kex-canvas-wrap');
-  var tlCanvas  = document.getElementById('tl-canvas-wrap');
-  var modeToggle= document.getElementById('ng-mode-toggle');
-  var zoomCtrls = document.getElementById('ng-zoom-ctrls');
-  var infoBar   = document.getElementById('ng-info-bar');
 
-  // ── Hide ALL sidebar panels ─────────────────────────────
-  var casSidebar = document.getElementById('ng-mode-cascade');
-  if (casSidebar) casSidebar.style.display = 'none';
+  // Canvas-wrap is the SHARED positioning parent — always stays display:flex.
+  // Only its CHILDREN (ng-canvas, kex/tl/cas wraps) are swapped.
+  var ngCanvasWrap = document.getElementById('ng-canvas-wrap');
+  var ngCanvas     = document.getElementById('ng-canvas');     // the <canvas> element
+  var ngEmpty      = document.getElementById('ng-empty');
+  var ngLoading    = document.getElementById('ng-loading');
+  var kexCanvas    = document.getElementById('kex-canvas-wrap');
+  var tlCanvas     = document.getElementById('tl-canvas-wrap');
+  var casCanvas    = document.getElementById('cas-canvas-wrap');
+  var modeToggle   = document.getElementById('ng-mode-toggle');
+  var zoomCtrls    = document.getElementById('ng-zoom-ctrls');
+  var infoBar      = document.getElementById('ng-info-bar');
+
+  // ── Keep canvas-wrap always visible (positioning parent) ─
+  if (ngCanvasWrap) ngCanvasWrap.style.display = 'flex';
+
+  // ── Hide ALL sidebar panels ────────────────────────────
   Object.values(modePanels).forEach(function(p) {
     if (p) p.style.display = 'none';
   });
 
-  // ── Hide ALL canvases ───────────────────────────────────
-  if (ngCanvas)  ngCanvas.style.display  = 'none';
-  if (kexCanvas) kexCanvas.style.display = 'none';
-  if (tlCanvas)  tlCanvas.style.display  = 'none';
+  // ── Hide ALL overlay canvases (absolute children) ──────
+  // Do NOT hide ngCanvasWrap itself — only its children
+  if (ngCanvas)   ngCanvas.style.display   = 'none';
+  if (ngEmpty)    ngEmpty.style.display    = 'none';
+  if (kexCanvas)  kexCanvas.style.display  = 'none';
+  if (tlCanvas)   tlCanvas.style.display   = 'none';
+  if (casCanvas)  casCanvas.style.display  = 'none';
   if (modeToggle) modeToggle.style.display = 'none';
   if (zoomCtrls)  zoomCtrls.style.display  = 'none';
-  if (infoBar)    infoBar.style.display     = 'none';
+  if (infoBar)    infoBar.style.display    = 'none';
 
-  // ── Stop any running animation ──────────────────────────
+  // ── Stop animation ─────────────────────────────────────
   if (NG.animFrame) { cancelAnimationFrame(NG.animFrame); NG.animFrame = null; }
 
-  // ── Activate requested mode ─────────────────────────────
+  // ── Activate requested mode ────────────────────────────
   if (mode === 'graph') {
     if (modePanels.graph) modePanels.graph.style.display = 'flex';
-    if (ngCanvas)  ngCanvas.style.display  = 'flex';
-    if (modeToggle && NG.built) modeToggle.style.display = 'flex';
-    if (zoomCtrls  && NG.built) zoomCtrls.style.display  = 'flex';
-    if (infoBar    && NG.built) infoBar.style.display     = 'flex';
-    if (NG.built && !NG.animFrame) ngAnimate();
+    // Show the 2D canvas (or empty state)
+    if (NG.built) {
+      if (ngCanvas)  ngCanvas.style.display  = 'block';
+      if (modeToggle) modeToggle.style.display = 'flex';
+      if (zoomCtrls)  zoomCtrls.style.display  = 'flex';
+      if (infoBar)    infoBar.style.display     = 'flex';
+      if (!NG.animFrame) ngAnimate();
+    } else {
+      if (ngEmpty) ngEmpty.style.display = 'flex';
+    }
 
   } else if (mode === 'explorer') {
     if (modePanels.explorer) modePanels.explorer.style.display = 'flex';
-    if (kexCanvas) kexCanvas.style.display = 'flex';
-    _kexInitSVG();
-    if (!KEX.query) _kexShowEmpty();
+    if (kexCanvas)  kexCanvas.style.display  = 'flex';
+    // Measure after display:flex is applied
+    requestAnimationFrame(function() {
+      _kexInitSVG();
+      if (!KEX.query) _kexShowEmpty();
+    });
 
   } else if (mode === 'timeline') {
     if (modePanels.timeline) modePanels.timeline.style.display = 'flex';
     if (tlCanvas)  tlCanvas.style.display  = 'flex';
-    _tlInitSVG();
-    if (!TL.built) tlBuild();
+    requestAnimationFrame(function() {
+      _tlInitSVG();
+      if (!TL.built) tlBuild();
+      else if (TL.nodes && TL.nodes.length) _tlRender();
+    });
+
+  } else if (mode === 'cascade') {
+    if (modePanels.cascade) modePanels.cascade.style.display = 'flex';
+    if (casCanvas)  casCanvas.style.display  = 'flex';
+    requestAnimationFrame(function() {
+      _casInitSVG();
+      if (!CAS.nodes.length) _casShowEmpty();
+    });
   }
 }
 
@@ -469,18 +500,27 @@ function _kexInitSVG() {
   var svg  = document.getElementById('kex-svg');
   if (!svg || !wrap) return;
 
-  KEX.W = wrap.offsetWidth  || 700;
-  KEX.H = wrap.offsetHeight || 500;
+  // Update dimensions (wrap must be visible/display:flex when this is called)
+  var w = wrap.offsetWidth  || 700;
+  var h = wrap.offsetHeight || 500;
+  KEX.W   = w;
+  KEX.H   = h;
   KEX.svg = svg;
-  KEX.zoom = 1;
-  KEX.panX = 0;
-  KEX.panY = 0;
 
-  svg.setAttribute('viewBox', '0 0 ' + KEX.W + ' ' + KEX.H);
-  svg.innerHTML = '<g id="kex-g" transform="translate(0,0) scale(1)"></g>';
-  KEX.svgG = document.getElementById('kex-g');
+  svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
 
-  // Pan/zoom via mouse
+  // Ensure the transform group exists
+  if (!document.getElementById('kex-g')) {
+    svg.innerHTML = '<g id="kex-g" transform="translate(0,0) scale(1)"></g>';
+    KEX.svgG = document.getElementById('kex-g');
+    // Register pan/zoom listeners ONCE
+    _kexRegisterInteractions(svg);
+  } else {
+    KEX.svgG = document.getElementById('kex-g');
+  }
+}
+
+function _kexRegisterInteractions(svg) {
   var isPanning = false;
   var panStart  = {x:0, y:0};
   var panOrig   = {x:0, y:0};
@@ -501,7 +541,7 @@ function _kexInitSVG() {
   });
   window.addEventListener('mouseup', function() {
     isPanning = false;
-    svg.style.cursor = 'grab';
+    if (svg) svg.style.cursor = 'grab';
   });
   svg.addEventListener('wheel', function(e) {
     e.preventDefault();
@@ -509,9 +549,6 @@ function _kexInitSVG() {
     KEX.zoom   = Math.max(0.2, Math.min(4, KEX.zoom * factor));
     _kexApplyTransform();
   }, {passive: false});
-
-  // Touch pinch
-  var _touchStart = null;
   svg.addEventListener('touchstart', function(e) {
     if (e.touches.length === 1) {
       isPanning = true;

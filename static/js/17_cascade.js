@@ -43,28 +43,7 @@ var CAS_NODE_COLORS = {
 // 2.  ngSwitchMode EXTENSION FOR CASCADE
 // ══════════════════════════════════════════════════════
 
-(function() {
-  var _prev = ngSwitchMode;
-  ngSwitchMode = function(mode, btn) {
-    // Run the base handler (handles graph/explorer/timeline)
-    _prev(mode, btn);
-
-    var casCanvas  = document.getElementById('cas-canvas-wrap');
-    var casSidebar = document.getElementById('ng-mode-cascade');
-
-    if (mode === 'cascade') {
-      // Base handler already hid everything else; show cascade pieces
-      if (casSidebar) casSidebar.style.display = 'flex';
-      if (casCanvas)  casCanvas.style.display  = 'flex';
-      _casInitSVG();
-      _casShowEmpty();
-    } else {
-      // Hide cascade pieces when switching away
-      if (casSidebar) casSidebar.style.display = 'none';
-      if (casCanvas)  casCanvas.style.display  = 'none';
-    }
-  };
-})();
+// ngSwitchMode: cascade mode handled in 15_knowledge_explorer.js
 
 // ══════════════════════════════════════════════════════
 // 3.  CASCADE SIMULATION  (calls /api/dependency/*)
