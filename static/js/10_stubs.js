@@ -27,41 +27,247 @@
 
 // ── 1. ONBOARDING FLOW ────────────────────────────────────────
 
-var OB = { step: 1, maxStep: 5 };
+// ── ONBOARDING ────────────────────────────────────────────────
 
+var OB = {
+  step: 1,
+  maxStep: 6,
+  prefs: { interests: [], regions: [], riskLevel: 'moderate' }
+};
+
+// Step definitions — title, subtitle, body HTML
+
+function _obInterestPicker() {
+  var options = [
+    {id:'geopolitics', icon:'&#x1F310;', label:'Geopolitics'},
+    {id:'finance',     icon:'&#x1F4C8;', label:'Finance'},
+    {id:'macro',       icon:'&#x1F3E6;', label:'Macro Econ'},
+    {id:'technology',  icon:'&#x1F4BB;', label:'Technology'},
+    {id:'energy',      icon:'&#x26A1;',  label:'Energy'},
+    {id:'conflict',    icon:'&#x2694;',  label:'Conflict'},
+    {id:'trade',       icon:'&#x1F6A2;', label:'Trade'},
+    {id:'climate',     icon:'&#x1F331;', label:'Climate'},
+  ];
+  var h = '<div style="margin-bottom:8px;font-size:11px;color:var(--t3)">Select all that apply:</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px">';
+  options.forEach(function(o) {
+    var sel = OB.prefs.interests.indexOf(o.id) > -1;
+    h += '<div onclick="obToggleInterest(\'' + o.id + '\',this)"'
+       + ' style="background:' + (sel ? 'rgba(59,130,246,.12)' : 'var(--bg2)') + ';'
+       + 'border:1px solid ' + (sel ? 'var(--b5)' : 'var(--bd)') + ';'
+       + 'border-radius:8px;padding:10px 6px;text-align:center;cursor:pointer;transition:all .15s">'
+       + '<div style="font-size:20px;margin-bottom:4px">' + o.icon + '</div>'
+       + '<div style="font-size:9px;font-weight:600;color:var(--t1)">' + o.label + '</div>'
+       + '</div>';
+  });
+  return h + '</div>';
+}
+
+function _obRegionPicker() {
+  var regions = ['USA','Europe','Asia','Middle East','Africa','Latin America','Global'];
+  var h = '<div style="margin-bottom:8px;font-size:11px;color:var(--t3)">Select regions of interest:</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:7px">';
+  regions.forEach(function(r) {
+    var sel = OB.prefs.regions.indexOf(r) > -1;
+    h += '<div onclick="obToggleRegion(\'' + r + '\',this)"'
+       + ' style="padding:8px 14px;border-radius:100px;cursor:pointer;transition:all .15s;'
+       + 'border:1px solid ' + (sel ? 'var(--b5)' : 'var(--bd)') + ';'
+       + 'background:' + (sel ? 'rgba(59,130,246,.12)' : 'var(--bg2)') + ';'
+       + 'font-size:11px;font-weight:600;color:' + (sel ? 'var(--b4)' : 'var(--t2)') + '">' + r + '</div>';
+  });
+  return h + '</div>';
+}
+
+function _obRiskPicker() {
+  var levels = [
+    {id:'conservative', icon:'&#x1F6E1;', label:'Conservative', desc:'Low volatility, capital preservation'},
+    {id:'moderate',     icon:'&#x2696;',  label:'Moderate',     desc:'Balanced risk and return'},
+    {id:'aggressive',   icon:'&#x1F680;', label:'Aggressive',   desc:'High growth, higher volatility'},
+  ];
+  var h = '<div style="display:flex;flex-direction:column;gap:8px">';
+  levels.forEach(function(l) {
+    var sel = OB.prefs.riskLevel === l.id;
+    h += '<div onclick="obSetRisk(\'' + l.id + '\',this)"'
+       + ' style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;cursor:pointer;transition:all .15s;'
+       + 'border:1px solid ' + (sel ? 'var(--b5)' : 'var(--bd)') + ';'
+       + 'background:' + (sel ? 'rgba(59,130,246,.1)' : 'var(--bg2)') + '">'
+       + '<span style="font-size:22px">' + l.icon + '</span>'
+       + '<div><div style="font-size:12px;font-weight:700;color:var(--t1)">' + l.label + '</div>'
+       + '<div style="font-size:10px;color:var(--t3)">' + l.desc + '</div></div>'
+       + (sel ? '<span style="margin-left:auto;color:var(--b4)">&#x2713;</span>' : '')
+       + '</div>';
+  });
+  return h + '</div>';
+}
+
+var OB_STEPS = [
+  /* Step 1 */
+  {
+    title: "Welcome to WorldLens",
+    sub:   "Your global intelligence command centre",
+    body:  function() {
+      return '<div style="text-align:center;padding:8px 0">'
+           + '<p style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:16px">'
+           + 'WorldLens aggregates <strong style="color:var(--t1)">live geopolitical events</strong>, '
+           + 'market data and AI analysis into a single real-time dashboard.</p>'
+           + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
+           + '<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:12px 8px;text-align:center"><div style="font-size:22px;margin-bottom:5px">&#x1F5FA;</div><div style="font-size:11px;font-weight:700;color:var(--t1);margin-bottom:2px">Live Map</div><div style="font-size:9px;color:var(--t3)">Events across 180+ countries</div></div>'
+           + '<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:12px 8px;text-align:center"><div style="font-size:22px;margin-bottom:5px">&#x1F4C8;</div><div style="font-size:11px;font-weight:700;color:var(--t1);margin-bottom:2px">Markets</div><div style="font-size:9px;color:var(--t3)">Prices, forecasts &amp; impact</div></div>'
+           + '<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:12px 8px;text-align:center"><div style="font-size:22px;margin-bottom:5px">&#x1F916;</div><div style="font-size:11px;font-weight:700;color:var(--t1);margin-bottom:2px">AI Analyst</div><div style="font-size:9px;color:var(--t3)">Ask anything, get answers</div></div>'
+           + '</div></div>';
+    }
+  },
+  /* Step 2 */
+  {
+    title: "Choose Your Focus Areas",
+    sub:   "Personalise your intelligence feed",
+    body:  _obInterestPicker
+  },
+  /* Step 3 */
+  {
+    title: "Select Your Regions",
+    sub:   "Get events from the regions you care about",
+    body:  _obRegionPicker
+  },
+  /* Step 4 */
+  {
+    title: "Set Risk Appetite",
+    sub:   "Calibrate your portfolio and risk alerts",
+    body:  _obRiskPicker
+  },
+  /* Step 5 */
+  {
+    title: "How to Navigate",
+    sub:   "A quick tour of the main sections",
+    body:  function() {
+      var items = [
+        {icon:'&#x1F5FA;',  name:'Map',      desc:'Real-time global event map with heatmap and timeline modes'},
+        {icon:'&#x1F4F0;',  name:'Feed',     desc:'Curated news feed sorted by severity and relevance'},
+        {icon:'&#x1F4C9;',  name:'Markets',  desc:'Full quant lab: Monte Carlo, backtesting, PCA'},
+        {icon:'&#x1F578;',  name:'Graph',    desc:'Knowledge graph: entity relationships from news'},
+        {icon:'&#x1F916;',  name:'AI',       desc:'Ask the AI analyst any geopolitical or macro question'},
+      ];
+      return '<div style="display:flex;flex-direction:column;gap:7px">'
+           + items.map(function(it) {
+               return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:10px 14px">'
+                    + '<div style="font-size:18px;flex-shrink:0">' + it.icon + '</div>'
+                    + '<div><div style="font-size:11px;font-weight:700;color:var(--t1)">' + it.name + '</div>'
+                    + '<div style="font-size:10px;color:var(--t3)">' + it.desc + '</div></div>'
+                    + '</div>';
+             }).join('')
+           + '</div>';
+    }
+  },
+  /* Step 6 */
+  {
+    title: "You're All Set!",
+    sub:   "Your personalised intelligence briefing is ready",
+    body:  function() {
+      return '<div style="text-align:center;padding:12px 0">'
+           + '<div style="font-size:52px;margin-bottom:12px">&#x1F389;</div>'
+           + '<p style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:16px">'
+           + 'WorldLens is now personalised to your interests.<br>Your dashboard shows events that matter most to you.</p>'
+           + '<div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:14px;font-size:11px;color:var(--t2);line-height:1.7">'
+           + '&#x1F4A1; <strong style="color:var(--t1)">Tip:</strong> Click the <strong style="color:var(--b4)">?</strong> button anytime to launch the interactive tutorial.'
+           + '</div></div>';
+    }
+  }
+];
+
+// ── Onboarding interaction handlers ──────────────────────
+function obToggleInterest(id, el2) {
+  var idx = OB.prefs.interests.indexOf(id);
+  if (idx > -1) OB.prefs.interests.splice(idx, 1);
+  else OB.prefs.interests.push(id);
+  // Re-render just the body to keep state
+  var bodyEl = document.getElementById('ob-body');
+  if (bodyEl) bodyEl.innerHTML = _obInterestPicker();
+}
+
+function obToggleRegion(r, el2) {
+  var idx = OB.prefs.regions.indexOf(r);
+  if (idx > -1) OB.prefs.regions.splice(idx, 1);
+  else OB.prefs.regions.push(r);
+  var bodyEl = document.getElementById('ob-body');
+  if (bodyEl) bodyEl.innerHTML = _obRegionPicker();
+}
+
+function obSetRisk(level, el2) {
+  OB.prefs.riskLevel = level;
+  var bodyEl = document.getElementById('ob-body');
+  if (bodyEl) bodyEl.innerHTML = _obRiskPicker();
+}
+
+// ── obNext / obBack / skipOnboarding ─────────────────────
 function obNext() {
-  var overlay = el('ob-overlay');
-  if (!overlay) return;
-  OB.step = Math.min(OB.step + 1, OB.maxStep);
+  if (OB.step >= OB.maxStep) { _obFinish(); return; }
+  OB.step++;
   _obRender();
 }
 
 function obBack() {
-  OB.step = Math.max(OB.step - 1, 1);
+  OB.step = Math.max(1, OB.step - 1);
   _obRender();
 }
 
 function skipOnboarding() {
-  var overlay = el('ob-overlay');
+  var overlay = document.getElementById('ob-overlay');
   if (overlay) overlay.style.display = 'none';
-  // Save preference to avoid showing again
   try { localStorage.setItem('wl_ob_done', '1'); } catch(e) {}
   toast('Welcome to WorldLens!', 's');
 }
 
+function _obFinish() {
+  // Save preferences to server
+  var prefs = {
+    interests:  OB.prefs.interests,
+    regions:    OB.prefs.regions,
+    risk_level: OB.prefs.riskLevel,
+    onboarding_done: true,
+  };
+  rq('/api/user/profile', { method: 'POST', body: prefs }).then(function() {
+    if (G.userProfile) Object.assign(G.userProfile, prefs);
+  }).catch(function(){});
+  var overlay = document.getElementById('ob-overlay');
+  if (overlay) overlay.style.display = 'none';
+  try { localStorage.setItem('wl_ob_done', '1'); } catch(e) {}
+  toast('Setup complete! Your dashboard is now personalised.', 's');
+  // Re-render with preferences
+  if (typeof renderDash === 'function') renderDash();
+  if (typeof applyPersonalization === 'function') applyPersonalization();
+}
+
+// ── _obRender — populate all dynamic elements ────────────
 function _obRender() {
-  var backBtn = el('ob-back');
-  var nextBtn = el('ob-next');
-  var progEl  = el('ob-progress');
+  var step    = OB_STEPS[OB.step - 1];
+  if (!step) return;
+
+  // Title, sub, icon
+  var titleEl = document.getElementById('ob-title');
+  var subEl   = document.getElementById('ob-sub');
+  var bodyEl  = document.getElementById('ob-body');
+  var lbl     = document.getElementById('ob-step-lbl');
+  var backBtn = document.getElementById('ob-back');
+  var nextBtn = document.getElementById('ob-next');
+  var dotsEl  = document.getElementById('ob-dots');
+
+  if (titleEl) titleEl.textContent = (step.icon ? step.icon + '  ' : '') + step.title;
+  if (subEl)   subEl.textContent   = step.sub || '';
+  if (bodyEl)  bodyEl.innerHTML    = (typeof step.body === 'function') ? step.body() : (step.body || '');
+  if (lbl)     lbl.textContent     = 'Step ' + OB.step + ' of ' + OB.maxStep;
   if (backBtn) backBtn.style.display = OB.step > 1 ? 'inline-flex' : 'none';
-  if (nextBtn) nextBtn.textContent   = OB.step >= OB.maxStep ? 'Get Started' : 'Next';
-  if (progEl)  progEl.textContent    = OB.step + ' / ' + OB.maxStep;
-  // Step panels: show/hide .ob-step elements by data-step
-  document.querySelectorAll('[data-step]').forEach(function(el) {
-    el.style.display = (parseInt(el.dataset.step) === OB.step) ? 'block' : 'none';
-  });
-  if (OB.step >= OB.maxStep && nextBtn) {
-    nextBtn.onclick = skipOnboarding;
+  if (nextBtn) nextBtn.textContent   = OB.step >= OB.maxStep ? '🚀 Get Started' : 'Next →';
+
+  // Progress dots
+  if (dotsEl) {
+    var dots = '';
+    for (var i = 1; i <= OB.maxStep; i++) {
+      dots += '<div style="width:' + (i === OB.step ? '18' : '6') + 'px;height:6px;border-radius:3px;'
+            + 'background:' + (i === OB.step ? 'var(--b4)' : i < OB.step ? 'var(--b6)' : 'var(--bg4)') + ';'
+            + 'transition:all .3s"></div>';
+    }
+    dotsEl.innerHTML = dots;
+    dotsEl.style.cssText = 'display:flex;align-items:center;gap:4px;justify-content:center;margin-bottom:8px';
   }
 }
 
