@@ -734,14 +734,17 @@
 
     <!-- ── Left controls panel ── -->
     <div class="ng-sidebar">
-      <div class="ng-sidebar-title">
-        <span style="font-size:16px">🕸</span>
-        <div>
-          <div style="font-family:var(--fh);font-size:13px;font-weight:700">Knowledge Graph</div>
-          <div style="font-size:9px;color:var(--t3);margin-top:1px">Auto-generated from live news</div>
-        </div>
-      </div>
+      <!-- ── Mode tab switcher ── -->
+      <div class="ng-tab-bar">
+        <button class="ng-tab on" id="ng-tab-graph" onclick="ngSwitchMode('graph',this)">
+          <span>🕸</span> News Graph
+        </button>
+        <button class="ng-tab" id="ng-tab-explorer" onclick="ngSwitchMode('explorer',this)">
+          <span>🔍</span> Explorer
+        </button>
+      </div></div>
 
+      <div id="ng-mode-graph">
       <!-- Build controls -->
       <div class="ng-section">
         <div class="ng-sec-title">Build Settings</div>
@@ -898,7 +901,54 @@
           Scroll to zoom · Click to inspect
         </div>
       </div>
+      </div><!-- ng-mode-graph -->
     </div>
+
+      <!-- ── Explorer mode sidebar ── -->
+      <div id="ng-mode-explorer" style="display:none;flex-direction:column;gap:0;height:100%;overflow:hidden">
+
+        <!-- Search bar -->
+        <div style="padding:12px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
+          <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--t1);margin-bottom:8px">
+            Knowledge Explorer
+          </div>
+          <div style="font-size:9px;color:var(--t3);margin-bottom:10px;line-height:1.5">
+            Search any topic to build an interactive knowledge map with sources
+          </div>
+          <div style="position:relative">
+            <input type="text" id="kex-search-inp" class="fi"
+                   placeholder="e.g. semiconductors, trade war, Fed policy…"
+                   style="width:100%;font-size:11px;padding:8px 32px 8px 10px;box-sizing:border-box;border-radius:var(--r8)"
+                   onkeydown="if(event.key==='Enter')kexSearch()"
+            />
+            <button onclick="kexSearch()" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--b6);border:none;border-radius:5px;padding:3px 8px;font-size:10px;color:#fff;cursor:pointer;font-weight:700">Go</button>
+          </div>
+          <!-- Quick topics -->
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px" id="kex-quick-topics">
+            <span class="kex-chip" onclick="kexSearchTerm('semiconductors')">Semiconductors</span>
+            <span class="kex-chip" onclick="kexSearchTerm('US-China trade')">US-China</span>
+            <span class="kex-chip" onclick="kexSearchTerm('Federal Reserve')">Fed Policy</span>
+            <span class="kex-chip" onclick="kexSearchTerm('energy crisis')">Energy</span>
+            <span class="kex-chip" onclick="kexSearchTerm('AI regulation')">AI Policy</span>
+            <span class="kex-chip" onclick="kexSearchTerm('Ukraine conflict')">Ukraine</span>
+          </div>
+        </div>
+
+        <!-- Results / node list -->
+        <div style="flex:1;overflow-y:auto;padding:8px">
+          <div id="kex-sidebar-content">
+            <div style="text-align:center;padding:32px 12px;color:var(--t3)">
+              <div style="font-size:32px;margin-bottom:8px">🔍</div>
+              <div style="font-size:11px;line-height:1.6">Search a topic to build<br>your knowledge map</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active node detail -->
+        <div id="kex-node-detail" style="display:none;border-top:1px solid var(--bd);flex-shrink:0;max-height:50%;overflow-y:auto;padding:10px 12px">
+        </div>
+
+      </div><!-- ng-mode-explorer -->
 
     <!-- ── Canvas area ── -->
     <div class="ng-canvas-wrap" id="ng-canvas-wrap">
@@ -924,6 +974,37 @@
 
       <!-- Main canvas -->
       <canvas id="ng-canvas" style="display:none;cursor:grab"></canvas>
+
+      <!-- ── Knowledge Explorer canvas ── -->
+      <div id="kex-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
+        <!-- Explorer top bar -->
+        <div id="kex-topbar" style="padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg1)">
+          <div id="kex-query-label" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">—</div>
+          <div id="kex-breadcrumb" style="font-size:10px;color:var(--t3);flex:1"></div>
+          <div style="display:flex;gap:6px">
+            <button onclick="kexLayout('radial')" id="kex-btn-radial" class="kex-view-btn on" title="Radial layout">⊙</button>
+            <button onclick="kexLayout('force')"  id="kex-btn-force"  class="kex-view-btn"    title="Force layout">⛶</button>
+            <button onclick="kexReset()" class="btn btn-g btn-xs" title="Reset graph">↺ Reset</button>
+          </div>
+        </div>
+        <!-- SVG canvas for explorer graph -->
+        <div id="kex-svg-wrap" style="flex:1;position:relative;overflow:hidden">
+          <svg id="kex-svg" style="width:100%;height:100%"></svg>
+          <!-- Zoom controls -->
+          <div style="position:absolute;bottom:14px;right:12px;display:flex;flex-direction:column;gap:3px">
+            <button class="ng-zoom-btn" onclick="kexZoom(1.3)">+</button>
+            <button class="ng-zoom-btn" onclick="kexZoom(0.77)">−</button>
+            <button class="ng-zoom-btn" onclick="kexFitView()">⊞</button>
+          </div>
+          <!-- Legend -->
+          <div id="kex-legend" style="position:absolute;bottom:14px;left:12px;font-size:9px;color:var(--t3);line-height:1.8">
+            <div><span style="color:#3B82F6">●</span> Live Event</div>
+            <div><span style="color:#10B981">●</span> Concept</div>
+            <div><span style="color:#F59E0B">●</span> Entity</div>
+            <div><span style="color:#8B5CF6">●</span> Source</div>
+          </div>
+        </div>
+      </div><!-- kex-canvas-wrap -->
 
       <!-- 2D / 3D mode toggle -->
       <div class="ng-mode-toggle" id="ng-mode-toggle" style="display:none">
@@ -2313,6 +2394,7 @@
 <script src="/static/js/13_portfolio.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="/static/js/14_graph3d.js"></script>
+<script src="/static/js/15_knowledge_explorer.js"></script>
 
 </body>
 </html>
