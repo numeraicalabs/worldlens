@@ -742,9 +742,15 @@
         <button class="ng-tab" id="ng-tab-explorer" onclick="ngSwitchMode('explorer',this)">
           <span>🔍</span> Explorer
         </button>
-      </div></div>
+        <button class="ng-tab" id="ng-tab-timeline" onclick="ngSwitchMode('timeline',this)">
+          <span>📅</span> Timeline
+        </button>
+        <button class="ng-tab" id="ng-tab-cascade" onclick="ngSwitchMode('cascade',this)">
+          <span>🔗</span> Cascade
+        </button>
+      </div>
 
-      <div id="ng-mode-graph">
+      <div id="ng-mode-graph" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding-bottom:16px">
       <!-- Build controls -->
       <div class="ng-section">
         <div class="ng-sec-title">Build Settings</div>
@@ -902,7 +908,6 @@
         </div>
       </div>
       </div><!-- ng-mode-graph -->
-    </div>
 
       <!-- ── Explorer mode sidebar ── -->
       <div id="ng-mode-explorer" style="display:none;flex-direction:column;gap:0;height:100%;overflow:hidden">
@@ -949,9 +954,146 @@
         </div>
 
       </div><!-- ng-mode-explorer -->
+      <!-- ── Timeline mode sidebar ── -->
+      <div id="ng-mode-timeline" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+
+        <div style="padding:10px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
+          <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--t1);margin-bottom:6px">Event Timeline</div>
+          <div style="font-size:9px;color:var(--t3);line-height:1.5;margin-bottom:8px">Events plotted on a temporal axis — severity drives vertical position</div>
+
+          <!-- Time range -->
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Window</label>
+            <select class="fi ng-select" id="tl-hours" onchange="tlBuild()">
+              <option value="12">12 hours</option>
+              <option value="24" selected>24 hours</option>
+              <option value="48">48 hours</option>
+              <option value="120">5 days</option>
+              <option value="240">10 days</option>
+            </select>
+          </div>
+          <!-- Band filter -->
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Band</label>
+            <select class="fi ng-select" id="tl-band" onchange="tlBuild()">
+              <option value="all">All bands</option>
+              <option value="conflict">⚔ Conflict</option>
+              <option value="geopolitical">🌐 Geopolitical</option>
+              <option value="macro">🏦 Macro</option>
+              <option value="markets">📈 Markets</option>
+              <option value="energy">⚡ Energy</option>
+              <option value="disaster">🌪 Disaster</option>
+              <option value="tech">💻 Tech</option>
+              <option value="humanitarian">🤝 Humanitarian</option>
+            </select>
+          </div>
+          <!-- Min severity -->
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Min sev.</label>
+            <input type="range" id="tl-minsev" min="1" max="9" step="0.5" value="3"
+                   oninput="document.getElementById('tl-minsev-val').textContent=this.value;tlBuild()"
+                   style="flex:1;accent-color:var(--b5)"/>
+            <span id="tl-minsev-val" style="font-size:10px;color:var(--b4);min-width:22px;text-align:right">3</span>
+          </div>
+          <!-- Group toggle -->
+          <div class="ng-toggle-row" style="margin-top:4px">
+            <label class="ng-toggle-label">
+              <input type="checkbox" id="tl-group" checked onchange="tlBuild()">
+              Group narratives
+            </label>
+          </div>
+          <button class="ng-build-btn" onclick="tlBuild()" style="margin-top:8px;width:100%;font-size:11px;padding:7px">
+            ⚡ Refresh Timeline
+          </button>
+        </div>
+
+        <!-- Event list below chart -->
+        <div style="flex:1;overflow-y:auto;padding:8px">
+          <div id="tl-event-list">
+            <div style="text-align:center;padding:28px 12px;color:var(--t3);font-size:11px">
+              Click a node on the timeline to see event details
+            </div>
+          </div>
+        </div>
+
+      </div><!-- ng-mode-timeline -->
+      <!-- ── Dependency Cascade sidebar ── -->
+      <div id="ng-mode-cascade" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+
+        <div style="padding:10px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
+          <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--t1);margin-bottom:4px">Risk Cascade Simulator</div>
+          <div style="font-size:9px;color:var(--t3);line-height:1.5;margin-bottom:10px">Simulate how a shock propagates through the global dependency network</div>
+
+          <!-- Source node -->
+          <div class="ng-ctrl-row" style="margin-bottom:6px">
+            <label class="ng-label">Shock source</label>
+            <input type="text" id="cas-source" class="fi" value="US"
+                   placeholder="US, CN, NVDA, Energy…"
+                   style="flex:1;font-size:10px;padding:5px 8px"/>
+          </div>
+          <!-- Shock magnitude -->
+          <div class="ng-ctrl-row" style="margin-bottom:6px">
+            <label class="ng-label">Magnitude</label>
+            <input type="range" id="cas-shock" min="1" max="10" step="0.5" value="8"
+                   oninput="document.getElementById('cas-shock-val').textContent=this.value"
+                   style="flex:1;accent-color:var(--re)"/>
+            <span id="cas-shock-val" style="font-size:10px;color:var(--re);min-width:22px;text-align:right">8</span>
+          </div>
+          <!-- Max hops -->
+          <div class="ng-ctrl-row" style="margin-bottom:6px">
+            <label class="ng-label">Max hops</label>
+            <select class="fi ng-select" id="cas-hops">
+              <option value="2">2 hops</option>
+              <option value="3" selected>3 hops</option>
+              <option value="4">4 hops</option>
+              <option value="5">5 hops</option>
+            </select>
+          </div>
+          <!-- Damping -->
+          <div class="ng-ctrl-row" style="margin-bottom:8px">
+            <label class="ng-label">Damping</label>
+            <input type="range" id="cas-damp" min="0.3" max="0.9" step="0.05" value="0.65"
+                   oninput="document.getElementById('cas-damp-val').textContent=this.value"
+                   style="flex:1;accent-color:var(--b5)"/>
+            <span id="cas-damp-val" style="font-size:10px;color:var(--b4);min-width:28px;text-align:right">0.65</span>
+          </div>
+
+          <button class="ng-build-btn" onclick="casRun()" style="width:100%;font-size:11px;padding:7px;background:var(--re)">
+            ⚡ Run Cascade
+          </button>
+
+          <!-- Path finder -->
+          <div style="border-top:1px solid var(--bd);margin-top:12px;padding-top:10px">
+            <div style="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:6px">Dependency Path Finder</div>
+            <div style="display:flex;gap:5px;margin-bottom:5px">
+              <input type="text" id="cas-path-src" class="fi" placeholder="From…" style="flex:1;font-size:10px;padding:5px 8px"/>
+              <input type="text" id="cas-path-tgt" class="fi" placeholder="To…"   style="flex:1;font-size:10px;padding:5px 8px"/>
+            </div>
+            <button class="btn btn-p btn-xs" onclick="casPath()" style="width:100%;font-size:10px;padding:5px">🔍 Find Path</button>
+          </div>
+
+          <!-- Critical nodes button -->
+          <div style="border-top:1px solid var(--bd);margin-top:10px;padding-top:8px">
+            <button class="btn btn-g btn-xs" onclick="casCritical()" style="width:100%;font-size:10px;padding:5px">🎯 Most Critical Nodes</button>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div style="flex:1;overflow-y:auto;padding:8px">
+          <div id="cas-results">
+            <div style="text-align:center;padding:28px 12px;color:var(--t3);font-size:11px">
+              <div style="font-size:32px;margin-bottom:8px">🔗</div>
+              Run a cascade simulation or find a dependency path
+            </div>
+          </div>
+        </div>
+      </div><!-- ng-mode-cascade -->
+
+    </div>
+
 
     <!-- ── Canvas area ── -->
-    <div class="ng-canvas-wrap" id="ng-canvas-wrap">
+    <div class="ng-canvas-wrap" id="ng-canvas-wrap" style="display:flex;flex-direction:column">
       <!-- Empty state -->
       <div id="ng-empty" class="ng-empty">
         <div style="font-size:48px;margin-bottom:12px">🕸</div>
@@ -1005,6 +1147,51 @@
           </div>
         </div>
       </div><!-- kex-canvas-wrap -->
+
+      <!-- ── Timeline Graph canvas ── -->
+      <div id="tl-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
+        <!-- Timeline topbar -->
+        <div id="tl-topbar" style="padding:8px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg1)">
+          <div id="tl-title" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">Event Timeline</div>
+          <div id="tl-stat-pill" style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(59,130,246,.12);color:var(--b4)"></div>
+          <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <span style="font-size:9px;color:var(--t3)">Colour:</span>
+            <button class="tl-color-btn on" id="tl-col-band"     onclick="tlSetColorMode('band',this)"    title="By band">Band</button>
+            <button class="tl-color-btn"   id="tl-col-severity"  onclick="tlSetColorMode('severity',this)" title="By severity">Severity</button>
+            <button class="tl-color-btn"   id="tl-col-sentiment" onclick="tlSetColorMode('sentiment',this)" title="By sentiment">Sentiment</button>
+          </div>
+        </div>
+        <!-- SVG timeline canvas -->
+        <div id="tl-svg-wrap" style="flex:1;position:relative;overflow:hidden;background:var(--bg0)">
+          <svg id="tl-svg" style="width:100%;height:100%"></svg>
+          <!-- Time axis label -->
+          <div id="tl-axis-label" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--t4)">← older &nbsp;&nbsp; newer →</div>
+          <!-- Zoom controls -->
+          <div style="position:absolute;top:10px;right:12px;display:flex;gap:3px">
+            <button class="ng-zoom-btn" onclick="tlZoom(1.3)" title="Zoom in">+</button>
+            <button class="ng-zoom-btn" onclick="tlZoom(0.77)" title="Zoom out">−</button>
+            <button class="ng-zoom-btn" onclick="tlFitView()" title="Fit all">⊞</button>
+          </div>
+          <!-- Band legend -->
+          <div id="tl-legend" style="position:absolute;top:10px;left:12px;font-size:9px;color:var(--t3);line-height:1.9;background:rgba(6,11,18,.7);padding:6px 9px;border-radius:8px;border:1px solid var(--bd)"></div>
+        </div>
+      </div><!-- tl-canvas-wrap -->
+
+      <!-- ── Dependency Cascade canvas ── -->
+      <div id="cas-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
+        <div id="cas-topbar" style="padding:8px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg1)">
+          <div id="cas-title" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">Dependency Cascade</div>
+          <div id="cas-stat" style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(239,68,68,.12);color:#EF4444"></div>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="ng-zoom-btn" onclick="casZoom(1.3)">+</button>
+            <button class="ng-zoom-btn" onclick="casZoom(0.77)">−</button>
+            <button class="ng-zoom-btn" onclick="casFitView()">⊞</button>
+          </div>
+        </div>
+        <div id="cas-svg-wrap" style="flex:1;position:relative;overflow:hidden;background:var(--bg0)">
+          <svg id="cas-svg" style="width:100%;height:100%"></svg>
+        </div>
+      </div><!-- cas-canvas-wrap -->
 
       <!-- 2D / 3D mode toggle -->
       <div class="ng-mode-toggle" id="ng-mode-toggle" style="display:none">
@@ -2395,6 +2582,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="/static/js/14_graph3d.js"></script>
 <script src="/static/js/15_knowledge_explorer.js"></script>
+<script src="/static/js/16_timeline_graph.js"></script>
+<script src="/static/js/17_cascade.js"></script>
 
 </body>
 </html>
