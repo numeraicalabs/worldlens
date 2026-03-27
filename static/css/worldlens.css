@@ -3275,8 +3275,8 @@ input[type="checkbox"], input[type="radio"] {
 .ng-sidebar {
   width: 230px; flex-shrink: 0;
   background: var(--bg1); border-right: 1px solid var(--bd);
-  overflow-y: auto; display: flex; flex-direction: column;
-  padding: 0 0 16px;
+  overflow: hidden; display: flex; flex-direction: column;
+  padding: 0;
 }
 .ng-sidebar-title {
   display: flex; align-items: center; gap: 10px;
@@ -4508,3 +4508,52 @@ input[type="checkbox"], input[type="radio"] {
   background: var(--bg1);
   flex-shrink: 0;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   TIMELINE GRAPH — color mode buttons + nodes
+═══════════════════════════════════════════════════════════ */
+.tl-color-btn {
+  padding: 3px 9px;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: var(--r4);
+  border: 1px solid var(--bd);
+  background: var(--bg2);
+  color: var(--t3);
+  cursor: pointer;
+  transition: all .15s;
+}
+.tl-color-btn:hover { border-color: var(--b5); color: var(--b4); }
+.tl-color-btn.on {
+  background: rgba(59,130,246,.15);
+  border-color: var(--b5);
+  color: var(--b4);
+}
+#tl-svg-wrap { cursor: grab; background: var(--bg0); }
+#tl-svg-wrap:active { cursor: grabbing; }
+#tl-legend { pointer-events: none; }
+
+/* ── Mode panel sizing — each fills the sidebar ─────────── */
+/* All mode panels: fill sidebar, flex-column, own scroll  */
+#ng-mode-graph,
+#ng-mode-explorer,
+#ng-mode-timeline {
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Graph mode panel: its sections scroll */
+#ng-mode-graph {
+  overflow-y: auto;
+  padding-bottom: 16px;
+}
+/* ng-canvas-wrap needs flex so its absolute children position correctly */
+.ng-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Cascade Simulator ────────────────────────────── */
+#cas-svg-wrap { cursor: grab; background: var(--bg0); }
+#cas-svg-wrap:active { cursor: grabbing; }
