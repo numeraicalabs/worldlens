@@ -1329,3 +1329,358 @@ function _showRelatedByCategory(ev, list) {
     }).catch(function(){});
   };
 })();
+
+// ════════════════════════════════════════════════════
+// WORLDLENS MOBILE ENGINE
+// Holographic UI interactions for touch devices
+// ════════════════════════════════════════════════════
+
+var _isMobile = function() { return window.innerWidth <= 768; };
+
+// ── Mobile nav ───────────────────────────────────────────────────────
+function mobileNav(view, btn) {
+  // Sync the desktop sv() call
+  var desktopBtn = document.querySelector('.ni[data-v="' + view + '"]');
+  sv(view, desktopBtn);
+
+  // Update mobile nav active state
+  document.querySelectorAll('.wl-mnav-btn[data-mv]').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  if (btn) btn.classList.add('active');
+  else {
+    var mb = document.querySelector('.wl-mnav-btn[data-mv="' + view + '"]');
+    if (mb) mb.classList.add('active');
+  }
+
+  // Close more drawer if open
+  closeMoreDrawer();
+}
+
+// Sync desktop nav → mobile nav active state
+(function() {
+  var _origSv = window.sv;
+  window.sv = function(name, btn) {
+    _origSv(name, btn);
+    if (_isMobile()) {
+      document.querySelectorAll('.wl-mnav-btn[data-mv]').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.mv === name);
+      });
+    }
+  };
+})();
+
+// ── More drawer ──────────────────────────────────────────────────────
+function toggleMoreDrawer() {
+  var drawer  = document.getElementById('wl-more-drawer');
+  var overlay = document.getElementById('wl-more-overlay');
+  if (!drawer) return;
+  var isOpen = drawer.classList.contains('open');
+  drawer.classList.toggle('open', !isOpen);
+  overlay.classList.toggle('open', !isOpen);
+}
+function closeMoreDrawer() {
+  var drawer  = document.getElementById('wl-more-drawer');
+  var overlay = document.getElementById('wl-more-overlay');
+  if (drawer)  drawer.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+}
+
+// ── Holographic XP popup ─────────────────────────────────────────────
+var _xpTimer;
+function showHoloXP(amount, reason) {
+  if (!_isMobile()) {
+    // Desktop: use existing xpPop
+    if (typeof xpPop === 'function') xpPop(amount, reason);
+    return;
+  }
+  var popup = document.getElementById('wl-holo-xp');
+  if (!popup) return;
+
+  document.getElementById('wl-xp-amount').textContent = '+' + amount;
+  document.getElementById('wl-xp-reason').textContent  = reason || 'Action completed';
+
+  // Sparkle particles
+  _spawnSparkles('wl-xp-sparkle');
+
+  clearTimeout(_xpTimer);
+  popup.classList.remove('hide');
+  popup.classList.add('show');
+
+  _xpTimer = setTimeout(function() {
+    popup.classList.add('hide');
+    setTimeout(function() { popup.classList.remove('show', 'hide'); }, 350);
+  }, 2600);
+}
+
+function _spawnSparkles(containerId) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '';
+  for (var i = 0; i < 12; i++) {
+    var dot = document.createElement('div');
+    var x   = Math.random() * 100;
+    var y   = Math.random() * 100;
+    var dur = .4 + Math.random() * .6;
+    var del = Math.random() * .4;
+    dot.style.cssText = [
+      'position:absolute',
+      'left:' + x + '%', 'top:' + y + '%',
+      'width:' + (2 + Math.random() * 3) + 'px',
+      'height:' + (2 + Math.random() * 3) + 'px',
+      'border-radius:50%',
+      'background:rgba(0,229,255,' + (.4 + Math.random() * .5) + ')',
+      'box-shadow:0 0 4px rgba(0,229,255,.6)',
+      'animation:sparkleOut ' + dur + 's ' + del + 's ease-out forwards',
+    ].join(';');
+    el.appendChild(dot);
+  }
+}
+
+// Add sparkle animation to neo CSS (injected once)
+(function() {
+  if (document.getElementById('sparkle-style')) return;
+  var s = document.createElement('style');
+  s.id  = 'sparkle-style';
+  s.textContent = '@keyframes sparkleOut{0%{transform:scale(0) translate(0,0);opacity:1}100%{transform:scale(1.5) translate(var(--dx,20px),var(--dy,-30px));opacity:0}}';
+  document.head.appendChild(s);
+})();
+
+// Override xpPop globally to use holographic version on mobile
+(function() {
+  var _origXpPop = window.xpPop;
+  window.xpPop = function(amount, msg) {
+    showHoloXP(amount, msg);
+    if (!_isMobile() && typeof _origXpPop === 'function') _origXpPop(amount, msg);
+  };
+})();
+
+// ── Holographic event popup ──────────────────────────────────────────
+var _holoEvId = null;
+
+function showHoloEvent(evId) {
+  if (!_isMobile()) return false;   // desktop handles normally
+
+  var ev = (G.events || []).find(function(e) { return e.id === evId; });
+  if (!ev) return false;
+
+  _holoEvId = evId;
+
+  // Category
+  var m   = (window.CATS && CATS[ev.category]) || { i:'●', c:'var(--cy)', bg:'rgba(0,229,255,.12)' };
+  var catEl = document.getElementById('wl-holo-ev-cat');
+  if (catEl) {
+    catEl.textContent = m.i + ' ' + ev.category;
+    catEl.style.color = m.c;
+  }
+
+  // Title
+  var titEl = document.getElementById('wl-holo-ev-title');
+  if (titEl) titEl.textContent = ev.title || '';
+
+  // Meta
+  var metaEl = document.getElementById('wl-holo-ev-meta');
+  if (metaEl) metaEl.textContent = [
+    ev.country_name, ev.source, typeof tAgo === 'function' ? tAgo(new Date(ev.timestamp)) : ''
+  ].filter(Boolean).join(' · ');
+
+  // Summary
+  var sumEl = document.getElementById('wl-holo-ev-summary');
+  if (sumEl) sumEl.textContent = ev.ai_summary || ev.summary || '';
+
+  // Severity ring
+  var sev = parseFloat(ev.severity) || 5;
+  var sevColor = sev >= 7 ? 'var(--re)' : sev >= 5 ? 'var(--am)' : 'var(--gr)';
+  var sevValEl = document.getElementById('wl-holo-sev-val');
+  var ringFill = document.getElementById('wl-holo-ring-fill');
+  if (sevValEl) { sevValEl.textContent = sev.toFixed(1); sevValEl.style.color = sevColor; }
+  if (ringFill) {
+    ringFill.style.stroke = sevColor;
+    // Circumference = 2π × 26 ≈ 163.4
+    var offset = 163.4 * (1 - sev / 10);
+    ringFill.style.setProperty('--ring-offset', offset.toFixed(1));
+    ringFill.style.strokeDashoffset = offset.toFixed(1);
+  }
+
+  // Save button state
+  var saveIcon  = document.getElementById('wl-holo-save-icon');
+  var saveLabel = document.getElementById('wl-holo-save-label');
+  var isSaved   = window._savedIds && _savedIds[evId];
+  if (saveIcon)  saveIcon.textContent  = isSaved ? '✅' : '🔖';
+  if (saveLabel) saveLabel.textContent = isSaved ? 'Saved' : 'Save';
+
+  // Reset AI strip
+  var aiStrip = document.getElementById('wl-holo-ai-strip');
+  if (aiStrip) aiStrip.style.display = 'none';
+
+  // Open popup
+  var overlay = document.getElementById('wl-holo-event-overlay');
+  if (overlay) overlay.classList.add('open');
+
+  // Track
+  if (typeof track === 'function') track('event_opened', 'mobile_holo', evId);
+
+  // Load AI brief async (non-blocking)
+  _loadHoloEventAI(ev);
+
+  return true;  // intercept handled
+}
+
+function _loadHoloEventAI(ev) {
+  var aiStrip = document.getElementById('wl-holo-ai-strip');
+  var aiText  = document.getElementById('wl-holo-ai-text');
+  if (!aiStrip || !aiText) return;
+
+  // If ai_summary already exists show it immediately
+  if (ev.ai_summary || ev.ai_market_note) {
+    aiText.textContent  = ev.ai_summary || ev.ai_market_note || '';
+    aiStrip.style.display = 'block';
+    return;
+  }
+
+  // Otherwise fetch a quick 1-sentence brief
+  if (!window.G || !G.token) return;
+  if (typeof rq !== 'function') return;
+
+  rq('/api/events/ai/ask', {
+    method: 'POST',
+    body: { event_id: ev.id, question: 'One sentence: market impact of this event?' }
+  }).then(function(r) {
+    if (r && (r.answer || r.response)) {
+      aiText.textContent  = r.answer || r.response;
+      aiStrip.style.display = 'block';
+    }
+  }).catch(function(){});
+}
+
+function closeHoloEvent(e) {
+  if (e && e.target !== document.getElementById('wl-holo-event-overlay')) return;
+  var overlay = document.getElementById('wl-holo-event-overlay');
+  if (overlay) overlay.classList.remove('open');
+  _holoEvId = null;
+}
+
+function holoEvAction(action) {
+  var evId = _holoEvId;
+  var ev   = evId && (G.events || []).find(function(e){ return e.id === evId; });
+
+  // Close popup
+  var overlay = document.getElementById('wl-holo-event-overlay');
+  if (overlay) overlay.classList.remove('open');
+
+  switch (action) {
+    case 'map':
+      mobileNav('map', null);
+      if (ev && G.map) {
+        setTimeout(function() {
+          if (ev.latitude && ev.longitude)
+            G.map.setView([ev.latitude, ev.longitude], 6, {animate:true});
+          if (typeof openEP === 'function') openEP(evId);
+        }, 350);
+      }
+      break;
+    case 'save':
+      if (evId) {
+        var isSaved = window._savedIds && _savedIds[evId];
+        var url = isSaved ? '/api/saved/' + evId : '/api/saved';
+        rq(url, { method: isSaved ? 'DELETE' : 'POST', body: isSaved ? undefined : { event_id: evId } }).then(function() {
+          if (window._savedIds) _savedIds[evId] = !isSaved;
+          showHoloXP(10, isSaved ? 'Event unsaved' : 'Saved to reading list');
+        });
+      }
+      break;
+    case 'ai':
+      mobileNav('ai', null);
+      setTimeout(function() {
+        if (ev && typeof aiSend === 'function')
+          aiSend('Summarize this event and market impact: ' + (ev.title || ''));
+      }, 300);
+      break;
+    case 'similar':
+      mobileNav('map', null);
+      setTimeout(function() {
+        if (typeof openEP === 'function') openEP(evId);
+        setTimeout(function() {
+          var analysisTab = document.querySelector('.ep-tab[data-tab="analysis"]');
+          if (analysisTab) analysisTab.click();
+          if (typeof loadSimilarEvents === 'function') loadSimilarEvents();
+        }, 400);
+      }, 300);
+      break;
+    case 'alert':
+      var evTitle = ev ? ev.title.slice(0,30) : '';
+      mobileNav('alerts', null);
+      setTimeout(function() {
+        var alnInput = document.getElementById('aln');
+        if (alnInput) alnInput.value = evTitle;
+      }, 300);
+      break;
+    case 'full':
+      mobileNav('map', null);
+      setTimeout(function() {
+        if (typeof openEP === 'function') openEP(evId);
+      }, 300);
+      break;
+  }
+}
+
+// ── Intercept event card taps on mobile to show holo popup ───────────
+(function() {
+  // Patch goEv to intercept on mobile
+  var _origGoEv = window.goEv;
+  window.goEv = function(id) {
+    if (_isMobile() && showHoloEvent(id)) return;
+    if (typeof _origGoEv === 'function') _origGoEv(id);
+    else { sv('map', document.querySelector('[data-v=map]')); setTimeout(function(){ openEP(id); }, 500); }
+  };
+
+  // Also patch evcard click delegates
+  document.addEventListener('click', function(e) {
+    if (!_isMobile()) return;
+    var card = e.target.closest('.evcard[data-eid]');
+    if (!card) return;
+    var impactBtn = e.target.closest('.impact-btn, .save-icon, a');
+    if (impactBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    showHoloEvent(card.dataset.eid);
+  }, true);
+})();
+
+// ── Touch swipe to dismiss more drawer ──────────────────────────────
+(function() {
+  var startY = 0;
+  document.addEventListener('touchstart', function(e) {
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', function(e) {
+    var dy = e.changedTouches[0].clientY - startY;
+    if (dy > 60) {
+      var drawer = document.getElementById('wl-more-drawer');
+      if (drawer && drawer.classList.contains('open')) closeMoreDrawer();
+    }
+  }, { passive: true });
+})();
+
+// ── Track XP actions on mobile ───────────────────────────────────────
+// Give XP for key actions when on mobile
+var _mobileXpEvents = {
+  'event_opened':     { xp: 5,  msg: 'Event Read' },
+  'ai_question':      { xp: 10, msg: 'AI Asked' },
+  'event_saved':      { xp: 10, msg: 'Event Saved' },
+  'graph_built':      { xp: 15, msg: 'Graph Built' },
+  'cascade_run':      { xp: 20, msg: 'Cascade Simulated' },
+  'export_csv':       { xp: 25, msg: 'Data Exported' },
+  'prediction_made':  { xp: 15, msg: 'Prediction Made' },
+};
+
+(function() {
+  var _origTrack = window.track;
+  window.track = function(action, section, detail) {
+    if (typeof _origTrack === 'function') _origTrack(action, section, detail);
+    if (_isMobile() && _mobileXpEvents[action]) {
+      var ev = _mobileXpEvents[action];
+      setTimeout(function() { showHoloXP(ev.xp, ev.msg); }, 300);
+    }
+  };
+})();
