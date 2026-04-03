@@ -1,0 +1,2952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>World Lens — Global Intelligence Platform</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<!-- WorldLens Styles -->
+<link rel="stylesheet" href="/static/css/worldlens.css">
+<link rel="stylesheet" href="/static/css/worldlens_neo.css">
+
+<!-- Leaflet JS (must load before app scripts) -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    /* Failsafe: remove loader after 8s regardless */
+    setTimeout(function(){
+      var l = document.getElementById('loader');
+      if (l) { l.style.opacity='0'; setTimeout(function(){ if(l&&l.parentNode) l.parentNode.removeChild(l); }, 500); }
+    }, 8000);
+  </script>
+
+
+  <style>
+    /* Critical: hide all views until JS boots.
+       Overrides if external CSS fails to load. */
+    .view { display: none !important; width: 100%; height: 100%; }
+    .view.on { display: flex !important; }
+    body { background: #060B12; color: #F0F6FF; margin: 0; overflow: hidden; }
+    #loader { position: fixed; inset: 0; background: #060B12; display: flex;
+              flex-direction: column; align-items: center; justify-content: center;
+              z-index: 9999; }
+  </style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="ll">World Lens</div>
+  <div class="lb"><div class="lf"></div></div>
+  <div style="font-size:11px;color:var(--t3)">Loading intelligence platform...</div>
+</div>
+
+<!-- FAILSAFE: remove loader after 8s even if JS crashes -->
+
+<!-- LANDING -->
+<div id="landing">
+  <canvas id="lcanvas"></canvas>
+  <nav class="lnav">
+    <div class="llogo">WorldLens</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-g" onclick="typeof showAuth==='function'&&showAuth('login')">Sign In</button>
+      <button class="btn btn-p" onclick="typeof showAuth==='function'&&showAuth('register')">Get Started Free</button>
+    </div>
+  </nav>
+  <section class="hero">
+    <div class="hbadge"><div class="hbdot"></div>Live global intelligence</div>
+    <h1>Understand the World<br><em>in Real Time.</em></h1>
+    <p>Track global events, markets, geopolitical risks and macro trends. AI-powered analysis on every event.</p>
+    <div class="hbtns">
+      <button class="btn btn-p btn-lg" onclick="typeof showAuth==='function'&&showAuth('register')">Start Free</button>
+      <button class="btn btn-o btn-lg" onclick="typeof showAuth==='function'&&showAuth('register')">Explore the Map</button>
+    </div>
+    <div class="hstats">
+      <div><div class="hsn">500+</div><div class="hsl">Events Tracked</div></div>
+      <div><div class="hsn">6</div><div class="hsl">Data Sources</div></div>
+      <div><div class="hsn">16</div><div class="hsl">Market Assets</div></div>
+      <div><div class="hsn">AI</div><div class="hsl">Powered</div></div>
+    </div>
+  </section>
+  <section class="feats">
+    <div class="ftag">Platform Features</div>
+    <div class="ftitle">Intelligence built for modern investors</div>
+    <div class="fgrid">
+      <div class="fcard"><div class="ficon" style="background:rgba(59,130,246,.15)">🌍</div><h3>Interactive World Map</h3><p>Live event markers with hover details, heatmap risk overlay, and AI analysis on every dot.</p></div>
+      <div class="fcard"><div class="ficon" style="background:rgba(239,68,68,.15)">🌡</div><h3>Region Risk Heatmap</h3><p>Country-level risk scores based on event density and severity, updated in real time.</p></div>
+      <div class="fcard"><div class="ficon" style="background:rgba(139,92,246,.15)">🤖</div><h3>AI Event Scoring</h3><p>Every event gets an AI impact score, market effects analysis, and investor action note.</p></div>
+      <div class="fcard"><div class="ficon" style="background:rgba(16,185,129,.15)">📊</div><h3>Macro Dashboard</h3><p>GDP, inflation, interest rates, PMI and 16 indicators across major economies.</p></div>
+      <div class="fcard"><div class="ficon" style="background:rgba(245,158,11,.15)">⭐</div><h3>Smart Watchlists</h3><p>Track countries, assets, topics. Get a personalized AI digest every session.</p></div>
+      <div class="fcard"><div class="ficon" style="background:rgba(249,115,22,.15)">🔔</div><h3>Custom Alerts</h3><p>Set conditions for countries, categories, or severity thresholds. Toggle on/off anytime.</p></div>
+    </div>
+  </section>
+</div>
+
+<!-- AUTH -->
+<div id="aov"><div class="amod">
+  <h2>Welcome to World Lens</h2><p>Real-time global intelligence platform</p>
+  <div class="atabs"><button class="atab on" id="tli" onclick="typeof atab==='function'&&atab('login')">Sign In</button><button class="atab" id="trg" onclick="typeof atab==='function'&&atab('register')">Create Account</button></div>
+  <div id="lif">
+    <div class="fg"><label class="fl">Email</label><input class="fi" type="email" id="le" placeholder="you@example.com"></div>
+    <div class="fg"><label class="fl">Password</label><input class="fi" type="password" id="lp" placeholder="••••••••"><div class="ferr" id="ler"></div></div>
+    <button class="btn btn-p" style="width:100%;justify-content:center;padding:10px" onclick="doLogin()">Sign In</button>
+  </div>
+  <div id="rgf" style="display:none">
+    <div id="invite-field" style="display:none" class="fg">
+      <label class="fl">Invite Code</label>
+      <input class="fi" type="text" id="ric" placeholder="WL-XXXXX-XXXXX"
+             style="text-transform:uppercase;letter-spacing:.08em;font-size:11px"
+             oninput="this.value=this.value.toUpperCase()"/>
+      <div style="font-size:9px;color:var(--t3);margin-top:2px">Required to create an account</div>
+    </div>
+    <div class="fg"><label class="fl">Name</label><input class="fi" type="text" id="rn" placeholder="Your name"></div>
+    <div class="fg"><label class="fl">Email</label><input class="fi" type="email" id="re" placeholder="you@example.com"></div>
+    <div class="fg"><label class="fl">Password</label><input class="fi" type="password" id="rp" placeholder="Min. 6 characters"><div class="ferr" id="rer"></div></div>
+    <button class="btn btn-p" style="width:100%;justify-content:center;padding:10px" onclick="doReg()">Create Account</button>
+    <div style="text-align:center;margin-top:8px;font-size:10px;color:var(--t3)">A quick setup guide will help you get started</div>
+  </div>
+  <button class="btn btn-g btn-sm" style="width:100%;justify-content:center;margin-top:9px" onclick="typeof closeAuth==='function'&&closeAuth()">Close</button>
+</div></div>
+
+<!-- SHELL -->
+<div id="shell">
+<nav id="nav">
+  <div class="nlogo">WorldLens</div>
+  <button class="ni on" data-v="dash" onclick="sv('dash',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Dashboard</button>
+  <button class="ni" data-v="map" onclick="sv('map',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="7" r="5.5"/><path d="M2.5 7h11M8 1.5c-2 2-3 3.5-3 5.5s1 4 3 5.5M8 1.5c2 2 3 3.5 3 5.5s-1 4-3 5.5"/></svg>Global Map</button>
+  <button class="ni" data-v="graph" onclick="sv('graph',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><line x1="8" y1="6" x2="3" y2="10"/><line x1="8" y1="6" x2="13" y2="10"/><line x1="3" y1="12" x2="13" y2="12"/></svg> Graph</button>
+<button class="ni" data-v="markets" onclick="sv('markets',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,11 5,7 8,9 11,4 15,2"/><line x1="1" y1="14" x2="15" y2="14"/></svg>Markets</button>
+  <button class="ni" data-v="insiders" onclick="sv('insiders',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/><path d="M11 7l2 2-2 2" stroke-width="1.3"/></svg> Insiders</button>
+<button class="ni" data-v="feed" onclick="sv('feed',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3h14M1 7h10M1 11h12"/></svg>Event Feed</button>
+  <button class="ni" data-v="macro" onclick="sv('macro',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12L5 8l3 3 4-5 3-2"/><rect x="1" y="1" width="14" height="14" rx="1"/></svg>Macro</button>
+  <button class="ni" data-v="ai" onclick="sv('ai',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3.5"/><path d="M8 9.5v3M5 14h6"/></svg>AI Analyst</button>
+  <button class="ni" data-v="portfolio" onclick="sv('portfolio',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="14" height="10" rx="1"/><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/></svg>Portfolio</button>
+  <button class="ni" data-v="gamification" onclick="sv('gamification',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l2 4 4.5.7-3.3 3.2.8 4.6L8 11.5l-4 2 .8-4.6L1.5 5.7 6 5z"/></svg>Achievements</button>
+  <button class="ni" data-v="earlywarning" onclick="sv('earlywarning',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l1.5 4h4l-3.2 2.3 1.2 3.7L8 8.8l-3.5 2.2 1.2-3.7L2.5 5h4z"/></svg>Early Warning</button>
+  <button class="ni" data-v="supplychain" onclick="sv('supplychain',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="3" cy="8" r="2"/><circle cx="13" cy="4" r="2"/><circle cx="13" cy="12" r="2"/><path d="M5 8h3l2-4M5 8h3l2 4"/></svg>Supply Chain</button>
+  <button class="ni" data-v="alerts"   onclick="sv('alerts',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 4 1.5 5 1.5 5h-13s1.5-1 1.5-5a5 5 0 0 1 5-5z"/><path d="M6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>Alerts<span id="al-badge" style="display:none;background:var(--or);color:#fff;font-size:8px;padding:1px 5px;border-radius:100px;margin-left:2px">0</span></button>
+  <div id="navr">
+    <div class="wsi"><div class="wsd" id="wsd"></div><span id="wst">Connecting</span></div>
+    <div class="uch" onclick="sv('profile',null)"><div class="uav" id="uav">U</div><span id="un">User</span></div>
+    <button class="btn btn-g btn-sm" onclick="openRiskRadar()">Risk Radar</button>
+    <button class="btn btn-g btn-sm" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+<div id="content">
+
+<!-- DASHBOARD -->
+<div class="view on" id="view-dash">
+
+<!-- ── LIVE INTELLIGENCE TICKER ── -->
+<div id="ticker-wrap">
+  <div class="ticker-label">LIVE</div>
+  <div id="ticker-track" class="ticker-track"></div>
+</div>
+
+<div class="db-root">
+
+  <!-- ═══════════════════════════════════════
+       ROW 1 — Header + 6 KPIs
+  ═══════════════════════════════════════ -->
+  <div class="db-header-row">
+
+    <!-- Greeting block -->
+    <div class="db-greeting">
+      <div class="db-greeting-time" id="db-time-label">Good morning</div>
+      <div class="db-greeting-title">Global Intelligence<br>Briefing</div>
+      <div class="db-greeting-sub" id="d-last-update"></div>
+      <!-- Personalization chips — filled by applyPersonalization() -->
+      <div id="db-affinity-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px;min-height:20px"></div>
+      <!-- Adaptive severity indicator -->
+      <div id="db-sev-indicator" style="font-size:9px;color:var(--t3);margin-bottom:6px"></div>
+      <div class="db-header-actions">
+        <button class="btn btn-ai btn-sm" onclick="sv('ai',document.querySelector('[data-v=ai]'))">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M5 8h6M8 5v6"/></svg>
+          AI Analyst
+        </button>
+        <button class="btn btn-g btn-sm" onclick="sv('map',document.querySelector('[data-v=map]'))">
+          🗺 Live Map
+        </button>
+      </div>
+    </div>
+
+    <!-- KPI strip -->
+    <div class="db-kpi-strip">
+
+      <div class="db-kpi" id="dbk-risk">
+        <div class="db-kpi-icon">🌡</div>
+        <div class="db-kpi-body">
+          <div class="db-kpi-lbl">Global Risk Index</div>
+          <div class="db-kpi-val" id="d-risk">—</div>
+          <div class="db-kpi-bar"><div id="d-risk-b" class="db-kpi-bar-fill"></div></div>
+          <div class="db-kpi-sub" id="d-risk-l">Loading…</div>
+        </div>
+      </div>
+
+      <div class="db-kpi" id="dbk-ev" onclick="sv('feed',document.querySelector('[data-v=feed]'))" style="cursor:pointer">
+        <div class="db-kpi-icon">⚡</div>
+        <div class="db-kpi-body">
+          <div class="db-kpi-lbl">Events 24h</div>
+          <div class="db-kpi-val" id="d-ev">—</div>
+          <div class="db-kpi-sub" id="d-hi" style="color:var(--re)">— critical</div>
+        </div>
+      </div>
+
+      <div class="db-kpi" id="dbk-sp" onclick="selectMktAsset('^GSPC','S&P 500');sv('markets',document.querySelector('[data-v=markets]'))" style="cursor:pointer">
+        <div class="db-kpi-icon">📈</div>
+        <div class="db-kpi-body">
+          <div class="db-kpi-lbl">S&amp;P 500</div>
+          <div class="db-kpi-val" id="d-sp">—</div>
+          <div class="db-kpi-sub" id="d-sp-c" style="color:var(--gr)">+0.00%</div>
+        </div>
+      </div>
+
+      <div class="db-kpi" id="dbk-btc">
+        <div class="db-kpi-icon">₿</div>
+        <div class="db-kpi-body">
+          <div class="db-kpi-lbl">Bitcoin</div>
+          <div class="db-kpi-val" id="d-btc">—</div>
+          <div class="db-kpi-sub" id="d-btc-c">—</div>
+        </div>
+      </div>
+
+      <div class="db-kpi" id="dbk-vix">
+        <div class="db-kpi-icon">😨</div>
+        <div class="db-kpi-body">
+          <div class="db-kpi-lbl">VIX Fear</div>
+          <div class="db-kpi-val" id="d-vix">—</div>
+          <div class="db-kpi-sub" id="d-vix-l">—</div>
+        </div>
+      </div>
+
+      <div class="db-kpi" id="dbk-gold">
+        <div class="db-kpi-icon">🥇</div>
+        <div class="db-kpi-body">
+          <div class="db-kpi-lbl">Gold</div>
+          <div class="db-kpi-val" id="d-gold">—</div>
+          <div class="db-kpi-sub" id="d-gold-c">—</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       ROW 2 — Crisis Spotlight (full width)
+  ═══════════════════════════════════════ -->
+  <div id="crisis-spotlight">
+    <div class="cs-bg"></div>
+    <div class="cs-border-glow"></div>
+    <div class="cs-content">
+      <div class="cs-left">
+        <div class="cs-overline">CRISIS SPOTLIGHT &bull; HIGHEST SEVERITY EVENT</div>
+        <div class="cs-title" id="cs-title">Loading critical event...</div>
+        <div class="cs-summary" id="cs-summary"></div>
+        <div class="cs-meta" id="cs-meta"></div>
+        <div class="cs-ai-note" id="cs-ai-note" style="display:none"></div>
+        <div class="cs-actions" style="margin-top:12px">
+          <button class="btn btn-d btn-sm" onclick="csFlyTo()">🗺 View on Map</button>
+          <button class="cs-load-btn" style="width:auto;padding:5px 12px;font-size:11px" onclick="csGetAI()">🤖 AI Analysis</button>
+          <a id="cs-link" target="_blank" class="btn btn-g btn-sm">Read Source ↗</a>
+        </div>
+      </div>
+      <div class="cs-right">
+        <div class="cs-sev-bar">
+          <div class="cs-sev-label">AI Severity Score</div>
+          <div class="cs-sev-num" id="cs-sev">—</div>
+          <div class="cs-sev-sub">/10</div>
+          <div style="height:3px;background:rgba(239,68,68,.15);border-radius:2px;margin-top:8px;overflow:hidden">
+            <div id="cs-sev-bar" style="height:100%;border-radius:2px;background:var(--re);width:0%;transition:width 1.5s"></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Market Exposure</div>
+          <div class="cs-markets" id="cs-markets"></div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Other Critical Events</div>
+          <div id="cs-others" style="display:flex;flex-direction:column;gap:4px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       ROW 3 — BENTO GRID  (main content)
+  ═══════════════════════════════════════ -->
+  <div class="db-bento">
+
+    <!-- A: Events Feed (tall, left) -->
+    <div class="db-bento-cell db-cell-events">
+      <div class="db-cell-header">
+        <div class="db-cell-title">
+          <span class="db-cell-icon">⚡</span>
+          <span id="d-evlist-label">High-Impact Events</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="d-pers-badge" style="display:none;font-size:9px;padding:1px 7px;border-radius:100px;background:rgba(59,130,246,.12);color:var(--b4);border:1px solid rgba(59,130,246,.2)">✦ For You</span>
+          <div style="display:flex;gap:8px;align-items:center">
+          <a class="db-cell-link" onclick="exportFeedCSV()" title="Export as CSV" style="font-size:10px">⬇ CSV</a>
+          <a class="db-cell-link" onclick="sv('feed',document.querySelector('[data-v=feed]'))">View all →</a>
+        </div>
+        </div>
+      </div>
+      <div id="d-evlist" class="db-evlist"></div>
+    </div>
+
+    <!-- B: Threat Matrix (top center) -->
+    <div class="db-bento-cell db-cell-threats">
+      <div class="db-cell-header">
+        <div class="db-cell-title"><span class="db-cell-icon">🎯</span>Threat Matrix</div>
+      </div>
+      <div class="threat-matrix" id="d-threats"></div>
+    </div>
+
+    <!-- C: Markets snapshot (top right) -->
+    <div class="db-bento-cell db-cell-markets">
+      <div class="db-cell-header">
+        <div class="db-cell-title"><span class="db-cell-icon">💹</span>Market Snapshot</div>
+        <a class="db-cell-link" onclick="sv('markets',document.querySelector('[data-v=markets]'))">All →</a>
+      </div>
+      <div id="d-mktlist" class="db-mktlist"></div>
+    </div>
+
+    <!-- D: AI Macro Briefing (center bottom) -->
+    <div class="db-bento-cell db-cell-ai">
+      <div class="db-cell-header">
+        <div class="db-cell-title">
+          <span class="db-cell-icon" style="background:rgba(167,139,250,.15);color:#A78BFA">🤖</span>
+          <span id="d-brief-label">AI Macro Briefing</span>
+        </div>
+        <span class="db-ai-badge" id="d-brief-badge">GPT</span>
+      </div>
+      <div class="aib-txt" id="d-brief-txt">Loading AI briefing…</div>
+    </div>
+
+    <!-- E: Risk Timeline (right center) -->
+    <div class="db-bento-cell db-cell-timeline">
+      <div class="db-cell-header">
+        <div class="db-cell-title"><span class="db-cell-icon">🕐</span>Risk Timeline</div>
+        <span style="font-size:9px;color:var(--t3)">Last 24h</span>
+      </div>
+      <div class="timeline" id="d-timeline"></div>
+    </div>
+
+    <!-- F: Category breakdown (bottom left) -->
+    <div class="db-bento-cell db-cell-cats">
+      <div class="db-cell-header">
+        <div class="db-cell-title"><span class="db-cell-icon">📊</span>Events by Category</div>
+      </div>
+      <div id="d-catbars"></div>
+    </div>
+
+    <!-- G: Active hotspots (bottom right) -->
+    <div class="db-bento-cell db-cell-hotspots">
+      <div class="db-cell-header">
+        <div class="db-cell-title"><span class="db-cell-icon">🔥</span>Active Hotspots</div>
+        <a class="db-cell-link" onclick="sv('map',document.querySelector('[data-v=map]'))">Map →</a>
+      </div>
+      <div id="d-hot" class="db-hotspot-grid"></div>
+    </div>
+
+  </div><!-- db-bento -->
+
+</div><!-- db-root -->
+
+</div><!-- view-dash end -->
+
+<!-- MAP -->
+<div class="view" id="view-map">
+  <div id="map"></div>
+
+  <!-- ── Knowledge Graph overlay ── -->
+  <div id="kg-overlay">
+    <canvas id="kg-canvas"></canvas>
+
+    <!-- Top bar -->
+    <div id="kg-topbar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;font-weight:700;color:var(--t1)">Event Knowledge Graph</span>
+        <span id="kg-stats" style="font-size:10px;color:var(--t3)">Loading…</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:9px;color:var(--t3)">Hover nodes &amp; edges · Click to open event</span>
+        <button id="kg-close-btn" onclick="closeKnowledgeGraph()">✕ Close</button>
+      </div>
+    </div>
+
+    <!-- Side panel: appears on hover -->
+    <div id="kg-panel">
+      <div id="kg-panel-body">
+        <div style="font-size:10px;color:var(--t3);padding:16px;text-align:center">
+          Hover over a node or edge to see details
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div id="kg-legend-box">
+      <div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">Relationship type</div>
+      <div class="kg-leg-row"><div class="kg-leg-line" style="background:#EF4444"></div><span>Causal</span></div>
+      <div class="kg-leg-row"><div class="kg-leg-line" style="background:#F59E0B"></div><span>Correlated</span></div>
+      <div class="kg-leg-row"><div class="kg-leg-line" style="background:#A78BFA"></div><span>Hierarchical</span></div>
+      <div class="kg-leg-row"><div class="kg-leg-line" style="background:#475569;border-style:dashed"></div><span>Temporal</span></div>
+      <div style="margin-top:8px;font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">Node size = severity</div>
+    </div>
+  </div>
+
+  <!-- ── Breaking news banner ── -->
+  <div id="map-breaking" style="display:none">
+    <div class="breaking-dot"></div>
+    <span class="breaking-label">BREAKING</span>
+    <span id="map-breaking-text" class="breaking-text"></span>
+    <button class="breaking-open" id="map-breaking-btn" onclick="openBreakingEvent()">View →</button>
+    <button class="breaking-close" onclick="this.parentElement.style.display='none'">✕</button>
+  </div>
+
+  <!-- ── Search bar (floats top-center, below toolbar) ── -->
+  <div id="map-search-bar">
+    <div id="map-search-wrap">
+      <span class="msearch-icon">🔍</span>
+      <input id="map-search-inp" type="text" placeholder="Search events, countries, topics…"
+             oninput="mapSearchInput(this.value)"
+             onkeydown="mapSearchKey(event)"
+             autocomplete="off" spellcheck="false"/>
+      <button id="map-search-clear" style="display:none" onclick="mapSearchClear()">✕</button>
+    </div>
+    <div id="map-search-results"></div>
+  </div>
+
+  <!-- ── Top toolbar ── -->
+  <div id="map-toolbar">
+    <button class="mtool-btn on" id="mtool-map"     onclick="setMapMode('map')">🗺 Map</button>
+    <div class="mtool-sep"></div>
+    <button class="mtool-btn"    id="mtool-heatmap"  onclick="setMapMode('heatmap')">🌡 Heat</button>
+    <button class="mtool-btn"    id="mtool-timeline" onclick="setMapMode('timeline')">⏱ Timeline</button>
+    <div class="mtool-sep"></div>
+    <button class="mtool-btn"    id="mtool-sent"     onclick="toggleSentimentOverlay()">💬 Sentiment</button>
+    <div class="mtool-sep"></div>
+    <button class="mtool-btn"    id="mtool-legend"   onclick="toggleMapLegend()">📖 Legend</button>
+  </div>
+
+  <!-- ── Map legend popup ── -->
+  <div id="map-legend-popup" style="display:none"></div>
+
+  <!-- ── Country panel (right side, appears on country focus) ── -->
+  <div id="country-panel">
+    <div id="country-panel-header">
+      <div>
+        <div id="cp-flag" style="font-size:24px;line-height:1"></div>
+        <div id="cp-name" style="font-size:14px;font-weight:700;color:var(--t1);margin-top:3px"></div>
+        <div id="cp-code" style="font-size:10px;color:var(--t3)"></div>
+      </div>
+      <button onclick="closeCountryPanel()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div id="country-panel-body">
+      <div class="cp-section">
+        <div class="cp-sec-title">Risk Score</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div id="cp-risk-score" class="cp-big-num">—</div>
+          <div style="flex:1">
+            <div id="cp-risk-bar-wrap" class="cp-bar-wrap">
+              <div id="cp-risk-bar" class="cp-bar-fill" style="width:0%"></div>
+            </div>
+            <div id="cp-risk-label" style="font-size:9px;color:var(--t3);margin-top:3px">Loading…</div>
+          </div>
+        </div>
+      </div>
+      <div class="cp-section">
+        <div class="cp-sec-title">Active Events</div>
+        <div id="cp-events-list" class="cp-list">
+          <div style="font-size:10px;color:var(--t3)">Loading…</div>
+        </div>
+      </div>
+      <div class="cp-section" id="cp-macro-section" style="display:none">
+        <div class="cp-sec-title">Macro Indicators</div>
+        <div id="cp-macro-list" class="cp-list"></div>
+      </div>
+      <div style="padding:10px 12px">
+        <button class="btn btn-o btn-sm" style="width:100%" onclick="mapFocusCountry(currentCountry)">
+          Focus map on this country
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Left panel ── -->
+  <div id="mleft">
+    <div class="mpc">
+      <div class="mptit">Global Risk Index</div>
+      <div class="risk-n" id="m-risk" style="color:var(--b4)">—</div>
+      <div class="risk-b"><div class="risk-bf" id="m-riskb" style="width:0%;background:var(--b5)"></div></div>
+      <div class="risk-l" id="m-riskl" style="color:var(--t3)">Loading...</div>
+    </div>
+    <div class="mpc"><div class="mptit">Filter</div><div id="mcats" style="display:flex;flex-wrap:wrap"></div></div>
+    <div class="mpc">
+      <div class="mptit">Live Stats</div>
+      <div class="mrow"><span style="color:var(--t2)">Visible</span><span class="mrv" id="m-evn">—</span></div>
+      <div class="mrow"><span style="color:var(--t2)">Clusters</span><span class="mrv" id="m-clusters" style="color:var(--b4)">—</span></div>
+      <div class="mrow"><span style="color:var(--t2)">High impact</span><span class="mrv" style="color:var(--re)" id="m-hin">—</span></div>
+      <div class="mrow"><span style="color:var(--t2)">Deduped</span><span class="mrv" style="color:var(--gr)" id="m-dedup">—</span></div>
+      <div class="mrow"><span style="color:var(--t2)">Updated</span><span class="mrv" id="m-upd">—</span></div>
+    </div>
+    <div class="mpc">
+      <div class="mptit" style="margin-bottom:6px">Zoom Level</div>
+      <div class="density-bar" id="density-bar">
+        <div class="density-seg"></div><div class="density-seg"></div><div class="density-seg"></div>
+        <div class="density-seg"></div><div class="density-seg"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:8px;color:var(--t4)">
+        <span>Global</span><span>Regional</span><span>Local</span>
+      </div>
+      <div style="font-size:10px;color:var(--b4);margin-top:5px;font-weight:600" id="zoom-mode-lbl">Global Overview</div>
+    </div>
+    <div class="mpc" id="kg-legend" style="display:none">
+      <div class="mptit">Relationship Types</div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">
+        <div style="display:flex;align-items:center;gap:7px;font-size:10px"><div style="width:18px;height:3px;background:#EF4444;border-radius:2px;flex-shrink:0"></div>Causal</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:10px"><div style="width:18px;height:3px;background:#F59E0B;border-radius:2px;flex-shrink:0"></div>Correlated</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:10px"><div style="width:18px;height:3px;background:#60A5FA;border-radius:2px;flex-shrink:0"></div>Hierarchical</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:10px"><div style="width:18px;height:3px;background:#94A3B8;border-radius:2px;flex-shrink:0;opacity:.6"></div>Temporal</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="map-zoom-overlay"></div>
+
+  <!-- ── Event Detail Panel ── -->
+  <div id="evpanel">
+    <div class="eph">
+      <button class="epx" onclick="closeEP()">×</button>
+      <div class="epcat" id="epcat"></div>
+      <div class="eptit" id="eptit"></div>
+      <!-- Severity meter bar -->
+      <div class="ep-sev-bar-wrap">
+        <div class="ep-sev-bar" id="ep-sev-bar" style="width:0%"></div>
+        <span class="ep-sev-num" id="ep-sev-num">—</span>
+      </div>
+      <!-- Panel tabs -->
+      <div class="ep-tabs">
+        <button class="ep-tab on" data-tab="overview" onclick="switchEPTab('overview',this)">Overview</button>
+        <button class="ep-tab" data-tab="analysis"  onclick="switchEPTab('analysis',this)">AI Analysis</button>
+        <button class="ep-tab" data-tab="markets"   onclick="switchEPTab('markets',this)">Markets</button>
+        <button class="ep-tab" data-tab="related"   onclick="switchEPTab('related',this)">Related</button>
+      </div>
+    </div>
+    <!-- TAB: overview -->
+    <div class="ep-tab-panel on" id="ept-overview">
+    <div class="epbody">
+      <div id="ep-dedup" style="display:none" class="dedup-badge">
+        <span>📰</span><span id="ep-dedup-txt">Multiple sources</span>
+      </div>
+      <div class="epsum" id="epsum"></div>
+      <div id="ep-sources" style="display:none">
+        <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Sources</div>
+        <div class="source-list" id="ep-source-list"></div>
+      </div>
+      <div class="epg">
+        <div class="epi"><div class="epil">Source</div><div class="epiv" id="epsrc"></div></div>
+        <div class="epi"><div class="epil">Impact</div><div class="epiv" id="epimp"></div></div>
+        <div class="epi"><div class="epil">Region</div><div class="epiv" id="epreg"></div></div>
+        <div class="epi"><div class="epil">Time</div><div class="epiv" id="eptime"></div></div>
+      </div>
+      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Related Markets</div>
+      <div class="mkts" id="epmkts"></div>
+      <div id="ai-market-note" style="font-size:11px;color:var(--am);margin-bottom:9px;display:none"></div>
+
+      <!-- Multi-dimensional sentiment panel -->
+      <div id="ep-sentiment" style="display:none;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Sentiment</div>
+          <div id="ep-sent-badge" class="sent-badge">—</div>
+        </div>
+        <div class="sent-score-bar" id="ep-sent-bar-wrap" style="margin-bottom:8px">
+          <span style="font-size:9px;color:var(--re)">−1</span>
+          <div class="sent-bar-track"><div id="ep-sent-bar" class="sent-bar-fill" style="width:50%;left:50%;background:var(--t3)"></div></div>
+          <span style="font-size:9px;color:var(--gr)">+1</span>
+          <span id="ep-sent-score" style="font-size:10px;font-weight:700;min-width:30px;text-align:right">0.0</span>
+        </div>
+        <div class="sent-multidim" id="ep-sent-multidim" style="display:none">
+          <div class="sent-dim-row">
+            <div class="sent-dim-label">Uncertainty</div>
+            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-uncertainty" style="width:0%;background:#F59E0B"></div></div>
+            <div class="sent-dim-val" id="sdim-uncertainty-v" style="color:#F59E0B">—</div>
+          </div>
+          <div class="sent-dim-row">
+            <div class="sent-dim-label">Market Stress</div>
+            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-stress" style="width:0%;background:#EF4444"></div></div>
+            <div class="sent-dim-val" id="sdim-stress-v" style="color:#EF4444">—</div>
+          </div>
+          <div class="sent-dim-row">
+            <div class="sent-dim-label">Narrative Momentum</div>
+            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-momentum" style="width:50%;background:#60A5FA"></div></div>
+            <div class="sent-dim-val" id="sdim-momentum-v" style="color:#60A5FA">—</div>
+          </div>
+          <div class="sent-dim-row">
+            <div class="sent-dim-label">Source Credibility</div>
+            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-cred" style="width:70%;background:#10B981"></div></div>
+            <div class="sent-dim-val" id="sdim-cred-v" style="color:#10B981">—</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <span class="sent-info-type" id="ep-info-type"></span>
+          <span style="font-size:9px;color:var(--t3)" id="ep-intensity"></span>
+        </div>
+        <div id="ep-entities" style="margin-top:8px"></div>
+        <div id="ep-ner" style="margin-top:8px;display:none">
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Named Entities</div>
+          <div id="ep-ner-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+        </div>
+      </div>
+
+      <!-- Related Events -->
+      <div id="ep-related" style="display:none;margin-bottom:10px">
+        <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Related Events <span id="ep-rel-count" style="color:var(--b4);font-weight:600"></span></div>
+        <div id="ep-related-list"></div>
+      </div>
+
+      <div class="epact">
+        <a id="eplink" target="_blank" class="btn btn-g btn-sm" style="flex:1;justify-content:center">Read Source</a>
+        <button class="btn btn-o btn-sm" onclick="watchEv()">+ Watch</button>
+        <button class="btn btn-g btn-sm" id="ep-save-btn" onclick="toggleSaveEvent()" title="Save to reading list">🔖 Save</button>
+      </div>
+    </div><!-- end epbody -->
+    </div><!-- end ept-overview -->
+
+    <!-- TAB: AI analysis -->
+    <div class="ep-tab-panel" id="ept-analysis">
+      <div class="epbody" style="padding-top:8px">
+        <div class="impact-row">
+          <button class="impact-btn" style="flex:1" onclick="showImpact()">📊 Market Impact</button>
+          <button class="impact-btn" style="flex:1" onclick="loadSimilarEvents()">🔗 Similar Events</button>
+          <button class="aibtn" style="flex:1" onclick="scoreEvent()">🎯 AI Score</button>
+        </div>
+        <div class="aisec" style="margin-top:8px">
+          <div class="aisec-t">Quick Analysis</div>
+          <button class="aibtn" onclick="panelAI('Summarize this event and its global significance in 3 bullet points.',true)">📋 Executive Summary</button>
+          <button class="aibtn" onclick="panelAI('What are the market impacts? Which assets and sectors are most affected?',true)">📈 Market Impact</button>
+          <button class="aibtn" onclick="panelAI('Assess geopolitical risk for this region. What escalation scenarios are possible?',true)">🌐 Geopolitical Risk</button>
+          <button class="aibtn" onclick="panelAI('What historical events are comparable? How did they resolve?',true)">📚 Historical Parallels</button>
+          <button class="aibtn" onclick="panelAI('What are likely developments in the next 30 days?',true)">🔮 30-Day Outlook</button>
+          <div class="aians" id="panelans"></div>
+        </div>
+        <div style="display:flex;gap:5px;margin-top:8px">
+          <button class="aibtn" style="flex:1;justify-content:center" onclick="runSentimentFull()">💬 Sentiment</button>
+          <button class="aibtn" style="flex:1;justify-content:center" onclick="panelAI('Classify the credibility of sources covering this event.',true)">🔍 Credibility</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Similar events panel (injected by loadSimilarEvents) -->
+    <div id="ep-similar" style="display:none;margin-bottom:10px">
+      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Similar Events</div>
+      <div id="ep-similar-list"></div>
+    </div>
+
+    <!-- TAB: markets -->
+    <div class="ep-tab-panel" id="ept-markets">
+      <div class="epbody" style="padding-top:8px">
+        <div class="aisec">
+          <div class="aisec-t">Related Assets</div>
+          <div class="mkts" id="epmkts" style="margin-bottom:10px"></div>
+          <div id="ai-market-note" style="font-size:11px;color:var(--am);margin-bottom:9px;display:none"></div>
+          <button class="aibtn" onclick="panelAI('Detailed market impact: which assets, by how much, and why?',true)">📈 Detailed Analysis</button>
+          <button class="aibtn" onclick="panelAI('What commodity, forex and equity correlations are relevant?',true)">🔗 Correlations</button>
+          <button class="aibtn" onclick="panelAI('Suggest 3 specific hedging strategies for this event type.',true)">🛡 Hedging Strategies</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: related -->
+    <div class="ep-tab-panel" id="ept-related">
+      <div class="epbody" style="padding-top:8px">
+        <div style="display:flex;gap:5px;margin-bottom:8px">
+          <button class="aibtn" style="flex:1;justify-content:center" onclick="loadRelatedEvents()">🔗 Find Related</button>
+          <button class="aibtn" style="flex:1;justify-content:center" onclick="openCountryPanelForEv()">🌍 Country Profile</button>
+        </div>
+        <div id="ep-sentiment" style="display:none;margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Sentiment</div>
+            <div id="ep-sent-badge" class="sent-badge">—</div>
+          </div>
+          <div class="sent-score-bar" id="ep-sent-bar-wrap" style="margin-bottom:8px">
+            <span style="font-size:9px;color:var(--re)">−1</span>
+            <div class="sent-bar-track"><div id="ep-sent-bar" class="sent-bar-fill" style="width:50%;left:0;background:var(--b5)"></div></div>
+            <span style="font-size:9px;color:var(--gr)">+1</span>
+            <span id="ep-sent-score" style="font-size:10px;font-weight:700;min-width:30px;text-align:right">—</span>
+          </div>
+          <div class="sent-multidim" id="ep-sent-multidim" style="display:none">
+            <div class="sent-dim-row"><div class="sent-dim-label">Uncertainty</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-uncertainty" style="width:0%;background:var(--am)"></div></div><div class="sent-dim-val" id="sdim-uncertainty-v" style="color:#F59E0B">—</div></div>
+            <div class="sent-dim-row"><div class="sent-dim-label">Market Stress</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-stress" style="width:0%;background:var(--re)"></div></div><div class="sent-dim-val" id="sdim-stress-v" style="color:#EF4444">—</div></div>
+            <div class="sent-dim-row"><div class="sent-dim-label">Narrative Momentum</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-momentum" style="width:50%;background:var(--b5)"></div></div><div class="sent-dim-val" id="sdim-momentum-v" style="color:#60A5FA">—</div></div>
+            <div class="sent-dim-row"><div class="sent-dim-label">Source Credibility</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-cred" style="width:70%;background:var(--gr)"></div></div><div class="sent-dim-val" id="sdim-cred-v" style="color:#10B981">—</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <span class="sent-info-type" id="ep-info-type"></span>
+            <span style="font-size:9px;color:var(--t3)" id="ep-intensity"></span>
+          </div>
+          <div id="ep-entities" style="margin-top:8px"></div>
+          <div id="ep-ner" style="margin-top:8px;display:none">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Entities</div>
+            <div id="ep-ner-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+          </div>
+        </div>
+        <div id="ep-related" style="display:none;margin-bottom:10px">
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin:0 0 6px">Related Events</div>
+          <div id="ep-related-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline slider -->
+  <div id="map-timeline-wrap">
+    <span style="font-size:10px;color:var(--t3);white-space:nowrap">⏱ Last</span>
+    <input type="range" id="timeline-slider" min="1" max="168" value="72" step="1" oninput="document.getElementById('timeline-label').textContent=this.value+'h'">
+    <span id="timeline-label">72h</span>
+    <button class="mtool-btn" onclick="applyTimelineFilter()" style="padding:4px 10px">Apply</button>
+  </div>
+
+  <button id="map-hm-btn" onclick="toggleHeatmap()" style="display:none">Heatmap</button>
+  <div id="mctrl">
+    <button class="mcb" onclick="G.map&&G.map.zoomIn()" title="Zoom in">+</button>
+    <button class="mcb" onclick="G.map&&G.map.zoomOut()" title="Zoom out">−</button>
+    <button class="mcb" onclick="G.map&&G.map.flyTo([25,15],3,{duration:1.5})" title="World view">○</button>
+    <button class="mcb" onclick="qf('CONFLICT')" title="Conflicts only">C</button>
+    <button class="mcb" onclick="qf(null)" title="Show all">A</button>
+  </div>
+  <div id="map-zoom-hud" style="display:none">
+    <div class="zoom-hud-label">View</div>
+    <div class="zoom-hud-mode" id="zoom-hud-text">Global</div>
+    <div class="zoom-hud-dots" id="zoom-hud-dots">
+      <div class="zoom-hud-dot"></div><div class="zoom-hud-dot"></div>
+      <div class="zoom-hud-dot"></div><div class="zoom-hud-dot"></div><div class="zoom-hud-dot"></div>
+    </div>
+    <div style="font-size:9px;color:var(--t3)" id="zoom-hud-count">—</div>
+  </div>
+
+  <!-- ── TIMELINE STRIP ── -->
+  <div id="map-timeline">
+    <div id="timeline-label">Event density — last 48h</div>
+    <div id="timeline-track"></div>
+  </div>
+
+  <!-- ── MARKET STRESS METER ── -->
+  <div id="stress-meter">
+    <div class="stress-title">Market Stress</div>
+    <div class="stress-gauge"><div class="stress-fill" id="stress-fill" style="width:0%;background:#10B981"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-bottom:4px">
+      <span id="stress-val">—</span><span id="stress-lbl">—</span>
+    </div>
+    <div class="stress-title" style="margin-top:4px">Avg Uncertainty</div>
+    <div class="stress-gauge"><div class="stress-fill" id="unc-fill" style="width:0%;background:#60A5FA"></div></div>
+    <div style="font-size:9px;color:var(--t3)" id="unc-val">—</div>
+  </div>
+
+</div>
+<!-- MARKETS -->
+<!-- ════════════════════════════════════════════════════
+     GRAPH VIEW — Auto News Knowledge Graph
+════════════════════════════════════════════════════ -->
+<div class="view" id="view-graph">
+  <div class="ng-root">
+
+    <!-- ── Left controls panel ── -->
+    <div class="ng-sidebar">
+      <!-- ── Mode tab switcher ── -->
+      <div class="ng-tab-bar">
+        <button class="ng-tab on" id="ng-tab-graph" onclick="ngSwitchMode('graph',this)">
+          <span>🕸</span> News Graph
+        </button>
+        <button class="ng-tab" id="ng-tab-explorer" onclick="ngSwitchMode('explorer',this)">
+          <span>🔍</span> Explorer
+        </button>
+        <button class="ng-tab" id="ng-tab-timeline" onclick="ngSwitchMode('timeline',this)">
+          <span>📅</span> Timeline
+        </button>
+        <button class="ng-tab" id="ng-tab-cascade" onclick="ngSwitchMode('cascade',this)">
+          <span>🔗</span> Cascade
+        </button>
+      </div>
+
+      <div id="ng-mode-graph" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding-bottom:16px">
+      <!-- Build controls -->
+      <div class="ng-section">
+        <div class="ng-sec-title">Build Settings</div>
+        <div class="ng-ctrl-row">
+          <label class="ng-label">Time window</label>
+          <select class="fi ng-select" id="ng-hours">
+            <option value="6">Last 6h</option>
+            <option value="24" selected>Last 24h</option>
+            <option value="48">Last 48h</option>
+            <option value="120">Last 5 days</option>
+          </select>
+        </div>
+        <div class="ng-ctrl-row">
+          <label class="ng-label">Min severity</label>
+          <select class="fi ng-select" id="ng-severity">
+            <option value="3">3.0 — All</option>
+            <option value="4.5" selected>4.5 — Medium+</option>
+            <option value="6">6.0 — High only</option>
+            <option value="7.5">7.5 — Critical</option>
+          </select>
+        </div>
+        <div class="ng-ctrl-row">
+          <label class="ng-label">Max nodes</label>
+          <select class="fi ng-select" id="ng-maxnodes">
+            <option value="40">40 — Fast</option>
+            <option value="80" selected>80 — Balanced</option>
+            <option value="150">150 — Dense</option>
+          </select>
+        </div>
+        <div class="ng-ctrl-row">
+          <label class="ng-label">Similarity edges</label>
+          <input type="range" id="ng-sim-thresh" min="0.1" max="0.8" step="0.05" value="0.25"
+                 oninput="document.getElementById('ng-sim-val').textContent=this.value"
+                 style="flex:1;accent-color:var(--b5)"/>
+          <span id="ng-sim-val" style="font-size:10px;color:var(--b4);min-width:30px;text-align:right">0.25</span>
+        </div>
+        <button class="ng-build-btn" id="ng-build-btn" onclick="ngBuild()">
+          <span id="ng-build-icon">⚡</span> Build Graph
+        </button>
+      </div>
+
+      <!-- Node search -->
+      <div class="ng-section">
+        <div class="ng-sec-title">Search Nodes</div>
+        <div style="position:relative">
+          <input type="text" id="ng-search-inp" class="fi"
+                 placeholder="Entity, person, ticker…"
+                 oninput="ngSearchNodes(this.value)"
+                 style="width:100%;font-size:10px;padding:5px 26px 5px 8px;box-sizing:border-box"/>
+          <span style="position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--t3);pointer-events:none">🔍</span>
+        </div>
+        <div id="ng-search-results" style="display:none;max-height:130px;overflow-y:auto;margin-top:4px;border:1px solid var(--bd);border-radius:var(--r4);background:var(--bg2)"></div>
+      </div>
+
+      <!-- View filters -->
+      <div class="ng-section">
+        <div class="ng-sec-title">Show / Hide</div>
+        <div class="ng-toggle-row">
+          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-news" checked onchange="ngRedraw()"> News</label>
+        </div>
+        <div class="ng-toggle-row">
+          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-entities" checked onchange="ngRedraw()"> Entities</label>
+        </div>
+        <div class="ng-toggle-row">
+          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-similarity" checked onchange="ngRedraw()"> Similarity edges</label>
+        </div>
+        <div class="ng-toggle-row">
+          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-cooc" checked onchange="ngRedraw()"> Co-occurrence edges</label>
+        </div>
+        <div class="ng-toggle-row">
+          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-mentions" checked onchange="ngRedraw()"> Mention edges</label>
+        </div>
+        <div class="ng-ctrl-row" style="margin-top:8px">
+          <label class="ng-label">Category</label>
+          <select class="fi ng-select" id="ng-cat-filter" onchange="ngRedraw()">
+            <option value="ALL">All</option>
+            <option value="ECONOMICS">Economics</option>
+            <option value="FINANCE">Finance</option>
+            <option value="CONFLICT">Conflict</option>
+            <option value="GEOPOLITICS">Geopolitics</option>
+            <option value="POLITICS">Politics</option>
+            <option value="ENERGY">Energy</option>
+            <option value="TECHNOLOGY">Technology</option>
+            <option value="DISASTER">Disaster</option>
+          </select>
+        </div>
+        <div class="ng-ctrl-row">
+          <label class="ng-label">Entity type</label>
+          <select class="fi ng-select" id="ng-entity-filter" onchange="ngRedraw()">
+            <option value="ALL">All entities</option>
+            <option value="company">Organizations</option>
+            <option value="person">Persons</option>
+            <option value="location">Locations</option>
+            <option value="ticker">Tickers</option>
+            <option value="commodity">Commodities</option>
+          </select>
+        </div>
+        <div class="ng-ctrl-row">
+          <label class="ng-label">Min degree</label>
+          <input type="range" id="ng-min-degree" min="0" max="10" step="1" value="0"
+                 oninput="ngSetMinDegree(this.value)" style="flex:1;accent-color:var(--b5)"/>
+          <span id="ng-min-degree-val" style="font-size:10px;color:var(--b4);min-width:18px;text-align:right">0</span>
+        </div>
+      </div>
+
+      <!-- Community legend -->
+      <div class="ng-section" id="ng-comm-legend" style="display:none">
+        <div class="ng-sec-title">Communities</div>
+        <div id="ng-comm-legend-body"></div>
+      </div>
+
+      <!-- Layout controls -->
+      <div class="ng-section">
+        <div class="ng-sec-title">Layout</div>
+        <div class="ng-ctrl-row">
+          <label class="ng-label">Force strength</label>
+          <input type="range" id="ng-force" min="0.2" max="2" step="0.1" value="1"
+                 oninput="ngSetForce(this.value)"
+                 style="flex:1;accent-color:var(--b5)"/>
+        </div>
+        <div style="display:flex;gap:5px;margin-top:6px">
+          <button class="btn btn-g btn-xs" style="flex:1" onclick="ngResetLayout()">↺ Reset</button>
+          <button class="btn btn-g btn-xs" style="flex:1" onclick="ngFitToView()">⊞ Fit</button>
+          <button class="btn btn-g btn-xs" style="flex:1" onclick="ngExportJSON()">↓ JSON</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="ng-section" id="ng-stats" style="display:none">
+        <div class="ng-sec-title">Graph Stats</div>
+        <div id="ng-stats-body"></div>
+      </div>
+
+      <!-- Legend -->
+      <div class="ng-section">
+        <div class="ng-sec-title">Legend</div>
+        <div class="ng-legend-items">
+          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#3B82F6"></div><span>News</span></div>
+          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#10B981"></div><span>Organization</span></div>
+          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#F59E0B"></div><span>Person</span></div>
+          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#8B5CF6"></div><span>Location</span></div>
+          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#F97316"></div><span>Ticker</span></div>
+          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#EC4899"></div><span>Commodity</span></div>
+        </div>
+        <div style="margin-top:8px">
+          <div class="ng-leg-edge" style="border-color:rgba(148,163,184,.5)">── mentions</div>
+          <div class="ng-leg-edge" style="border-color:#60A5FA;border-style:dashed">- - co-occur</div>
+          <div class="ng-leg-edge" style="border-color:#F59E0B;border-style:dotted">··· similar</div>
+        </div>
+        <div style="margin-top:8px;font-size:9px;color:var(--t3);line-height:1.6">
+          Node size = degree centrality<br>
+          Ring color = community ID<br>
+          Drag to reposition nodes<br>
+          Scroll to zoom · Click to inspect
+        </div>
+      </div>
+      </div><!-- ng-mode-graph -->
+
+      <!-- ── Explorer mode sidebar ── -->
+      <div id="ng-mode-explorer" style="display:none;flex-direction:column;gap:0;height:100%;overflow:hidden">
+
+        <!-- Search bar -->
+        <div style="padding:12px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
+          <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--t1);margin-bottom:8px">
+            Knowledge Explorer
+          </div>
+          <div style="font-size:9px;color:var(--t3);margin-bottom:10px;line-height:1.5">
+            Search any topic to build an interactive knowledge map with sources
+          </div>
+          <div style="position:relative">
+            <input type="text" id="kex-search-inp" class="fi"
+                   placeholder="e.g. semiconductors, trade war, Fed policy…"
+                   style="width:100%;font-size:11px;padding:8px 32px 8px 10px;box-sizing:border-box;border-radius:var(--r8)"
+                   onkeydown="if(event.key==='Enter')kexSearch()"
+            />
+            <button onclick="kexSearch()" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--b6);border:none;border-radius:5px;padding:3px 8px;font-size:10px;color:#fff;cursor:pointer;font-weight:700">Go</button>
+          </div>
+          <!-- Quick topics -->
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px" id="kex-quick-topics">
+            <span class="kex-chip" onclick="kexSearchTerm('semiconductors')">Semiconductors</span>
+            <span class="kex-chip" onclick="kexSearchTerm('US-China trade')">US-China</span>
+            <span class="kex-chip" onclick="kexSearchTerm('Federal Reserve')">Fed Policy</span>
+            <span class="kex-chip" onclick="kexSearchTerm('energy crisis')">Energy</span>
+            <span class="kex-chip" onclick="kexSearchTerm('AI regulation')">AI Policy</span>
+            <span class="kex-chip" onclick="kexSearchTerm('Ukraine conflict')">Ukraine</span>
+          </div>
+        </div>
+
+        <!-- Results / node list -->
+        <div style="flex:1;overflow-y:auto;padding:8px">
+          <div id="kex-sidebar-content">
+            <div style="text-align:center;padding:32px 12px;color:var(--t3)">
+              <div style="font-size:32px;margin-bottom:8px">🔍</div>
+              <div style="font-size:11px;line-height:1.6">Search a topic to build<br>your knowledge map</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active node detail -->
+        <div id="kex-node-detail" style="display:none;border-top:1px solid var(--bd);flex-shrink:0;max-height:50%;overflow-y:auto;padding:10px 12px">
+        </div>
+
+      </div><!-- ng-mode-explorer -->
+      <!-- ── Timeline mode sidebar ── -->
+      <div id="ng-mode-timeline" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+
+        <div style="padding:10px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
+          <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--t1);margin-bottom:6px">Event Timeline</div>
+          <div style="font-size:9px;color:var(--t3);line-height:1.5;margin-bottom:8px">Events plotted on a temporal axis — severity drives vertical position</div>
+
+          <!-- Time range -->
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Window</label>
+            <select class="fi ng-select" id="tl-hours" onchange="tlBuild()">
+              <option value="12">12 hours</option>
+              <option value="24" selected>24 hours</option>
+              <option value="48">48 hours</option>
+              <option value="120">5 days</option>
+              <option value="240">10 days</option>
+            </select>
+          </div>
+          <!-- Band filter -->
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Band</label>
+            <select class="fi ng-select" id="tl-band" onchange="tlBuild()">
+              <option value="all">All bands</option>
+              <option value="conflict">⚔ Conflict</option>
+              <option value="geopolitical">🌐 Geopolitical</option>
+              <option value="macro">🏦 Macro</option>
+              <option value="markets">📈 Markets</option>
+              <option value="energy">⚡ Energy</option>
+              <option value="disaster">🌪 Disaster</option>
+              <option value="tech">💻 Tech</option>
+              <option value="humanitarian">🤝 Humanitarian</option>
+            </select>
+          </div>
+          <!-- Min severity -->
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Min sev.</label>
+            <input type="range" id="tl-minsev" min="1" max="9" step="0.5" value="3"
+                   oninput="document.getElementById('tl-minsev-val').textContent=this.value;tlBuild()"
+                   style="flex:1;accent-color:var(--b5)"/>
+            <span id="tl-minsev-val" style="font-size:10px;color:var(--b4);min-width:22px;text-align:right">3</span>
+          </div>
+          <!-- Group toggle -->
+          <div class="ng-toggle-row" style="margin-top:4px">
+            <label class="ng-toggle-label">
+              <input type="checkbox" id="tl-group" checked onchange="tlBuild()">
+              Group narratives
+            </label>
+          </div>
+          <button class="ng-build-btn" onclick="tlBuild()" style="margin-top:8px;width:100%;font-size:11px;padding:7px">
+            ⚡ Refresh Timeline
+          </button>
+        </div>
+
+        <!-- Event list below chart -->
+        <div style="flex:1;overflow-y:auto;padding:8px">
+          <div id="tl-event-list">
+            <div style="text-align:center;padding:28px 12px;color:var(--t3);font-size:11px">
+              Click a node on the timeline to see event details
+            </div>
+          </div>
+        </div>
+
+      </div><!-- ng-mode-timeline -->
+      <!-- ── Dependency Cascade sidebar ── -->
+      <div id="ng-mode-cascade" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+
+        <div style="padding:10px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
+          <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--t1);margin-bottom:4px">Risk Cascade Simulator</div>
+          <div style="font-size:9px;color:var(--t3);line-height:1.5;margin-bottom:10px">Simulate how a shock propagates through the global dependency network</div>
+
+          <!-- Source node -->
+          <div class="ng-ctrl-row" style="margin-bottom:6px">
+            <label class="ng-label">Shock source</label>
+            <input type="text" id="cas-source" class="fi" value="US"
+                   placeholder="US, CN, NVDA, Energy…"
+                   style="flex:1;font-size:10px;padding:5px 8px"/>
+          </div>
+          <!-- Shock magnitude -->
+          <div class="ng-ctrl-row" style="margin-bottom:6px">
+            <label class="ng-label">Magnitude</label>
+            <input type="range" id="cas-shock" min="1" max="10" step="0.5" value="8"
+                   oninput="document.getElementById('cas-shock-val').textContent=this.value"
+                   style="flex:1;accent-color:var(--re)"/>
+            <span id="cas-shock-val" style="font-size:10px;color:var(--re);min-width:22px;text-align:right">8</span>
+          </div>
+          <!-- Max hops -->
+          <div class="ng-ctrl-row" style="margin-bottom:6px">
+            <label class="ng-label">Max hops</label>
+            <select class="fi ng-select" id="cas-hops">
+              <option value="2">2 hops</option>
+              <option value="3" selected>3 hops</option>
+              <option value="4">4 hops</option>
+              <option value="5">5 hops</option>
+            </select>
+          </div>
+          <!-- Damping -->
+          <div class="ng-ctrl-row" style="margin-bottom:8px">
+            <label class="ng-label">Damping</label>
+            <input type="range" id="cas-damp" min="0.3" max="0.9" step="0.05" value="0.65"
+                   oninput="document.getElementById('cas-damp-val').textContent=this.value"
+                   style="flex:1;accent-color:var(--b5)"/>
+            <span id="cas-damp-val" style="font-size:10px;color:var(--b4);min-width:28px;text-align:right">0.65</span>
+          </div>
+
+          <button class="ng-build-btn" onclick="casRun()" style="width:100%;font-size:11px;padding:7px;background:var(--re)">
+            ⚡ Run Cascade
+          </button>
+
+          <!-- Path finder -->
+          <div style="border-top:1px solid var(--bd);margin-top:12px;padding-top:10px">
+            <div style="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:6px">Dependency Path Finder</div>
+            <div style="display:flex;gap:5px;margin-bottom:5px">
+              <input type="text" id="cas-path-src" class="fi" placeholder="From…" style="flex:1;font-size:10px;padding:5px 8px"/>
+              <input type="text" id="cas-path-tgt" class="fi" placeholder="To…"   style="flex:1;font-size:10px;padding:5px 8px"/>
+            </div>
+            <button class="btn btn-p btn-xs" onclick="casPath()" style="width:100%;font-size:10px;padding:5px">🔍 Find Path</button>
+          </div>
+
+          <!-- Critical nodes button -->
+          <div style="border-top:1px solid var(--bd);margin-top:10px;padding-top:8px">
+            <button class="btn btn-g btn-xs" onclick="casCritical()" style="width:100%;font-size:10px;padding:5px">🎯 Most Critical Nodes</button>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div style="flex:1;overflow-y:auto;padding:8px">
+          <div id="cas-results">
+            <div style="text-align:center;padding:28px 12px;color:var(--t3);font-size:11px">
+              <div style="font-size:32px;margin-bottom:8px">🔗</div>
+              Run a cascade simulation or find a dependency path
+            </div>
+          </div>
+        </div>
+      </div><!-- ng-mode-cascade -->
+
+    </div>
+
+
+    <!-- ── Canvas area ── -->
+    <div class="ng-canvas-wrap" id="ng-canvas-wrap" style="display:flex;flex-direction:column;position:relative">
+      <!-- Empty state -->
+      <div id="ng-empty" class="ng-empty">
+        <div style="font-size:48px;margin-bottom:12px">🕸</div>
+        <div style="font-family:var(--fh);font-size:18px;font-weight:700;margin-bottom:8px">News Knowledge Graph</div>
+        <div style="font-size:12px;color:var(--t3);max-width:300px;text-align:center;line-height:1.8;margin-bottom:20px">
+          Automatically extracts entities from live news and builds a relationship graph with communities and centrality metrics.
+        </div>
+        <button class="ng-build-btn" onclick="ngBuild()" style="font-size:13px;padding:10px 28px">
+          ⚡ Build Graph Now
+        </button>
+        <div style="font-size:10px;color:var(--t4);margin-top:12px">Takes ~2–5 seconds · Uses last 24h of news</div>
+      </div>
+
+      <!-- Loading overlay -->
+      <div id="ng-loading" style="display:none" class="ng-loading">
+        <div class="ng-spinner"></div>
+        <div id="ng-loading-msg" style="font-size:12px;color:var(--t2);margin-top:14px">Building graph…</div>
+        <div id="ng-loading-sub" style="font-size:10px;color:var(--t3);margin-top:4px"></div>
+      </div>
+
+      <!-- Main canvas -->
+      <canvas id="ng-canvas" style="display:none;cursor:grab"></canvas>
+
+      <!-- ── Knowledge Explorer canvas ── -->
+      <div id="kex-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
+        <!-- Explorer top bar -->
+        <div id="kex-topbar" style="padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg1)">
+          <div id="kex-query-label" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">—</div>
+          <div id="kex-breadcrumb" style="font-size:10px;color:var(--t3);flex:1"></div>
+          <div style="display:flex;gap:6px">
+            <button onclick="kexLayout('radial')" id="kex-btn-radial" class="kex-view-btn on" title="Radial layout">⊙</button>
+            <button onclick="kexLayout('force')"  id="kex-btn-force"  class="kex-view-btn"    title="Force layout">⛶</button>
+            <button onclick="kexReset()" class="btn btn-g btn-xs" title="Reset graph">↺ Reset</button>
+          </div>
+        </div>
+        <!-- SVG canvas for explorer graph -->
+        <div id="kex-svg-wrap" style="flex:1;position:relative;overflow:hidden">
+          <svg id="kex-svg" style="width:100%;height:100%"></svg>
+          <!-- Zoom controls -->
+          <div style="position:absolute;bottom:14px;right:12px;display:flex;flex-direction:column;gap:3px">
+            <button class="ng-zoom-btn" onclick="kexZoom(1.3)">+</button>
+            <button class="ng-zoom-btn" onclick="kexZoom(0.77)">−</button>
+            <button class="ng-zoom-btn" onclick="kexFitView()">⊞</button>
+          </div>
+          <!-- Legend -->
+          <div id="kex-legend" style="position:absolute;bottom:14px;left:12px;font-size:9px;color:var(--t3);line-height:1.8">
+            <div><span style="color:#3B82F6">●</span> Live Event</div>
+            <div><span style="color:#10B981">●</span> Concept</div>
+            <div><span style="color:#F59E0B">●</span> Entity</div>
+            <div><span style="color:#8B5CF6">●</span> Source</div>
+          </div>
+        </div>
+      </div><!-- kex-canvas-wrap -->
+
+      <!-- ── Timeline Graph canvas ── -->
+      <div id="tl-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
+        <!-- Timeline topbar -->
+        <div id="tl-topbar" style="padding:8px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg1)">
+          <div id="tl-title" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">Event Timeline</div>
+          <div id="tl-stat-pill" style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(59,130,246,.12);color:var(--b4)"></div>
+          <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <span style="font-size:9px;color:var(--t3)">Colour:</span>
+            <button class="tl-color-btn on" id="tl-col-band"     onclick="tlSetColorMode('band',this)"    title="By band">Band</button>
+            <button class="tl-color-btn"   id="tl-col-severity"  onclick="tlSetColorMode('severity',this)" title="By severity">Severity</button>
+            <button class="tl-color-btn"   id="tl-col-sentiment" onclick="tlSetColorMode('sentiment',this)" title="By sentiment">Sentiment</button>
+          </div>
+        </div>
+        <!-- SVG timeline canvas -->
+        <div id="tl-svg-wrap" style="flex:1;position:relative;overflow:hidden;background:var(--bg0)">
+          <svg id="tl-svg" style="width:100%;height:100%"></svg>
+          <!-- Time axis label -->
+          <div id="tl-axis-label" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--t4)">← older &nbsp;&nbsp; newer →</div>
+          <!-- Zoom controls -->
+          <div style="position:absolute;top:10px;right:12px;display:flex;gap:3px">
+            <button class="ng-zoom-btn" onclick="tlZoom(1.3)" title="Zoom in">+</button>
+            <button class="ng-zoom-btn" onclick="tlZoom(0.77)" title="Zoom out">−</button>
+            <button class="ng-zoom-btn" onclick="tlFitView()" title="Fit all">⊞</button>
+          </div>
+          <!-- Band legend -->
+          <div id="tl-legend" style="position:absolute;top:10px;left:12px;font-size:9px;color:var(--t3);line-height:1.9;background:rgba(6,11,18,.7);padding:6px 9px;border-radius:8px;border:1px solid var(--bd)"></div>
+        </div>
+      </div><!-- tl-canvas-wrap -->
+
+      <!-- ── Dependency Cascade canvas ── -->
+      <div id="cas-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
+        <div id="cas-topbar" style="padding:8px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg1)">
+          <div id="cas-title" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">Dependency Cascade</div>
+          <div id="cas-stat" style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(239,68,68,.12);color:#EF4444"></div>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="ng-zoom-btn" onclick="casZoom(1.3)">+</button>
+            <button class="ng-zoom-btn" onclick="casZoom(0.77)">−</button>
+            <button class="ng-zoom-btn" onclick="casFitView()">⊞</button>
+          </div>
+        </div>
+        <div id="cas-svg-wrap" style="flex:1;position:relative;overflow:hidden;background:var(--bg0)">
+          <svg id="cas-svg" style="width:100%;height:100%"></svg>
+        </div>
+      </div><!-- cas-canvas-wrap -->
+
+      <!-- 2D / 3D mode toggle -->
+      <div class="ng-mode-toggle" id="ng-mode-toggle" style="display:none">
+        <button class="ng-mode-btn on" id="ng-btn-2d" onclick="ngSetMode('2d',this)" title="2D Force Layout">2D</button>
+        <button class="ng-mode-btn"    id="ng-btn-3d" onclick="ngSetMode('3d',this)" title="3D WebGL">3D</button>
+      </div>
+
+      <!-- Zoom controls overlay -->
+      <div class="ng-zoom-ctrls" id="ng-zoom-ctrls" style="display:none">
+        <button onclick="ngZoomIn()">+</button>
+        <button onclick="ngZoomOut()">−</button>
+        <button onclick="ngFitToView()">⊞</button>
+      </div>
+
+      <!-- Three.js WebGL container (3D mode) -->
+      <div id="ng-3d-wrap" style="display:none;position:absolute;inset:0;"></div>
+
+      <!-- Top-right info bar -->
+      <div class="ng-info-bar" id="ng-info-bar" style="display:none">
+        <span id="ng-bar-nodes" class="ng-stat-pill"></span>
+        <span id="ng-bar-edges" class="ng-stat-pill"></span>
+        <span id="ng-bar-communities" class="ng-stat-pill"></span>
+        <span id="ng-bar-time" class="ng-stat-pill" style="color:var(--t3)"></span>
+      </div>
+    </div>
+
+    <!-- ── Detail panel (right) ── -->
+    <div class="ng-detail" id="ng-detail" style="display:none">
+      <div class="ng-detail-header">
+        <div id="ng-detail-type-badge" class="ng-type-badge"></div>
+        <button onclick="ngCloseDetail()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1;padding:2px">✕</button>
+      </div>
+      <div id="ng-detail-body" class="ng-detail-body"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="view" id="view-markets">
+
+  <!-- ── SIDEBAR ── -->
+  <div class="mkt-sidebar">
+    <div class="mkt-search-wrap">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-family:var(--fh);font-size:13px;font-weight:700">Quant Lab</span>
+        <div class="mkt-mode-toggle">
+          <button class="mkt-mode-btn active" id="mkt-mode-beginner" onclick="setMktMode('beginner',this)">Guide</button>
+          <button class="mkt-mode-btn" id="mkt-mode-advanced" onclick="setMktMode('advanced',this)">Quant</button>
+        </div>
+      </div>
+      <input class="mkt-search" type="text" id="mkt-search-inp" placeholder="Symbol, name or ISIN…" oninput="filterMktAssets(this.value)">
+    </div>
+    <div class="mkt-sidebar-list" id="mkt-sidebar-list">
+      <div class="mkt-section-lbl">Trending</div>
+      <div id="mkt-trending"></div>
+      <div class="mkt-section-lbl">Watchlist</div>
+      <div id="mkt-wl-list"></div>
+      <div class="mkt-section-lbl" style="display:flex;align-items:center;justify-content:space-between">
+        <span>All Assets</span>
+        <span style="font-size:9px;color:var(--t4)" id="mkt-asset-count"></span>
+      </div>
+      <div id="mkt-all-list"></div>
+    </div>
+  </div>
+
+  <!-- ── MAIN PANEL ── -->
+  <div class="mkt-main" id="mkt-main">
+
+    <!-- Empty state -->
+    <div class="mkt-empty-state" id="mkt-empty">
+      <div style="font-size:48px;margin-bottom:12px">📐</div>
+      <div style="font-family:var(--fh);font-size:20px;font-weight:700;color:var(--t1);margin-bottom:6px">Quantitative Lab</div>
+      <div style="font-size:12px;color:var(--t3);max-width:280px;text-align:center;line-height:1.7">Select an asset from the sidebar to start your analysis — charts, forecasts, backtests, factor models and Monte Carlo simulation.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px">
+        <button class="btn btn-g btn-sm" onclick="selectMktAsset('^GSPC','S&P 500')">S&amp;P 500</button>
+        <button class="btn btn-g btn-sm" onclick="selectMktAsset('BTC-USD','Bitcoin')">Bitcoin</button>
+        <button class="btn btn-g btn-sm" onclick="selectMktAsset('GC=F','Gold')">Gold</button>
+        <button class="btn btn-g btn-sm" onclick="selectMktAsset('NVDA','NVIDIA')">NVDA</button>
+      </div>
+    </div>
+
+    <!-- Ticker content -->
+    <div id="mkt-ticker-content" style="display:none;flex-direction:column;flex:1;min-height:0">
+
+      <!-- ── HEADER ── -->
+      <div class="mkt-ticker-bar">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <div class="mkt-ticker-name" id="mkt-t-name">—</div>
+            <span id="mkt-t-region" style="font-size:10px;background:var(--bg3);border-radius:100px;padding:2px 8px;color:var(--t3)"></span>
+            <button class="astar" id="mkt-wl-btn" onclick="mktToggleWatch()" style="opacity:.5;font-size:16px">★</button>
+          </div>
+          <div class="mkt-ticker-sym" id="mkt-t-sym">—</div>
+          <div class="mkt-perf-pills" id="mkt-t-pills"></div>
+        </div>
+        <div style="text-align:right">
+          <div class="mkt-ticker-price" id="mkt-t-price">—</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div class="mkt-ticker-chg" id="mkt-t-chg">—</div>
+            <div class="mkt-ticker-chg" id="mkt-t-abs" style="opacity:.65;font-size:12px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB NAVIGATION ── -->
+      <div class="qlab-tabs">
+        <button class="qlab-tab on" data-tab="chart"    onclick="setQuantTab('chart',this)">📈 Chart</button>
+        <button class="qlab-tab"    data-tab="metrics"  onclick="setQuantTab('metrics',this)">📊 Metrics</button>
+        <button class="qlab-tab"    data-tab="forecast" onclick="setQuantTab('forecast',this)">🎯 Forecast</button>
+        <button class="qlab-tab"    data-tab="backtest" onclick="setQuantTab('backtest',this)">⚙ Backtest</button>
+        <button class="qlab-tab"    data-tab="factor"   onclick="setQuantTab('factor',this)">🔬 Factors</button>
+        <button class="qlab-tab"    data-tab="portfolio" onclick="setQuantTab('portfolio',this)">💼 Portfolio</button>
+        <button class="qlab-tab"    data-tab="pca"      onclick="setQuantTab('pca',this)">🧮 PCA</button>
+        <button class="qlab-tab"    data-tab="insiders" onclick="setQuantTab('insiders',this)">🏛 Insider Trades</button>
+      </div>
+
+      <!-- ══ TAB: CHART ══ -->
+      <div class="qlab-panel on" id="qtab-chart">
+
+        <!-- ── PRICE CHART (with event overlay) ── -->
+        <div class="qlab-chart-wrap" style="position:relative">
+          <!-- Chart header: timeframe + event toggle -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+            <span style="font-size:11px;font-weight:600;color:var(--t2)">Price · <span id="qchart-sym">—</span></span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div class="mkt-tf-btns">
+                <button class="mkt-tf-btn on" onclick="setMktTF('1M',this)">1M</button>
+                <button class="mkt-tf-btn"    onclick="setMktTF('3M',this)">3M</button>
+                <button class="mkt-tf-btn"    onclick="setMktTF('1Y',this)">1Y</button>
+                <button class="mkt-tf-btn"    onclick="setMktTF('ALL',this)">MAX</button>
+              </div>
+              <div class="mkt-tf-btns" style="margin-left:4px">
+                <button class="mkt-tf-btn on" id="chart-type-line"   onclick="setChartType('line',this)"   title="Line chart">〜</button>
+                <button class="mkt-tf-btn"    id="chart-type-candle" onclick="setChartType('candle',this)" title="Candlestick">📊</button>
+                <button class="mkt-tf-btn"    id="chart-type-compare" onclick="openCompareModal()"         title="Compare assets">⊕</button>
+              </div>
+              <button class="mkt-tf-btn" onclick="openPriceAlert()" title="Set price alert" style="margin-left:4px">🔔</button>
+              <button class="hev-toggle" id="hev-toggle-btn" onclick="toggleHistoricalEvents()">
+                <span class="hev-dot"></span>
+                <span id="hev-toggle-label">Show Events</span>
+              </button>
+            </div>
+          </div>
+          <!-- Price canvas -->
+          <div style="position:relative">
+            <canvas id="mkt-price-chart" style="width:100%;height:220px;display:block;cursor:crosshair"></canvas>
+            <!-- Hover info bar (appears on mouse-over) -->
+            <div id="chart-hover-bar" style="display:none;align-items:center;gap:14px;padding:5px 8px;background:rgba(6,11,24,.8);border-top:1px solid rgba(255,255,255,.07);font-size:11px;backdrop-filter:blur(8px)"></div>
+            <!-- Volume bar chart -->
+            <canvas id="mkt-volume-chart" style="width:100%;height:40px;display:block;border-top:1px solid rgba(255,255,255,.04)"></canvas>
+            <!-- Event marker overlay (drawn on top) -->
+            <canvas id="hev-overlay-canvas" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
+            <!-- Tooltip for hovered marker -->
+            <div id="hev-marker-tooltip" style="display:none;position:absolute;z-index:20;pointer-events:none;
+              background:rgba(6,11,18,.95);border:1px solid rgba(255,255,255,.15);border-radius:var(--r12);
+              padding:8px 10px;min-width:160px;max-width:220px;backdrop-filter:blur(12px);
+              box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
+          </div>
+
+          <!-- ── EVENT OVERLAY SECTION (hidden until toggled) ── -->
+          <div id="hev-section" style="display:none;margin-top:10px">
+
+            <!-- Stats summary row -->
+            <div id="hev-stats" class="hev-stats-row" style="display:none"></div>
+
+            <!-- Category filter pills -->
+            <div class="hev-filter-bar" id="hev-filter-bar">
+              <span style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-right:4px">Filter</span>
+              <span class="hev-cat-pill on" data-cat="ALL"
+                    style="background:rgba(148,163,184,.15);color:var(--t2);border-color:rgba(148,163,184,.3)"
+                    onclick="setHevFilter('ALL',this)">All</span>
+              <!-- Dynamic category pills injected here -->
+            </div>
+
+            <!-- Loading state -->
+            <div class="hev-loading" id="hev-loading">
+              <div class="hev-loading-dot"></div>
+              <div class="hev-loading-dot"></div>
+              <div class="hev-loading-dot"></div>
+              <span>Loading historical events…</span>
+            </div>
+
+            <!-- Event cards timeline strip -->
+            <div class="hev-timeline-strip" id="hev-timeline"></div>
+
+            <!-- Scroll hint -->
+            <div class="hev-scroll-hint" id="hev-scroll-hint" style="display:none">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5h6M6 3l2 2-2 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+              scroll to explore events
+            </div>
+          </div>
+        </div>
+
+        <!-- ── EVENT MARKERS STRIP ── -->
+        <div id="mkt-events-strip" style="display:none;margin-top:8px"></div>
+
+        <!-- ── DRAWDOWN ── -->
+        <div class="qlab-chart-wrap" style="margin-top:8px">
+          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Drawdown</div>
+          <canvas id="qchart-dd" style="width:100%;height:80px"></canvas>
+        </div>
+
+        <!-- ── VOL + DISTRIBUTION ── -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+          <div class="qlab-chart-wrap">
+            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Rolling Volatility (20d ann.)</div>
+            <canvas id="qchart-vol" style="width:100%;height:80px"></canvas>
+          </div>
+          <div class="qlab-chart-wrap">
+            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Returns Distribution</div>
+            <canvas id="qchart-dist" style="width:100%;height:80px"></canvas>
+          </div>
+        </div>
+
+        <!-- ── TECHNICALS ── -->
+        <div class="card" style="padding:12px;margin-top:8px">
+          <div class="card-tit" style="margin-bottom:8px">Technical Snapshot</div>
+          <div class="tech-grid" id="mkt-tech-grid"></div>
+        </div>
+
+        <!-- ── AI SUMMARY (beginner mode) ── -->
+        <div class="step-ai-box" id="mkt-step1-ai" style="margin-top:8px">
+          <div class="step-ai-label">AI: What is happening</div>
+          <div class="step-ai-text" id="mkt-step1-ai-txt">Select an asset to generate analysis.</div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: METRICS ══ -->
+      <div class="qlab-panel" id="qtab-metrics">
+        <div id="qmetrics-loading" style="text-align:center;padding:40px;color:var(--t3)">Loading quantitative metrics…</div>
+        <div id="qmetrics-body" style="display:none">
+          <!-- Risk/Return summary -->
+          <div class="qlab-kpi-grid" id="qmetrics-kpis"></div>
+          <!-- Distribution stats -->
+          <div class="card" style="padding:12px;margin-top:10px">
+            <div class="card-tit" style="margin-bottom:8px">Distribution Statistics</div>
+            <div id="qmetrics-dist-stats" class="qlab-kpi-grid"></div>
+          </div>
+          <!-- Correlation matrix -->
+          <div class="card" style="padding:12px;margin-top:10px">
+            <div class="card-tit" style="margin-bottom:10px">
+              Asset Correlations
+              <span style="font-size:9px;color:var(--t3);font-weight:400;margin-left:6px">vs major assets, 90-day rolling</span>
+            </div>
+            <div id="qmetrics-corr-matrix" style="overflow-x:auto"></div>
+          </div>
+          <!-- Related events -->
+          <!-- Why it moved -->
+          <div id="mkt-drivers" style="display:none;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-top:10px">
+            <div class="card-tit" style="margin-bottom:8px">📰 Why it&#39;s moving</div>
+            <div id="mkt-drivers-list"></div>
+          </div>
+          <div class="card" style="padding:12px;margin-top:10px">
+            <div class="card-tit">Related Global Events</div>
+            <div id="mkt-events-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: FORECAST ══ -->
+      <div class="qlab-panel" id="qtab-forecast">
+        <!-- Controls -->
+        <div class="qlab-controls">
+          <div class="qlab-ctrl-group">
+            <label class="qlab-label">Horizon</label>
+            <div style="display:flex;gap:4px">
+              <button class="qlab-ctrl-btn on" data-h="21"  onclick="setFcHorizon(21,this)">1M</button>
+              <button class="qlab-ctrl-btn"    data-h="63"  onclick="setFcHorizon(63,this)">3M</button>
+              <button class="qlab-ctrl-btn"    data-h="126" onclick="setFcHorizon(126,this)">6M</button>
+              <button class="qlab-ctrl-btn"    data-h="252" onclick="setFcHorizon(252,this)">1Y</button>
+            </div>
+          </div>
+          <div class="qlab-ctrl-group">
+            <label class="qlab-label">Volatility <span id="fc-vol-val">1.0×</span></label>
+            <input type="range" min="0.5" max="3" step="0.1" value="1" id="fc-vol-slider"
+              oninput="document.getElementById('fc-vol-val').textContent=this.value+'×';runForecast()" style="width:120px;accent-color:var(--b5)">
+          </div>
+          <div class="qlab-ctrl-group">
+            <label class="qlab-label">Return adj. <span id="fc-mu-val">0%</span></label>
+            <input type="range" min="-30" max="30" step="1" value="0" id="fc-mu-slider"
+              oninput="document.getElementById('fc-mu-val').textContent=this.value+'%';runForecast()" style="width:120px;accent-color:var(--b5)">
+          </div>
+          <button class="btn btn-g btn-sm" onclick="runForecast()">Run Simulation</button>
+        </div>
+        <!-- Forecast chart -->
+        <div class="qlab-chart-wrap" style="position:relative">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:11px;font-weight:600;color:var(--t2)">Monte Carlo Forecast · GBM · <span id="fc-paths-lbl">1000 paths</span></span>
+            <div style="display:flex;gap:10px;font-size:9px;color:var(--t3)">
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#10B981;display:inline-block"></span>Bullish 75th pct</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#60A5FA;display:inline-block"></span>Base (median)</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#EF4444;display:inline-block"></span>Bearish 25th pct</span>
+            </div>
+          </div>
+          <canvas id="qchart-forecast" style="width:100%;height:260px"></canvas>
+          <div id="fc-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(4,9,18,.7);border-radius:var(--r12);font-size:12px;color:var(--t3)">Running simulation…</div>
+        </div>
+        <!-- Scenario cards -->
+        <div id="fc-scenarios" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px"></div>
+        <!-- Assumptions tooltip -->
+        <div class="qlab-assumptions" id="fc-assumptions"></div>
+      </div>
+
+      <!-- ══ TAB: BACKTEST ══ -->
+      <div class="qlab-panel" id="qtab-backtest">
+        <div class="qlab-controls">
+          <div class="qlab-ctrl-group">
+            <label class="qlab-label">Strategy</label>
+            <select id="bt-strategy" class="fi" style="font-size:11px;padding:5px 8px" onchange="runBacktest()">
+              <option value="buy_hold">Buy &amp; Hold</option>
+              <option value="ma_crossover">MA Crossover</option>
+              <option value="momentum">Momentum</option>
+            </select>
+          </div>
+          <div class="qlab-ctrl-group" id="bt-ma-params">
+            <label class="qlab-label">Fast MA</label>
+            <input type="number" id="bt-fast" value="20" min="5" max="100" class="fi" style="width:60px;font-size:11px;padding:5px 8px">
+            <label class="qlab-label" style="margin-left:6px">Slow MA</label>
+            <input type="number" id="bt-slow" value="50" min="10" max="200" class="fi" style="width:60px;font-size:11px;padding:5px 8px">
+          </div>
+          <div class="qlab-ctrl-group">
+            <label class="qlab-label">Period</label>
+            <div style="display:flex;gap:4px">
+              <button class="qlab-ctrl-btn" data-p="1y"  onclick="setBtPeriod('1y',this)">1Y</button>
+              <button class="qlab-ctrl-btn on" data-p="2y" onclick="setBtPeriod('2y',this)">2Y</button>
+              <button class="qlab-ctrl-btn" data-p="5y"  onclick="setBtPeriod('5y',this)">5Y</button>
+            </div>
+          </div>
+          <button class="btn btn-g btn-sm" onclick="runBacktest()">Run Backtest</button>
+        </div>
+        <!-- Cumulative return chart -->
+        <div class="qlab-chart-wrap">
+          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Cumulative Return (base 100)</div>
+          <canvas id="qchart-bt" style="width:100%;height:220px"></canvas>
+        </div>
+        <!-- Metrics comparison -->
+        <div id="bt-metrics" style="margin-top:10px"></div>
+      </div>
+
+      <!-- ══ TAB: FACTORS ══ -->
+      <div class="qlab-panel" id="qtab-factor">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:10px">
+          Linear regression of <strong id="fc-asset-name">asset</strong> daily returns vs market factors.
+          Identifies which macro drivers explain price movements.
+        </div>
+        <div id="factor-loading" style="text-align:center;padding:30px;color:var(--t3)">Loading factor analysis…</div>
+        <div id="factor-body" style="display:none">
+          <!-- Factor bars -->
+          <div class="card" style="padding:12px;margin-bottom:10px">
+            <div class="card-tit" style="margin-bottom:8px">Factor Loadings (R²)</div>
+            <div id="factor-bars"></div>
+          </div>
+          <!-- Scatter plots -->
+          <div id="factor-scatter-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: PORTFOLIO ══ -->
+      <div class="qlab-panel" id="qtab-portfolio">
+
+        <!-- Risk Level Selector -->
+        <div class="port-risk-header">
+          <div class="port-risk-title">
+            <span style="font-size:18px">🎯</span>
+            <div>
+              <div style="font-weight:700;font-size:13px;color:var(--t1)">Risk-Based Portfolio Builder</div>
+              <div style="font-size:10px;color:var(--t3);margin-top:1px">Auto-generates allocation from your risk tolerance · 5 levels</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5-level risk track -->
+        <div class="port-risk-track-wrap">
+          <div class="port-risk-level-labels">
+            <span>1<br><span style="font-size:8px;opacity:.7">Safe</span></span>
+            <span>2<br><span style="font-size:8px;opacity:.7">Cautious</span></span>
+            <span>3<br><span style="font-size:8px;opacity:.7">Balanced</span></span>
+            <span>4<br><span style="font-size:8px;opacity:.7">Growth</span></span>
+            <span>5<br><span style="font-size:8px;opacity:.7">Aggressive</span></span>
+          </div>
+          <div class="port-risk-buttons">
+            <button class="port-rlvl-btn" data-level="1" onclick="portRiskChange(1,this)">1</button>
+            <button class="port-rlvl-btn" data-level="2" onclick="portRiskChange(2,this)">2</button>
+            <button class="port-rlvl-btn active" data-level="3" onclick="portRiskChange(3,this)">3</button>
+            <button class="port-rlvl-btn" data-level="4" onclick="portRiskChange(4,this)">4</button>
+            <button class="port-rlvl-btn" data-level="5" onclick="portRiskChange(5,this)">5</button>
+          </div>
+          <div id="port-risk-desc" class="port-risk-desc">⚖ Balanced — mix of growth and stability</div>
+        </div>
+
+        <!-- Mode toggle -->
+        <div class="port-mode-row">
+          <button class="port-mode-btn on" id="port-mode-auto"   onclick="portSetMode('auto',this)">⚡ Auto Allocation</button>
+          <button class="port-mode-btn"    id="port-mode-custom" onclick="portSetMode('custom',this)">✏ Custom Weights</button>
+          <button class="btn btn-g btn-sm" onclick="portBuild()" style="margin-left:auto">▶ Build Portfolio</button>
+        </div>
+
+        <!-- Auto: suggested allocation cards -->
+        <div id="port-auto-section">
+          <div class="port-alloc-grid" id="port-alloc-grid">
+            <!-- Populated by portRiskChange() -->
+          </div>
+        </div>
+
+        <!-- Custom: manual holdings builder -->
+        <div id="port-custom-section" style="display:none">
+          <div class="card" style="padding:12px;margin-bottom:10px">
+            <div class="card-tit" style="margin-bottom:8px">Custom Holdings</div>
+            <div id="port-holdings"></div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+              <select id="port-add-sym" class="fi" style="font-size:11px;padding:5px 8px;flex:1">
+                <option value="">Add asset…</option>
+              </select>
+              <button class="btn btn-g btn-sm" onclick="portAddAsset()">+ Add</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results panel (shown after compute) -->
+        <div id="port-results" style="display:none">
+          <div id="port-result-kpis" class="port-result-kpis"></div>
+          <div class="port-charts-row">
+            <div class="port-donut-wrap">
+              <canvas id="port-donut-canvas" width="150" height="150"></canvas>
+              <div id="port-donut-legend" class="port-donut-legend"></div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">NAV (normalised)</div>
+              <canvas id="qchart-port" style="width:100%;height:130px"></canvas>
+            </div>
+          </div>
+          <div class="port-ai-narrative" id="port-ai-narrative" style="display:none"></div>
+          <div id="port-stress-wrap" style="display:none"></div>
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn btn-g btn-sm" onclick="portRunStressTest()">🌪 Stress Test</button>
+            <button class="btn btn-o btn-sm" onclick="portGetAINarrative()">🤖 AI Analysis</button>
+            <button class="btn btn-g btn-sm" onclick="portExportCSV()">↓ Export CSV</button>
+          </div>
+        </div>
+
+        <!-- hidden back-compat containers -->
+        <div id="port-chart-wrap" style="display:none"><div id="port-metrics"></div></div>
+      </div>
+
+      <!-- ══ TAB: PCA ══ -->
+      <div class="qlab-panel" id="qtab-pca">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:10px">
+          Principal Component Analysis — identifies the main variance drivers across a basket of assets.
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+          <button class="btn btn-g btn-sm" onclick="runPCA()">Run PCA (top 10 assets)</button>
+          <span style="font-size:10px;color:var(--t3)">or select a custom basket:</span>
+          <select id="pca-period" class="fi" style="font-size:11px;padding:5px 8px">
+            <option value="6mo">6 months</option>
+            <option value="1y" selected>1 year</option>
+            <option value="2y">2 years</option>
+          </select>
+        </div>
+        <div id="pca-loading" style="text-align:center;padding:30px;color:var(--t3)">Click "Run PCA" to analyse</div>
+        <div id="pca-body" style="display:none">
+          <!-- Scree plot -->
+          <div class="qlab-chart-wrap" style="margin-bottom:10px">
+            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Variance Explained (Scree Plot)</div>
+            <canvas id="qchart-scree" style="width:100%;height:100px"></canvas>
+          </div>
+          <!-- 2D scatter (PC1 vs PC2) -->
+          <div class="qlab-chart-wrap">
+            <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">PC1 vs PC2 — Asset Clustering</div>
+            <canvas id="qchart-pca2d" style="width:100%;height:220px"></canvas>
+          </div>
+          <!-- Loadings table -->
+          <div class="card" style="padding:12px;margin-top:10px">
+            <div class="card-tit" style="margin-bottom:8px">PC1 Loadings (Factor Weights)</div>
+            <div id="pca-loadings"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TAB: INSIDER TRADES ══ -->
+      <div class="qlab-panel" id="qtab-insiders">
+        <!-- Sub-navigation -->
+        <div class="ins-subnav" id="ins-subnav">
+          <button class="ins-sub-btn on" data-sub="congress" onclick="setInsiderSub('congress',this)">🏛 Congress Trades</button>
+          <button class="ins-sub-btn" data-sub="signals"  onclick="setInsiderSub('signals',this)">📡 Signals</button>
+          <button class="ins-sub-btn" data-sub="leaderboard" onclick="setInsiderSub('leaderboard',this)">🏆 Leaderboard</button>
+          <button class="ins-sub-btn" data-sub="billionaires" onclick="setInsiderSub('billionaires',this)">💎 Billionaires 13F</button>
+          <button class="ins-sub-btn" data-sub="alerts" onclick="setInsiderSub('alerts',this)">🔔 Correlation Alerts</button>
+        </div>
+
+        <!-- ── CONGRESS TRADES ── -->
+        <div class="ins-panel on" id="ins-congress">
+          <div class="ins-filters">
+            <select class="fi ins-filter" id="ins-filter-chamber" onchange="loadInsiderTrades()">
+              <option value="all">Both chambers</option>
+              <option value="house">House</option>
+              <option value="senate">Senate</option>
+            </select>
+            <select class="fi ins-filter" id="ins-filter-party" onchange="loadInsiderTrades()">
+              <option value="">All parties</option>
+              <option value="D">Democrat</option>
+              <option value="R">Republican</option>
+            </select>
+            <select class="fi ins-filter" id="ins-filter-days" onchange="loadInsiderTrades()">
+              <option value="30">Last 30 days</option>
+              <option value="90" selected>Last 90 days</option>
+              <option value="180">Last 6 months</option>
+              <option value="365">Last year</option>
+            </select>
+            <input class="fi ins-filter" id="ins-filter-ticker" type="text" placeholder="Filter by ticker…" oninput="loadInsiderTrades()" style="width:120px"/>
+            <button class="btn btn-g btn-sm" onclick="loadInsiderTrades()">Refresh</button>
+          </div>
+          <div class="ins-summary-row" id="ins-summary"></div>
+          <div id="ins-trades-loading" style="padding:24px;text-align:center;color:var(--t3);font-size:12px">Loading Congress trades…</div>
+          <div id="ins-trades-table" style="display:none"></div>
+        </div>
+
+        <!-- ── SIGNALS ── -->
+        <div class="ins-panel" id="ins-signals">
+          <div id="ins-signals-content" style="padding:12px;color:var(--t3);font-size:12px">Loading signals…</div>
+        </div>
+
+        <!-- ── LEADERBOARD ── -->
+        <div class="ins-panel" id="ins-leaderboard">
+          <div id="ins-lb-content" style="padding:12px;color:var(--t3);font-size:12px">Loading leaderboard…</div>
+        </div>
+
+        <!-- ── BILLIONAIRES 13F ── -->
+        <div class="ins-panel" id="ins-billionaires">
+          <div class="ins-bill-grid" id="ins-bill-grid">
+            <div style="padding:24px;text-align:center;color:var(--t3);font-size:12px">Loading 13F filings…</div>
+          </div>
+        </div>
+
+        <!-- ── CORRELATION ALERTS ── -->
+        <div class="ins-panel" id="ins-alerts">
+          <div id="ins-alerts-content" style="padding:12px;color:var(--t3);font-size:12px">Loading correlation alerts…</div>
+        </div>
+      </div>
+
+    </div><!-- mkt-ticker-content -->
+
+    <!-- ── Compare Modal ── -->
+    <div id="mkt-compare-modal" style="display:none;position:absolute;inset:0;z-index:50;background:rgba(6,11,24,.95);backdrop-filter:blur(8px);flex-direction:column;padding:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-family:var(--fh);font-size:15px;font-weight:700">Compare Assets</div>
+        <button onclick="closeCompareModal()" style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <input id="compare-search" type="text" class="mkt-search" placeholder="Add symbol (e.g. MSFT, GC=F)…"
+               oninput="compareSearchInput(this.value)" style="flex:1;min-width:200px"/>
+        <button class="btn btn-g btn-sm" onclick="compareAddFromInput()">+ Add</button>
+      </div>
+      <div id="compare-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+      <div id="compare-search-results" style="margin-bottom:12px"></div>
+      <div class="qlab-chart-wrap" style="flex:1;position:relative">
+        <canvas id="qchart-compare" style="width:100%;height:280px;display:block"></canvas>
+        <div id="compare-legend" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- ── Price Alert Modal ── -->
+    <div id="mkt-alert-modal" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;width:320px;background:var(--bg1);border:1px solid var(--bdb);border-radius:var(--r16);padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.8)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-family:var(--fh);font-size:14px;font-weight:700">🔔 Price Alert</div>
+        <button onclick="closePriceAlert()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer">✕</button>
+      </div>
+      <div id="alert-asset-name" style="font-size:12px;color:var(--t2);margin-bottom:12px">—</div>
+      <div class="fg">
+        <label class="fl">Alert when price goes</label>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button class="mkt-tf-btn on" id="alert-dir-above" onclick="setAlertDir('above',this)">▲ Above</button>
+          <button class="mkt-tf-btn"    id="alert-dir-below" onclick="setAlertDir('below',this)">▼ Below</button>
+        </div>
+        <input id="alert-price-inp" type="number" class="fi" placeholder="Target price…" step="any"/>
+      </div>
+      <div class="fg" style="margin-top:4px">
+        <label class="fl">Note (optional)</label>
+        <input id="alert-note-inp" type="text" class="fi" placeholder="e.g. Support level, take profit…"/>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:14px">
+        <button class="btn btn-p" style="flex:1" onclick="savePriceAlert()">Set Alert</button>
+        <button class="btn btn-g" onclick="closePriceAlert()">Cancel</button>
+      </div>
+    </div>
+
+  </div><!-- mkt-main -->
+</div>
+<!-- FEED -->
+<!-- ── INSIDERS VIEW (standalone nav page) ── -->
+<div class="view" id="view-insiders">
+  <div style="display:flex;flex-direction:column;height:100%;overflow-y:auto;background:var(--bg0)">
+    <!-- Header -->
+    <div style="padding:16px 20px 10px;border-bottom:1px solid var(--bd);background:var(--bg1);flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-family:var(--fh);font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">
+            🏛 Politici &amp; Ricchi
+            <span style="font-size:10px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:var(--re);border-radius:100px;padding:2px 8px;font-family:var(--fb);font-weight:700">LIVE</span>
+          </div>
+          <div style="font-size:11px;color:var(--t3);margin-top:3px">US Congress trade disclosures · SEC 13F institutional holdings · News correlation alerts</div>
+        </div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <button class="btn btn-g btn-sm" onclick="loadInsiderTrades()">↻ Refresh</button>
+          <a href="https://efts.sec.gov/LATEST/search-index?forms=13F-HR" target="_blank" class="btn btn-o btn-sm">SEC EDGAR ↗</a>
+        </div>
+      </div>
+      <!-- Sub-nav -->
+      <div class="ins-subnav" style="margin-top:10px">
+        <button class="ins-sub-btn on" data-sub="congress-full" onclick="setInsiderSubFull('congress-full',this)">🏛 Congress Trades</button>
+        <button class="ins-sub-btn" data-sub="signals-full"   onclick="setInsiderSubFull('signals-full',this)">📡 Signals</button>
+        <button class="ins-sub-btn" data-sub="leaderboard-full" onclick="setInsiderSubFull('leaderboard-full',this)">🏆 Leaderboard</button>
+        <button class="ins-sub-btn" data-sub="billionaires-full" onclick="setInsiderSubFull('billionaires-full',this)">💎 Billionaires 13F</button>
+        <button class="ins-sub-btn" data-sub="alerts-full"   onclick="setInsiderSubFull('alerts-full',this)">🔔 Alerts</button>
+      </div>
+    </div>
+    <!-- Content panels (same IDs with -full suffix) -->
+    <div style="flex:1;padding:16px 20px;overflow-y:auto">
+      <div class="ins-panel on" id="ins-congress-full">
+        <div class="ins-filters" style="margin-bottom:12px">
+          <select class="fi ins-filter" id="ins-filter-chamber-f" onchange="loadInsiderTradesFull()">
+            <option value="all">Both chambers</option>
+            <option value="house">House</option>
+            <option value="senate">Senate</option>
+          </select>
+          <select class="fi ins-filter" id="ins-filter-party-f" onchange="loadInsiderTradesFull()">
+            <option value="">All parties</option>
+            <option value="D">Democrat</option>
+            <option value="R">Republican</option>
+          </select>
+          <select class="fi ins-filter" id="ins-filter-days-f" onchange="loadInsiderTradesFull()">
+            <option value="30">30 days</option>
+            <option value="90" selected>90 days</option>
+            <option value="180">6 months</option>
+            <option value="365">1 year</option>
+          </select>
+          <input class="fi ins-filter" id="ins-filter-ticker-f" type="text" placeholder="Filter by ticker…" oninput="loadInsiderTradesFull()" style="width:130px"/>
+        </div>
+        <div id="ins-summary-full"></div>
+        <div id="ins-trades-table-full"></div>
+      </div>
+      <div class="ins-panel" id="ins-signals-full">
+        <div id="ins-signals-full-content"></div>
+      </div>
+      <div class="ins-panel" id="ins-leaderboard-full">
+        <div id="ins-lb-full-content"></div>
+      </div>
+      <div class="ins-panel" id="ins-billionaires-full">
+        <div id="ins-bill-full-grid"></div>
+      </div>
+      <div class="ins-panel" id="ins-alerts-full">
+        <div id="ins-alerts-full-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view" id="view-feed">
+  <aside class="fside">
+    <!-- Reading list toggle -->
+    <div style="padding-bottom:10px;border-bottom:1px solid var(--bd);margin-bottom:10px">
+      <div class="fcg">
+        <div class="fc on" id="feed-tab-live"  onclick="switchFeedTab('live',this)"  style="gap:5px">📡 Live</div>
+        <div class="fc"    id="feed-tab-pers"  onclick="switchFeedTab('pers',this)"  style="gap:5px">✦ For You</div>
+        <div class="fc"    id="feed-tab-saved" onclick="switchFeedTab('saved',this)" style="gap:5px">🔖 Saved</div>
+      </div>
+    </div>
+    <div id="feed-live-filters">
+    <div><div class="fstit">Impact</div><div class="fcg"><div class="fc on" onclick="sf('impact','',this)">All</div><div class="fc" style="color:var(--re)" onclick="sf('impact','High',this)">High</div><div class="fc" style="color:var(--am)" onclick="sf('impact','Medium',this)">Medium</div><div class="fc" style="color:var(--gr)" onclick="sf('impact','Low',this)">Low</div></div></div>
+    <div><div class="fstit">Category</div><div class="fcg" id="feedcats"></div></div>
+    <div><div class="fstit">Search</div><input class="fi" type="text" placeholder="Keywords..." oninput="sf('search',this.value,null)" style="font-size:11px;padding:6px 10px"></div>
+    <div><div class="fstit">Time Range</div><div class="fcg"><div class="fc on" onclick="sf('hours',24,this)">24h</div><div class="fc" onclick="sf('hours',48,this)">48h</div><div class="fc" onclick="sf('hours',72,this)">72h</div></div></div>
+    <div style="font-size:10px;color:var(--t3)" id="finfo">Loading...</div>
+    <div style="padding-top:10px;margin-top:2px">
+      <button class="btn btn-g btn-sm" style="width:100%;justify-content:center;font-size:10px;gap:5px"
+              onclick="exportFeedCSV()">⬇&#xFE0E; Export CSV</button>
+    </div>
+    </div><!-- feed-live-filters -->
+  </aside>
+  <div class="fmain" id="fmain" onscroll="feedScrollCheck(this)"></div>
+  <!-- Personalized feed (hidden by default) -->
+  <div id="fpers" style="display:none;flex:1;overflow-y:auto;padding:12px 14px"></div>
+  <!-- Saved events list (hidden by default) -->
+  <div id="fsaved" style="display:none;flex:1;overflow-y:auto;padding:12px 14px"></div>
+</div>
+
+<!-- MACRO -->
+<div class="view" id="view-macro">
+<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:14px;width:100%">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div><div class="vtit">Macro Dashboard</div><div class="vsub">Key economic indicators across major economies</div></div>
+    <button class="btn btn-ai btn-sm" onclick="getMacroBrief()">AI Briefing</button>
+  </div>
+  <div class="ai-brief" id="macro-brief" style="display:none"><div class="aib-hdr">AI MACRO BRIEFING</div><div class="aib-txt" id="macro-brief-txt"></div></div>
+  <div class="macro-tabs" id="macro-tabs"><div class="macro-tab on" onclick="setMacroTab('all',this)">All</div><div class="macro-tab" onclick="setMacroTab('economy',this)">Economy</div><div class="macro-tab" onclick="setMacroTab('rates',this)">Rates</div><div class="macro-tab" onclick="setMacroTab('activity',this)">Activity</div><div class="macro-tab" onclick="setMacroTab('risk',this)">Risk</div><div class="macro-tab" onclick="setMacroTab('energy',this)">Energy</div><div class="macro-tab" onclick="setMacroTab('forex',this)">Forex</div></div>
+  <div class="macro-grid" id="macro-grid"></div>
+  <div class="card"><div class="card-tit">Region Risk Scores <a onclick="loadRegionRisks()">Refresh</a></div><div id="region-risk-table"></div></div>
+</div>
+</div>
+
+<!-- AI ANALYST -->
+<div class="view" id="view-ai">
+<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:14px;width:100%">
+  <div class="aihead"><h2>AI Global Analyst</h2><p>Ask anything about global events, markets, and geopolitical risks. Powered by Google Gemini AI. Configure your API key in Admin → Settings.</p></div>
+  <div><div class="vtit" style="font-size:13px;margin-bottom:10px">Quick Prompts</div>
+  <div class="aipg">
+    <div class="aip" onclick="aiSend('What are the top 3 global risks investors must monitor this week?')"><div class="aipi">⚠️</div><h4>Top Global Risks</h4><p>Key threats to monitor right now</p></div>
+    <div class="aip" onclick="aiSend('Analyze the current geopolitical situation in the Middle East and its impact on oil markets.')"><div class="aipi">🛢️</div><h4>Middle East and Oil</h4><p>Geopolitics and energy market impact</p></div>
+    <div class="aip" onclick="aiSend('What are the main macroeconomic risks for investors in 2025? Which markets are most exposed?')"><div class="aipi">📊</div><h4>Macro Risks 2025</h4><p>Economy outlook and exposed markets</p></div>
+    <div class="aip" onclick="aiSend('What global events are most likely to move Bitcoin and crypto markets in the next 3 months?')"><div class="aipi">B</div><h4>Crypto Catalysts</h4><p>Global events that move crypto</p></div>
+    <div class="aip" onclick="aiSend('Which emerging markets have the highest political risk right now?')"><div class="aipi">🌍</div><h4>EM Political Risk</h4><p>High-risk countries and implications</p></div>
+    <div class="aip" onclick="aiSend('What is the current state of US-China relations? How does it affect tech stocks?')"><div class="aipi">🏛</div><h4>US-China Tensions</h4><p>Tech and supply chain implications</p></div>
+    <div class="aip" onclick="aiSend('Analyze Russia-Ukraine conflict: energy impact on Europe, defense sector implications.')"><div class="aipi">🚨</div><h4>Russia-Ukraine Impact</h4><p>European energy and defense analysis</p></div>
+    <div class="aip" onclick="aiSend('Analyze global central bank policies. What are the implications for currencies and bonds?')"><div class="aipi">🏦</div><h4>Central Bank Watch</h4><p>Monetary policy and market impact</p></div>
+  </div></div>
+  <div class="aichat">
+    <div class="aimsgs" id="aimsgs"><div class="aimsg bot">Hello! I am your AI Global Analyst. Click a quick prompt above or type your own question about global events, markets, or geopolitical risks.</div></div>
+    <div class="airow"><textarea class="aiinp" id="aiinp" rows="2" placeholder="Ask about any global event, market risk, or geopolitical situation..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend()}"></textarea><button class="btn btn-ai" onclick="aiSend()">Send</button></div>
+  </div>
+</div>
+</div>
+
+<!-- PORTFOLIO -->
+<div class="view" id="view-portfolio">
+<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:16px;width:100%">
+  <div><div class="vtit">AI Portfolio Generator</div><div class="vsub">Build a personalized investment portfolio powered by AI</div></div>
+  <div class="card" style="background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(6,182,212,.05));border-color:var(--bdb)">
+    <div class="card-tit">Configure Your Portfolio</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div>
+        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Risk Profile</div>
+        <div style="display:flex;flex-direction:column;gap:6px" id="risk-btns">
+          <button id="risk-Conservative" onclick="selectRisk('Conservative')" class="btn btn-g" style="justify-content:flex-start;gap:10px"><span>🛡</span><div style="text-align:left"><div style="font-weight:600;font-size:12px">Conservative</div><div style="font-size:10px;opacity:.7">4-6% target return</div></div></button>
+          <button id="risk-Moderate" onclick="selectRisk('Moderate')" class="btn btn-o" style="justify-content:flex-start;gap:10px"><span>⚖</span><div style="text-align:left"><div style="font-weight:600;font-size:12px">Moderate</div><div style="font-size:10px;opacity:.7">7-10% target return</div></div></button>
+          <button id="risk-Aggressive" onclick="selectRisk('Aggressive')" class="btn btn-g" style="justify-content:flex-start;gap:10px"><span>🚀</span><div style="text-align:left"><div style="font-weight:600;font-size:12px">Aggressive</div><div style="font-size:10px;opacity:.7">10-15% target return</div></div></button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Amount (USD)</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+            <button class="btn btn-g btn-sm" onclick="document.getElementById('port-amount').value=5000">$5K</button>
+            <button class="btn btn-g btn-sm" onclick="document.getElementById('port-amount').value=10000">$10K</button>
+            <button class="btn btn-g btn-sm" onclick="document.getElementById('port-amount').value=50000">$50K</button>
+            <button class="btn btn-g btn-sm" onclick="document.getElementById('port-amount').value=100000">$100K</button>
+          </div>
+          <input class="fi" type="number" id="port-amount" value="10000" style="font-size:13px">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Horizon</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <button class="btn btn-g btn-sm" id="hor-1" onclick="selHorizon('Short-term (1 year)',this)">1 Year</button>
+            <button class="btn btn-o btn-sm" id="hor-3" onclick="selHorizon('Medium-term (3-5 years)',this)">3-5 Years</button>
+            <button class="btn btn-g btn-sm" id="hor-10" onclick="selHorizon('Long-term (10+ years)',this)">10+ Years</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px">Focus Areas</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="focus-chips">
+        <div class="fc" data-focus="Technology" onclick="togFocus(this)">Technology</div>
+        <div class="fc" data-focus="ESG" onclick="togFocus(this)">ESG</div>
+        <div class="fc" data-focus="Emerging Markets" onclick="togFocus(this)">Emerging Markets</div>
+        <div class="fc" data-focus="Dividend Income" onclick="togFocus(this)">Dividend Income</div>
+        <div class="fc" data-focus="Real Estate" onclick="togFocus(this)">Real Estate</div>
+        <div class="fc" data-focus="Commodities" onclick="togFocus(this)">Commodities</div>
+        <div class="fc" data-focus="Crypto" onclick="togFocus(this)">Crypto</div>
+        <div class="fc" data-focus="Healthcare" onclick="togFocus(this)">Healthcare</div>
+      </div>
+      <input class="fi" type="text" id="port-goals" placeholder="Investment goals (e.g. retirement, passive income...)" style="font-size:12px">
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button class="btn btn-ai" style="padding:11px 28px;font-size:13px" onclick="generatePortfolio()">Generate AI Portfolio</button>
+      <div id="port-status" style="font-size:11px;color:var(--t3)"></div>
+    </div>
+  </div>
+  <div id="port-result" style="display:none">
+    <div class="card" style="border-color:var(--bdg)">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div><div class="vtit" id="port-name" style="font-size:16px"></div><div style="font-size:12px;color:var(--t2);margin-top:4px" id="port-strategy"></div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="text-align:center;background:var(--bg2);border-radius:var(--r8);padding:8px 14px"><div style="font-family:var(--fh);font-size:18px;font-weight:700;color:var(--gr)" id="port-return">—</div><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em">Return</div></div>
+          <div style="text-align:center;background:var(--bg2);border-radius:var(--r8);padding:8px 14px"><div style="font-family:var(--fh);font-size:18px;font-weight:700;color:var(--am)" id="port-riskscore">—</div><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em">Risk Score</div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:start">
+        <canvas id="port-donut" width="180" height="180"></canvas>
+        <div id="port-alloc-list"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
+        <div style="background:var(--bg2);border-radius:var(--r12);padding:12px"><div style="font-size:9px;color:var(--am);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Geopolitical Considerations</div><div style="font-size:11px;color:var(--t2);line-height:1.6" id="port-geo"></div></div>
+        <div style="background:var(--bg2);border-radius:var(--r12);padding:12px"><div style="font-size:9px;color:var(--b4);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Macro Outlook</div><div style="font-size:11px;color:var(--t2);line-height:1.6" id="port-macro"></div></div>
+      </div>
+      <div style="margin-top:12px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.18);border-radius:var(--r12);padding:12px"><div style="font-size:9px;color:var(--re);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Key Risks</div><div id="port-risks" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
+    </div>
+  </div>
+  <div class="card"><div class="card-tit">Portfolio History <a onclick="loadPortfolios()">Refresh</a></div><div id="port-history"></div></div>
+</div>
+</div>
+
+<!-- ACHIEVEMENTS -->
+<div class="view" id="view-gamification">
+<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:14px;width:100%">
+  <div style="background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(59,130,246,.12));border:1px solid rgba(139,92,246,.3);border-radius:var(--r16);padding:20px">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;background:rgba(139,92,246,.2);border:2px solid rgba(139,92,246,.4);flex-shrink:0" id="gam-level-icon">👁</div>
+      <div style="flex:1">
+        <div style="font-size:10px;color:#A78BFA;letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px">YOUR RANK</div>
+        <div class="vtit" id="gam-level-name" style="font-size:20px;margin:0">Loading...</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px"><span id="gam-xp">0</span> XP total</div>
+        <div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-bottom:4px"><span>Level Progress</span><span id="gam-next-level">—</span></div><div style="height:6px;background:rgba(139,92,246,.15);border-radius:3px;overflow:hidden"><div id="gam-xp-bar" style="height:100%;border-radius:3px;background:linear-gradient(90deg,#7C3AED,#3B82F6);transition:width 1s;width:0%"></div></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,auto);gap:10px">
+        <div style="text-align:center"><div style="font-family:var(--fh);font-size:20px;font-weight:700;color:var(--pu)" id="gam-badges-count">0</div><div style="font-size:9px;color:var(--t3)">Badges</div></div>
+        <div style="text-align:center"><div style="font-family:var(--fh);font-size:20px;font-weight:700;color:var(--b4)" id="gam-port-count">0</div><div style="font-size:9px;color:var(--t3)">Portfolios</div></div>
+        <div style="text-align:center"><div style="font-family:var(--fh);font-size:20px;font-weight:700;color:var(--gr)" id="gam-ai-count">0</div><div style="font-size:9px;color:var(--t3)">AI Queries</div></div>
+      </div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">
+    <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:4px">🗺</div><div style="font-family:var(--fh);font-size:18px;font-weight:700;color:var(--b4)" id="gam-ev-viewed">0</div><div style="font-size:10px;color:var(--t3)">Events Explored</div><div style="font-size:9px;color:var(--t3)">+2 XP each</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:4px">⚡</div><div style="font-family:var(--fh);font-size:18px;font-weight:700;color:var(--am)" id="gam-ev-scored">0</div><div style="font-size:10px;color:var(--t3)">Events Scored</div><div style="font-size:9px;color:var(--t3)">+10 XP each</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:4px">🤖</div><div style="font-family:var(--fh);font-size:18px;font-weight:700;color:var(--pu)" id="gam-ai-q">0</div><div style="font-size:10px;color:var(--t3)">AI Queries</div><div style="font-size:9px;color:var(--t3)">+5 XP each</div></div>
+    <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:4px">💼</div><div style="font-family:var(--fh);font-size:18px;font-weight:700;color:var(--gr)" id="gam-pf-c">0</div><div style="font-size:10px;color:var(--t3)">Portfolios</div><div style="font-size:9px;color:var(--t3)">+25 XP each</div></div>
+  </div>
+  <div class="card"><div class="card-tit">Achievements and Badges</div><div id="gam-badges" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px"></div></div>
+  <div class="card">
+    <div class="card-tit">Daily Missions <span id="missions-prog" style="font-size:10px;color:var(--am);font-weight:500"></span><a onclick="loadMissions()" style="font-size:10px;color:var(--b4);cursor:pointer">Refresh</a></div>
+    <div id="missions-list" style="display:flex;flex-direction:column;gap:7px"></div>
+  </div>
+  <div class="card">
+    <div class="card-tit">Market Predictions
+      <div style="display:flex;align-items:center;gap:8px"><span id="pred-accuracy" style="font-size:10px;color:var(--gr)"></span><a onclick="loadPredictions()" style="font-size:10px;color:var(--b4);cursor:pointer">History</a></div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;color:var(--t2);margin-bottom:8px">Predict market reaction to a global event:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">
+        <select class="fi" id="pred-asset" style="font-size:11px;padding:6px 9px;flex:1"><option value="Oil">Oil</option><option value="Gold">Gold</option><option value="S&P 500">S&P 500</option><option value="Bitcoin">Bitcoin</option><option value="EUR/USD">EUR/USD</option></select>
+        <input class="fi" type="text" id="pred-event-title" placeholder="Describe the event..." style="font-size:11px;padding:6px 9px;flex:2">
+      </div>
+      <div class="pred-btns">
+        <button class="pred-btn up" onclick="makePrediction('up')">Will Rise</button>
+        <button class="pred-btn st" onclick="makePrediction('stable')">Stable</button>
+        <button class="pred-btn dn" onclick="makePrediction('down')">Will Fall</button>
+      </div>
+    </div>
+    <div id="pred-list" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
+  </div>
+  <div class="report-card" id="weekly-report-section">
+    <div style="font-size:10px;color:#A78BFA;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px">YOUR WORLD LENS WEEKLY REPORT</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+      <div class="report-stat"><div class="report-stat-val" id="rs-xp">—</div><div class="report-stat-lbl">XP Earned</div></div>
+      <div class="report-stat"><div class="report-stat-val" id="rs-ai">—</div><div class="report-stat-lbl">AI Queries</div></div>
+      <div class="report-stat"><div class="report-stat-val" id="rs-ev">—</div><div class="report-stat-lbl">Events</div></div>
+      <div class="report-stat"><div class="report-stat-val" id="rs-ms">—</div><div class="report-stat-lbl">Missions</div></div>
+    </div>
+    <div id="report-bullets" style="display:flex;flex-direction:column"></div>
+    <button class="btn btn-ai btn-sm" style="margin-top:12px" onclick="loadWeeklyReport()">Generate This Week Report</button>
+  </div>
+  <div class="card"><div class="card-tit">Dashboard Layout</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="layout-btn" id="lay-default" onclick="setLayout('default',this)"><div class="layout-icon">🏠</div><div class="layout-name">Standard</div><div class="layout-desc">Balanced for all users</div></div>
+      <div class="layout-btn" id="lay-trader" onclick="setLayout('trader',this)"><div class="layout-icon">📈</div><div class="layout-name">Trader</div><div class="layout-desc">Charts and market focus</div></div>
+      <div class="layout-btn" id="lay-geo" onclick="setLayout('geo',this)"><div class="layout-icon">🌍</div><div class="layout-name">Geopolitical</div><div class="layout-desc">Map and events focus</div></div>
+      <div class="layout-btn" id="lay-macro" onclick="setLayout('macro',this)"><div class="layout-icon">📊</div><div class="layout-name">Macro</div><div class="layout-desc">Economic indicators</div></div>
+    </div>
+  </div>
+  <div class="card"><div class="card-tit">Level Roadmap</div><div id="gam-levels" style="display:flex;flex-direction:column;gap:6px"></div></div>
+</div>
+</div>
+
+<!-- ALERTS -->
+<div class="view" id="view-alerts">
+<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:12px;width:100%">
+  <div><div class="vtit">Alerts</div><div class="vsub">Custom intelligence notifications</div></div>
+  <div class="card">
+    <div class="card-tit">Create New Alert</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-top:8px">
+      <div><div style="font-size:10px;color:var(--t3);margin-bottom:4px">Alert Name</div><input class="fi" type="text" id="aln" placeholder="e.g. Ukraine Update" style="font-size:12px"></div>
+      <div><div style="font-size:10px;color:var(--t3);margin-bottom:4px">Condition</div><input class="fi" type="text" id="alc" placeholder="e.g. conflict Eastern Europe" style="font-size:12px"></div>
+      <button class="btn btn-p" onclick="addAlert()">+ Add</button>
+    </div>
+  </div>
+  <div id="allist" style="display:flex;flex-direction:column;gap:7px"></div>
+</div>
+</div>
+
+<!-- PROFILE -->
+<div class="view" id="view-profile">
+<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:12px;width:100%">
+  <div class="prof-hdr">
+    <div class="pav-big" id="pav">U</div>
+    <div><div class="prof-name" id="pname">User</div><div class="prof-email" id="pemail">email</div><div style="font-size:10px;color:var(--t3);margin-top:4px" id="psince">—</div><div class="prof-edit-form" id="prof-edit" style="display:none;flex-direction:column;gap:8px;padding:12px;background:var(--bg2);border-radius:var(--r12);margin-top:8px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="fl">Display Name</label><input class="fi" id="pe-name" type="text" style="font-size:12px"></div><div><label class="fl">Avatar Color</label><input class="fi" id="pe-color" type="color" style="height:36px;padding:2px 4px"></div></div><div><label class="fl">Bio</label><input class="fi" id="pe-bio" type="text" placeholder="e.g. Macro investor, risk analyst..." style="font-size:12px"></div><div style="display:flex;gap:7px"><button class="btn btn-p btn-sm" onclick="saveProfile()">Save</button><button class="btn btn-g btn-sm" onclick="toggleEdit()">Cancel</button></div></div></div>
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+      <button class="btn btn-g btn-sm" onclick="toggleEdit()">Edit Profile</button>
+      <button class="btn btn-ai btn-sm" onclick="loadDigest()">My Digest</button>
+    </div>
+  </div>
+  <div id="digest-box" style="display:none;background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(6,182,212,.05));border:1px solid var(--bdb);border-radius:var(--r12);padding:13px"><div style="font-size:10px;color:var(--b4);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px">PERSONALIZED DIGEST</div><div style="font-size:12px;color:var(--t2);line-height:1.7" id="digest-txt"></div></div>
+  <div class="pstats"><div class="ps"><div class="psv" id="ps-wl">0</div><div class="psl">Watchlist</div></div><div class="ps"><div class="psv" id="ps-al">0</div><div class="psl">Alerts</div></div><div class="ps"><div class="psv" id="ps-ev">0</div><div class="psl">Events Today</div></div><div class="ps"><div class="psv" id="ps-hi" style="color:var(--re)">0</div><div class="psl">High Impact</div></div></div>
+  <!-- Affinity radar — personalisation profile from real behaviour -->
+  <div class="card" id="prof-affinity-card" style="margin-bottom:12px">
+    <div class="card-tit" style="display:flex;align-items:center;justify-content:space-between">
+      <span>📡 Your Interest Profile</span>
+      <span id="prof-affinity-since" style="font-size:9px;color:var(--t3)"></span>
+    </div>
+    <div id="prof-affinity-bars" style="display:flex;flex-direction:column;gap:5px;margin-top:8px">
+      <div style="font-size:10px;color:var(--t3)">Loading behaviour data…</div>
+    </div>
+    <div id="prof-affinity-empty" style="display:none;font-size:10px;color:var(--t3);padding:8px 0">
+      No activity yet — browse events to build your profile
+    </div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:9px;color:var(--t4)">Severity filter:</span>
+      <span id="prof-minsev" style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(59,130,246,.1);color:var(--b4)">Auto</span>
+      <span style="font-size:9px;color:var(--t4);margin-left:6px">Based on last 30 days of activity</span>
+    </div>
+  </div>
+
+  <div class="prof-2col">
+    <div class="card">
+      <div class="card-tit">My Watchlist<select class="fi" id="wl-filter" onchange="renderProfile()" style="font-size:10px;padding:2px 6px;width:80px"><option value="">All</option><option value="country">Country</option><option value="asset">Asset</option><option value="topic">Topic</option></select></div>
+      <div id="profwl" style="margin-bottom:10px"></div>
+      <div class="divider"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <input class="fi" type="text" id="wlval" placeholder="Add item..." style="flex:1;font-size:11px;padding:6px 9px">
+        <select class="fi" id="wltype" style="width:90px;font-size:11px;padding:6px 8px"><option value="country">Country</option><option value="asset">Asset</option><option value="topic">Topic</option></select>
+        <button class="btn btn-p btn-sm" onclick="addWL()">Add</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-tit">My Alerts</div>
+      <div id="profalerts" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div class="divider"></div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:8px">
+        <input class="fi" type="text" id="q-aln" placeholder="Quick alert name..." style="font-size:11px;padding:6px 9px">
+        <button class="btn btn-p btn-sm" onclick="quickAlert()">+ Alert</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- EARLY WARNING SYSTEM -->
+<div class="view" id="view-earlywarning">
+<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:14px;width:100%">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div><div class="vtit">Crisis Early Warning System</div><div class="vsub">AI pattern analysis across news sentiment, macro stress, market signals and event velocity</div></div>
+    <button class="btn btn-ai btn-sm" onclick="loadEarlyWarning(true)">Refresh Analysis</button>
+  </div>
+
+  <!-- EW Score Hero -->
+  <div class="ew-score-hero" id="ew-hero" style="opacity:.4">
+    <div>
+      <div class="ew-score-num" id="ew-score" style="color:var(--am)">—</div>
+      <div class="ew-score-label" id="ew-label" style="color:var(--am)">Loading...</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px">AI Assessment</div>
+      <div class="ew-score-desc" id="ew-assess">Analyzing global risk patterns...</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:70px">
+      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Events 48h</div>
+      <div class="vtit" id="ew-evcount" style="font-size:22px;margin:0">—</div>
+    </div>
+  </div>
+
+  <!-- Stress Gauges -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px" id="ew-gauges">
+    <div class="ew-gauge"><div class="ew-gauge-label">Macro Stress</div><div class="ew-gauge-val" id="ewg-macro" style="color:var(--am)">—</div><div class="ew-gauge-bar"><div class="ew-gauge-fill" id="ewgb-macro" style="width:0%;background:var(--am)"></div></div></div>
+    <div class="ew-gauge"><div class="ew-gauge-label">Market Stress</div><div class="ew-gauge-val" id="ewg-market" style="color:var(--re)">—</div><div class="ew-gauge-bar"><div class="ew-gauge-fill" id="ewgb-market" style="width:0%;background:var(--re)"></div></div></div>
+    <div class="ew-gauge"><div class="ew-gauge-label">Sentiment Trend</div><div class="ew-gauge-val" id="ewg-sent" style="color:var(--t2)">—</div><div class="ew-gauge-bar"><div class="ew-gauge-fill" id="ewgb-sent" style="width:0%;background:var(--re)"></div></div></div>
+    <div class="ew-gauge"><div class="ew-gauge-label">Event Velocity</div><div class="ew-gauge-val" id="ewg-vel" style="color:var(--b4)">—</div><div class="ew-gauge-bar"><div class="ew-gauge-fill" id="ewgb-vel" style="width:0%;background:var(--b5)"></div></div></div>
+  </div>
+
+  <!-- Crisis Pattern Matrix -->
+  <div class="card">
+    <div class="card-tit">Crisis Pattern Detection</div>
+    <div class="pattern-grid" id="ew-patterns"></div>
+  </div>
+
+  <!-- Active Signals -->
+  <div class="card">
+    <div class="card-tit">Active Crisis Signals <span id="ew-signal-count" style="font-size:10px;color:var(--t3);font-weight:400"></span>
+      <a onclick="loadEWSignals()" style="font-size:10px;color:var(--b4);cursor:pointer">Refresh</a>
+    </div>
+    <div class="ew-signals-grid" id="ew-signals"></div>
+  </div>
+
+  <!-- Historical EW Timeline -->
+  <div class="card">
+    <div class="card-tit">EW Score History</div>
+    <canvas id="ew-chart" height="80" style="width:100%"></canvas>
+  </div>
+</div>
+</div>
+
+<!-- SUPPLY CHAIN INTELLIGENCE -->
+<div class="view" id="view-supplychain">
+<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:14px;width:100%">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div><div class="vtit">Global Supply Chain Intelligence</div><div class="vsub">Real-time risk monitoring across chokepoints, ports, trade routes and critical production nodes</div></div>
+    <button class="btn btn-ai btn-sm" onclick="loadSupplyChain()">Refresh</button>
+  </div>
+
+  <!-- SC Stress Hero -->
+  <div class="sc-stress-hero" id="sc-hero" style="opacity:.4">
+    <div>
+      <div class="sc-stress-num" id="sc-stress" style="color:var(--am)">—</div>
+      <div style="font-size:13px;font-weight:700;color:var(--am);letter-spacing:.06em">SC STRESS INDEX</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">AI Supply Chain Briefing</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.65" id="sc-brief">Analyzing global supply chain risk factors...</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:130px">
+      <div style="text-align:center;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:var(--r8);padding:8px"><div class="vtit" id="sc-critical" style="font-size:20px;margin:0;color:var(--re)">—</div><div style="font-size:9px;color:var(--t3)">Critical</div></div>
+      <div style="text-align:center;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:var(--r8);padding:8px"><div class="vtit" id="sc-high" style="font-size:20px;margin:0;color:var(--am)">—</div><div style="font-size:9px;color:var(--t3)">High Risk</div></div>
+    </div>
+  </div>
+
+  <!-- Interactive Supply Chain Map -->
+  <div class="card" style="padding:10px">
+    <div class="card-tit" style="margin-bottom:8px">Live Risk Map
+      <div class="sc-node-legend">
+        <span class="sc-node-type"><span style="color:#EF4444">■</span> Chokepoint</span>
+        <span class="sc-node-type"><span style="color:#F59E0B">■</span> Major Port</span>
+        <span class="sc-node-type"><span style="color:#8B5CF6">■</span> Critical Node</span>
+        <span class="sc-node-type"><span style="color:#06B6D4">■</span> Trade Route</span>
+      </div>
+    </div>
+    <div id="sc-map-wrap"><div id="sc-map"></div></div>
+  </div>
+
+  <!-- Active Disruptions -->
+  <div class="card">
+    <div class="card-tit">Active Disruptions <span id="sc-disrupt-count" style="font-size:10px;color:var(--re);font-weight:500"></span></div>
+    <div id="sc-disruptions" style="display:flex;flex-direction:column;gap:7px"></div>
+  </div>
+
+  <!-- Sector Exposure -->
+  <div class="card">
+    <div class="card-tit">Industry Sector Exposure</div>
+    <div class="sc-sector-grid" id="sc-sectors"></div>
+  </div>
+</div>
+</div>
+
+</div><!-- content -->
+</div><!-- shell -->
+
+<!-- ONBOARDING -->
+<div id="ob-overlay">
+<div class="ob-modal">
+  <div class="ob-header">
+    <div class="ob-dots" id="ob-dots"></div>
+    <div class="ob-step-lbl" id="ob-step-lbl">Step 1 of 6</div>
+    <div class="ob-title" id="ob-title">Welcome</div>
+    <div class="ob-sub" id="ob-sub"></div>
+  </div>
+  <div class="ob-body" id="ob-body"></div>
+  <div class="ob-footer">
+    <span class="ob-skip" onclick="skipOnboarding()">Skip setup</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-g btn-sm" id="ob-back" onclick="obBack()" style="display:none">Back</button>
+      <button class="btn btn-p" id="ob-next" onclick="obNext()" style="padding:8px 20px;font-size:12px">Next</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- TUTORIAL -->
+<div id="tut-overlay">
+  <div id="tut-backdrop"></div>
+  <div class="tut-spotlight" id="tut-spot" style="display:none"></div>
+  <div class="tut-popup" id="tut-popup">
+    <div class="tut-step-num"><div class="tut-step-pip"></div><span id="tut-num">Step 1 of 6</span></div>
+    <div class="tut-icon" id="tut-icon">🌍</div>
+    <div class="tut-title" id="tut-title">Tutorial</div>
+    <div class="tut-body" id="tut-body"></div>
+    <div class="tut-tips" id="tut-tips"></div>
+    <div class="tut-footer">
+      <div style="display:flex;flex-direction:column;gap:5px"><div class="tut-progress" id="tut-prog"></div><span class="tut-skip" onclick="skipTutorial()">Skip tutorial</span></div>
+      <div class="tut-nav"><button class="tut-arrow" id="tut-back" onclick="tutBack()">&#8592;</button><button class="tut-arrow" id="tut-next" onclick="tutNext()">&#8594;</button><button class="tut-finish" id="tut-finish" onclick="skipTutorial()" style="display:none">Finish!</button></div>
+    </div>
+  </div>
+</div>
+
+<button id="help-btn" title="Interactive Guide" onclick="startTutorial()">?</button>
+
+<!-- ═══════════════════════════════════
+     SHOW IMPACT MODAL
+═══════════════════════════════════ -->
+<div id="impact-modal">
+  <div class="impact-card">
+    <div class="impact-header">
+      <div class="impact-overline">MARKET IMPACT ANALYSIS</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div class="impact-title" id="imp-title">Analyzing...</div>
+        <button onclick="closeImpact()" style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;flex-shrink:0;line-height:1;padding:2px">x</button>
+      </div>
+    </div>
+    <div class="impact-body" id="imp-body">
+      <div style="text-align:center;padding:40px;color:var(--t3)">
+        <div style="font-size:28px;margin-bottom:10px">...</div>
+        <div style="font-size:12px">Generating impact analysis...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="kg-edge-tip"></div>
+<div id="toasts"></div>
+<div id="alert-tray"></div>
+
+<!-- RISK RADAR MODAL -->
+<div id="radar-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);z-index:6000;align-items:center;justify-content:center">
+  <div style="background:var(--bg1);border:1px solid rgba(239,68,68,.3);border-radius:var(--r20);width:100%;max-width:540px;overflow:hidden">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-family:var(--fh);font-size:15px;font-weight:700">Global Risk Radar</div>
+      <div style="display:flex;gap:7px"><button class="btn btn-p btn-sm" onclick="shareRadar()">Share Snapshot</button><button class="btn btn-g btn-sm" onclick="document.getElementById('radar-modal').style.display='none'">Close</button></div>
+    </div>
+    <div style="padding:20px" id="radar-body"><div style="text-align:center;color:var(--t3);font-size:12px">Loading...</div></div>
+    <canvas id="share-canvas" style="display:none" width="600" height="400"></canvas>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════
+     ADMIN DASHBOARD SHELL
+═══════════════════════════════════ -->
+<div id="admin-shell">
+  <div class="adm-bar">
+    <span class="adm-logo">WorldLens</span>
+    <span class="adm-badge">ADMIN</span>
+    <nav>
+      <button class="adm-nav-btn active" onclick="admNav('overview',this)">Overview</button>
+      <button class="adm-nav-btn" onclick="admNav('users',this)">Users</button>
+      <button class="adm-nav-btn" onclick="admNav('invites',this)">Invites</button>
+      <button class="adm-nav-btn" onclick="admNav('activity',this)">Activity</button>
+      <button class="adm-nav-btn" onclick="admNav('events',this)">Events</button>
+      <button class="adm-nav-btn" onclick="admNav('ai',this)">AI Monitor</button>
+      <button class="adm-nav-btn" onclick="admNav('settings',this)">Settings</button>
+    </nav>
+    <button class="adm-back" onclick="exitAdmin()">Exit Admin</button>
+  </div>
+
+  <div class="adm-body">
+    <div class="adm-content">
+
+      <!-- ── OVERVIEW ── -->
+      <div class="adm-panel active" id="adm-overview">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-family:var(--fh);font-size:18px;font-weight:700">System Overview</div>
+            <div style="font-size:11px;color:var(--t3)">Real-time platform statistics</div>
+          </div>
+          <button class="adm-btn adm-btn-blue" onclick="loadAdmOverview()">Refresh</button>
+        </div>
+        <div class="adm-kpis" id="adm-kpis"></div>
+        <div class="adm-chart-row">
+          <div class="adm-chart-box">
+            <div class="adm-chart-title">Top Followed Regions</div>
+            <div id="adm-top-regions"></div>
+          </div>
+          <div class="adm-chart-box">
+            <div class="adm-chart-title">Top Watchlisted Assets</div>
+            <div id="adm-top-assets"></div>
+          </div>
+        </div>
+        <div class="adm-chart-row">
+          <div class="adm-chart-box">
+            <div class="adm-chart-title">Section Usage (24h)</div>
+            <canvas id="adm-section-chart" height="100"></canvas>
+          </div>
+          <div class="adm-chart-box">
+            <div class="adm-chart-title">AI Provider Distribution</div>
+            <div id="adm-ai-providers"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── USERS ── -->
+      <div class="adm-panel" id="adm-users">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+          <div style="font-family:var(--fh);font-size:18px;font-weight:700">User Management</div>
+          <span id="adm-user-count" style="font-size:11px;color:var(--t3)"></span>
+        </div>
+        <div class="adm-search-row">
+          <input class="adm-search" type="text" id="adm-user-search" placeholder="Search email or name..." oninput="admSearchUsers()">
+          <select class="adm-filter" id="adm-user-role" onchange="admSearchUsers()">
+            <option value="">All roles</option>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+          <select class="adm-filter" id="adm-user-active" onchange="admSearchUsers()">
+            <option value="">All status</option>
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+          </select>
+        </div>
+        <div class="adm-table-wrap">
+          <table class="adm-table">
+            <thead><tr>
+              <th>User</th><th>Email</th><th>Role</th><th>Status</th>
+              <th>Watchlist</th><th>Activity 7d</th><th>Joined</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="adm-user-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <!-- ── BEHAVIOUR ── -->
+      <div class="adm-panel" id="adm-behaviour" style="display:none">
+        <div style="font-family:var(--fh);font-size:18px;font-weight:700;margin-bottom:16px">
+          User Behaviour Analytics
+        </div>
+
+        <!-- Summary KPIs -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+          <div class="adm-chart-box" style="text-align:center">
+            <div style="font-size:11px;color:var(--t3);margin-bottom:4px">Total Actions</div>
+            <div id="beh-total-actions" style="font-size:26px;font-weight:800;color:var(--t1)">—</div>
+          </div>
+          <div class="adm-chart-box" style="text-align:center">
+            <div style="font-size:11px;color:var(--t3);margin-bottom:4px">Active Users (7d)</div>
+            <div id="beh-active-users" style="font-size:26px;font-weight:800;color:var(--b4)">—</div>
+          </div>
+          <div class="adm-chart-box" style="text-align:center">
+            <div style="font-size:11px;color:var(--t3);margin-bottom:4px">AI Feedback</div>
+            <div id="beh-ai-feedback" style="font-size:26px;font-weight:800;color:var(--gr)">—</div>
+          </div>
+          <div class="adm-chart-box" style="text-align:center">
+            <div style="font-size:11px;color:var(--t3);margin-bottom:4px">Satisfaction Rate</div>
+            <div id="beh-satisfaction" style="font-size:26px;font-weight:800;color:var(--am)">—</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+          <!-- Top actions -->
+          <div class="adm-chart-box">
+            <div style="font-size:13px;font-weight:700;margin-bottom:12px">Top Actions</div>
+            <div id="beh-top-actions"></div>
+          </div>
+
+          <!-- Category affinity distribution -->
+          <div class="adm-chart-box">
+            <div style="font-size:13px;font-weight:700;margin-bottom:12px">Category Affinity (platform-wide)</div>
+            <div id="beh-cat-affinity"></div>
+          </div>
+
+          <!-- Section popularity -->
+          <div class="adm-chart-box">
+            <div style="font-size:13px;font-weight:700;margin-bottom:12px">Section Popularity</div>
+            <div id="beh-sections"></div>
+          </div>
+
+          <!-- AI feedback detail -->
+          <div class="adm-chart-box">
+            <div style="font-size:13px;font-weight:700;margin-bottom:12px">AI Feedback (last 30d)</div>
+            <div id="beh-ai-detail"></div>
+            <button class="btn btn-g btn-sm" style="margin-top:10px" onclick="admExportTraining()">
+              ↓ Export Training Data
+            </button>
+          </div>
+
+        </div>
+      </div><!-- adm-behaviour -->
+
+      <!-- ── ACTIVITY ── -->
+      <div class="adm-panel" id="adm-activity">
+        <div style="font-family:var(--fh);font-size:18px;font-weight:700;margin-bottom:12px">Activity Monitor</div>
+        <div class="adm-chart-row">
+          <div class="adm-chart-box">
+            <div class="adm-chart-title">Top Interests</div>
+            <div id="adm-top-interests"></div>
+          </div>
+          <div class="adm-chart-box">
+            <div class="adm-chart-title">Actions (24h)</div>
+            <div id="adm-by-action"></div>
+          </div>
+        </div>
+        <div class="adm-table-wrap">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px 0">
+            <div style="font-size:11px;font-weight:600">Recent Activity Log</div>
+            <select class="adm-filter" id="adm-act-hours" onchange="loadAdmActivity()">
+              <option value="24">Last 24h</option>
+              <option value="48">Last 48h</option>
+              <option value="168">Last 7 days</option>
+            </select>
+          </div>
+          <table class="adm-table" style="margin-top:8px">
+            <thead><tr><th>User</th><th>Action</th><th>Section</th><th>Detail</th><th>Time</th></tr></thead>
+            <tbody id="adm-act-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── EVENTS ── -->
+      <div class="adm-panel" id="adm-events">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+          <div style="font-family:var(--fh);font-size:18px;font-weight:700">Event Management</div>
+          <div style="display:flex;gap:6px">
+            <button class="adm-btn adm-btn-warning" onclick="loadAdmDuplicates()">Find Duplicates</button>
+            <button class="adm-btn adm-btn-blue" onclick="loadAdmEvents()">Refresh</button>
+          </div>
+        </div>
+        <div class="adm-search-row">
+          <input class="adm-search" type="text" id="adm-ev-search" placeholder="Search events..." oninput="loadAdmEvents()">
+          <select class="adm-filter" id="adm-ev-cat" onchange="loadAdmEvents()">
+            <option value="">All categories</option>
+            <option>CONFLICT</option><option>ECONOMICS</option><option>FINANCE</option>
+            <option>GEOPOLITICS</option><option>TECHNOLOGY</option><option>ENERGY</option>
+            <option>HUMANITARIAN</option><option>DISASTER</option><option>EARTHQUAKE</option>
+          </select>
+          <select class="adm-filter" id="adm-ev-impact" onchange="loadAdmEvents()">
+            <option value="">All impact</option>
+            <option>High</option><option>Medium</option><option>Low</option>
+          </select>
+        </div>
+        <div id="adm-dup-warning" style="display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r8);padding:10px 14px;font-size:12px;color:var(--am)"></div>
+        <div class="adm-table-wrap">
+          <table class="adm-table">
+            <thead><tr>
+              <th>Title</th><th>Category</th><th>Country</th>
+              <th>Impact</th><th>Severity</th><th>AI Score</th><th>Flagged</th><th>Time</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="adm-ev-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── AI MONITOR ── -->
+      <div class="adm-panel" id="adm-ai">
+        <div style="font-family:var(--fh);font-size:18px;font-weight:700;margin-bottom:12px">AI Output Monitor</div>
+        <div class="adm-kpis" id="adm-ai-kpis" style="grid-template-columns:repeat(4,1fr)"></div>
+        <div class="adm-table-wrap" style="margin-top:4px">
+          <div style="padding:10px 12px 0;font-size:11px;font-weight:600">Recent AI Outputs — click row to edit</div>
+          <table class="adm-table">
+            <thead><tr>
+              <th>Title</th><th>Category</th><th>AI Summary</th>
+              <th>Sentiment</th><th>Impact Score</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="adm-ai-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── SETTINGS ── -->
+      <div class="adm-panel" id="adm-settings">
+        <div style="font-family:var(--fh);font-size:18px;font-weight:700;margin-bottom:16px">AI &amp; System Settings</div>
+
+        <!-- ══ SECTION 1: Active Provider ══ -->
+        <div class="adm-chart-box" style="margin-bottom:14px">
+          <div class="adm-chart-title" style="margin-bottom:4px">
+            Active AI Provider
+            <span id="adm-provider-badge" style="font-size:10px;padding:2px 10px;border-radius:100px;background:rgba(16,185,129,.2);color:#34D399;margin-left:8px;font-weight:600">—</span>
+          </div>
+          <div style="font-size:11px;color:var(--t3);margin-bottom:12px;line-height:1.6">
+            Choose which AI provider is used for all users. The switch takes effect immediately — no restart required.
+            To activate a provider, save its API key below first.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="adm-btn" id="prov-btn-gemini" onclick="setGlobalProvider('gemini')"
+              style="display:flex;align-items:center;gap:6px;padding:8px 18px;font-size:12px;transition:all .2s">
+              ✨ Google Gemini
+              <span style="font-size:9px;background:rgba(52,211,153,.15);color:#34D399;padding:1px 6px;border-radius:100px">free tier</span>
+            </button>
+            <button class="adm-btn" id="prov-btn-claude" onclick="setGlobalProvider('claude')"
+              style="display:flex;align-items:center;gap:6px;padding:8px 18px;font-size:12px;transition:all .2s">
+              🤖 Claude (Anthropic)
+              <span style="font-size:9px;background:rgba(96,165,250,.15);color:#60A5FA;padding:1px 6px;border-radius:100px">paid</span>
+            </button>
+            <button class="adm-btn adm-btn-warning" id="prov-btn-none" onclick="setGlobalProvider('none')"
+              style="display:flex;align-items:center;gap:6px;padding:8px 18px;font-size:12px;transition:all .2s">
+              🚫 Disable AI
+            </button>
+          </div>
+        </div>
+
+        <!-- ══ SECTION 2: API Keys ══ -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+
+          <!-- Gemini — primary, free tier -->
+          <div class="adm-provider-card" id="adm-gemini-card">
+            <div class="adm-provider-icon">✨</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <div class="adm-provider-name" style="margin-bottom:0">Gemini 1.5 Flash</div>
+                <span style="font-size:9px;background:rgba(52,211,153,.15);color:#34D399;padding:1px 7px;border-radius:100px;font-weight:600;flex-shrink:0">FREE TIER</span>
+              </div>
+              <div class="adm-provider-desc">
+                Google AI free-tier API. Fast and capable for geopolitical and financial analysis. <strong>Recommended.</strong><br>
+                Get your key: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--b4)">aistudio.google.com/app/apikey</a>
+              </div>
+              <div class="adm-key-row" style="margin-top:10px">
+                <input class="adm-key-inp" type="password" id="gemini-key-inp" placeholder="AIzaSy..." autocomplete="off">
+                <button class="adm-btn adm-btn-ok" onclick="saveAIKey('gemini')">Save Key</button>
+              </div>
+              <div style="font-size:10px;margin-top:6px" id="gemini-key-status"></div>
+            </div>
+          </div>
+
+          <!-- Claude — secondary, disabled by default -->
+          <div class="adm-provider-card" id="adm-claude-card" style="opacity:.65">
+            <div class="adm-provider-icon">🤖</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <div class="adm-provider-name" style="margin-bottom:0">Claude (Anthropic)</div>
+                <span style="font-size:9px;background:rgba(248,113,113,.15);color:#F87171;padding:1px 7px;border-radius:100px;font-weight:600;flex-shrink:0">DISABLED</span>
+              </div>
+              <div class="adm-provider-desc">
+                Paid API — Claude Haiku. More capable for complex analysis but requires a paid Anthropic account.
+                Save a key here, then select it as the active provider above to enable it.
+              </div>
+              <div class="adm-key-row" style="margin-top:10px">
+                <input class="adm-key-inp" type="password" id="claude-key-inp" placeholder="sk-ant-..." autocomplete="off">
+                <button class="adm-btn adm-btn-ok" onclick="saveAIKey('claude')">Save Key</button>
+              </div>
+              <div style="font-size:10px;margin-top:6px" id="claude-key-status"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ SECTION 3: Promote Admin ══ -->
+        <div class="adm-chart-box" style="max-width:440px;margin-bottom:14px">
+          <div class="adm-chart-title">Promote User to Admin</div>
+          <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Enter a registered user's email to grant them admin privileges.</div>
+          <div style="display:flex;gap:7px">
+            <input class="adm-key-inp" type="email" id="promote-email" placeholder="user@example.com" style="flex:1">
+            <button class="adm-btn adm-btn-warning" style="padding:7px 14px;white-space:nowrap" onclick="promoteAdmin()">Promote</button>
+          </div>
+        </div>
+
+        <!-- ══ SECTION 4: System Info ══ -->
+        <div class="adm-chart-box" id="adm-sys-info">
+          <div class="adm-chart-title">System Info</div>
+          <div id="adm-sys-info-body" style="font-size:11px;color:var(--t2);display:flex;flex-direction:column;margin-top:8px"></div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Event editor modal -->
+<div id="adm-event-modal">
+  <div class="adm-modal-card">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="adm-modal-title">Edit Event</div>
+      <button style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer" onclick="closeAdmEventModal()">x</button>
+    </div>
+    <input type="hidden" id="adm-edit-id">
+    <div class="adm-field"><label>Title</label><input type="text" id="adm-edit-title"></div>
+    <div class="adm-field"><label>AI Summary</label><textarea id="adm-edit-ai-summary"></textarea></div>
+    <div class="adm-field"><label>Market Note</label><input type="text" id="adm-edit-market-note"></div>
+    <div class="adm-field"><label>Sentiment Tone</label>
+      <select id="adm-edit-tone">
+        <option>Positive</option><option selected>Neutral</option><option>Negative</option>
+      </select>
+    </div>
+    <div class="adm-field"><label>Admin Note</label><input type="text" id="adm-edit-admin-note" placeholder="Internal note..."></div>
+    <div style="display:flex;gap:7px;justify-content:flex-end">
+      <button class="adm-btn adm-btn-danger" onclick="admDeleteEvent()">Delete Event</button>
+      <button class="adm-btn adm-btn-blue" onclick="admFlagEvent()">Flag</button>
+      <button class="adm-btn adm-btn-ok" onclick="admSaveEvent()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- WorldLens Application Scripts (load order matters) -->
+<script src="/static/js/01_globals.js"></script>
+<script src="/static/js/02_core.js"></script>
+<script src="/static/js/03_map.js"></script>
+<script src="/static/js/04_events.js"></script>
+<script src="/static/js/05_markets.js"></script>
+<script src="/static/js/06_supply_admin.js"></script>
+<script src="/static/js/07_map_advanced.js"></script>
+<script src="/static/js/08_knowledge_graph.js"></script>
+<script src="/static/js/09_historical_events.js"></script>
+<script src="/static/js/10_stubs.js"></script>
+<script src="/static/js/11_insiders.js"></script>
+<script src="/static/js/12_graph.js"></script>
+<script src="/static/js/13_portfolio.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/static/js/14_graph3d.js"></script>
+<script src="/static/js/15_knowledge_explorer.js"></script>
+<script src="/static/js/16_timeline_graph.js"></script>
+<script src="/static/js/17_cascade.js"></script>
+
+
+<script>
+/* ── WORLDLENS NEO: Holographic 3D Hover Engine ─────────────────────── */
+(function() {
+  var MAX_TILT = 8;   // max degrees tilt
+  var MAX_LIFT = 16;  // max translateZ pixels
+
+  function applyHolo(el, e) {
+    var r  = el.getBoundingClientRect();
+    var mx = (e.clientX - r.left) / r.width;   // 0–1
+    var my = (e.clientY - r.top)  / r.height;  // 0–1
+    var rx = (my - .5) * -MAX_TILT;   // tilt X
+    var ry = (mx - .5) *  MAX_TILT;   // tilt Y
+    el.style.setProperty('--rx', rx.toFixed(2) + 'deg');
+    el.style.setProperty('--ry', ry.toFixed(2) + 'deg');
+    el.style.setProperty('--tz', MAX_LIFT + 'px');
+    el.style.setProperty('--mx', (mx * 100).toFixed(1) + '%');
+    el.style.setProperty('--my', (my * 100).toFixed(1) + '%');
+  }
+
+  function resetHolo(el) {
+    el.style.removeProperty('--rx');
+    el.style.removeProperty('--ry');
+    el.style.removeProperty('--tz');
+  }
+
+  function addHoloSheen(el) {
+    if (el.querySelector('.holo-sheen')) return;
+    var sheen = document.createElement('div');
+    sheen.className = 'holo-sheen';
+    el.appendChild(sheen);
+  }
+
+  function initHolo() {
+    /* Apply to KPI cards, event cards, bento cells, standard cards */
+    var selectors = [
+      '.db-kpi', '.evcard', '.db-bento-cell',
+      '.card', '.fcard', '.sprint-card'
+    ];
+    selectors.forEach(function(sel) {
+      document.querySelectorAll(sel).forEach(function(el) {
+        el.classList.add('holo-card');
+        addHoloSheen(el);
+        el.addEventListener('mousemove', function(e) { applyHolo(el, e); }, { passive: true });
+        el.addEventListener('mouseleave', function()  { resetHolo(el); });
+      });
+    });
+  }
+
+  /* Run on init and after dynamic renders */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHolo);
+  } else {
+    initHolo();
+  }
+
+  /* Re-init after section switch (dynamic content) */
+  var _origSv = window.sv;
+  window.sv = function(name, btn) {
+    if (typeof _origSv === 'function') _origSv(name, btn);
+    setTimeout(initHolo, 200);
+  };
+
+  /* Re-init after feed/dashboard render */
+  var _holoTimer;
+  var observer = new MutationObserver(function(mutations) {
+    var hasCards = mutations.some(function(m) {
+      return Array.from(m.addedNodes).some(function(n) {
+        return n.nodeType === 1 && (
+          n.classList && (n.classList.contains('evcard') || n.classList.contains('db-kpi')) ||
+          n.querySelector && n.querySelector('.evcard, .db-kpi')
+        );
+      });
+    });
+    if (hasCards) {
+      clearTimeout(_holoTimer);
+      _holoTimer = setTimeout(initHolo, 80);
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  /* Custom cursor: crosshair dot that follows mouse */
+  var cursor = document.createElement('div');
+  cursor.id  = 'wl-cursor';
+  cursor.style.cssText = [
+    'position:fixed', 'pointer-events:none', 'z-index:99999',
+    'width:20px', 'height:20px', 'border-radius:50%',
+    'border:1px solid rgba(0,229,255,.6)',
+    'box-shadow:0 0 8px rgba(0,229,255,.3), inset 0 0 4px rgba(0,229,255,.1)',
+    'transform:translate(-50%,-50%)',
+    'transition:width .15s, height .15s, opacity .15s',
+    'mix-blend-mode:screen', 'left:-100px', 'top:-100px',
+  ].join(';');
+
+  var cursorDot = document.createElement('div');
+  cursorDot.style.cssText = [
+    'position:fixed', 'pointer-events:none', 'z-index:99999',
+    'width:4px', 'height:4px', 'border-radius:50%',
+    'background:rgba(0,229,255,.9)',
+    'box-shadow:0 0 6px rgba(0,229,255,.8)',
+    'transform:translate(-50%,-50%)',
+    'left:-100px', 'top:-100px',
+  ].join(';');
+
+  document.body.appendChild(cursor);
+  document.body.appendChild(cursorDot);
+
+  var cx = -100, cy = -100;
+  var tx = -100, ty = -100;
+
+  document.addEventListener('mousemove', function(e) {
+    tx = e.clientX; ty = e.clientY;
+    cursorDot.style.left = tx + 'px';
+    cursorDot.style.top  = ty + 'px';
+  }, { passive: true });
+
+  /* Smooth cursor lag */
+  (function animCursor() {
+    cx += (tx - cx) * .18;
+    cy += (ty - cy) * .18;
+    cursor.style.left = cx + 'px';
+    cursor.style.top  = cy + 'px';
+    requestAnimationFrame(animCursor);
+  })();
+
+  /* Cursor grow on hoverable elements */
+  var hoverables = 'button, a, .evcard, .db-kpi, .card, .ni, input, select, [onclick]';
+  document.addEventListener('mouseover', function(e) {
+    if (e.target.closest(hoverables)) {
+      cursor.style.width  = '36px';
+      cursor.style.height = '36px';
+      cursor.style.borderColor = 'rgba(0,229,255,.9)';
+      cursor.style.boxShadow = '0 0 16px rgba(0,229,255,.5), inset 0 0 8px rgba(0,229,255,.15)';
+    }
+  });
+  document.addEventListener('mouseout', function(e) {
+    if (e.target.closest(hoverables)) {
+      cursor.style.width  = '20px';
+      cursor.style.height = '20px';
+      cursor.style.borderColor = 'rgba(0,229,255,.6)';
+      cursor.style.boxShadow = '0 0 8px rgba(0,229,255,.3), inset 0 0 4px rgba(0,229,255,.1)';
+    }
+  });
+
+  /* Cursor crosshair lines (vertical + horizontal) */
+  var hLine = document.createElement('div');
+  hLine.style.cssText = [
+    'position:fixed', 'pointer-events:none', 'z-index:99998',
+    'width:30px', 'height:1px',
+    'background:rgba(0,229,255,.25)',
+    'transform:translate(-50%,-50%)',
+    'left:-100px', 'top:-100px',
+  ].join(';');
+  var vLine = document.createElement('div');
+  vLine.style.cssText = hLine.style.cssText.replace('30px', '1px').replace('1px', '1px').replace('30px', '1px');
+  vLine.style.width  = '1px';
+  vLine.style.height = '30px';
+
+  document.body.appendChild(hLine);
+  document.body.appendChild(vLine);
+
+  document.addEventListener('mousemove', function(e) {
+    hLine.style.left = e.clientX + 'px';
+    hLine.style.top  = e.clientY + 'px';
+    vLine.style.left = e.clientX + 'px';
+    vLine.style.top  = e.clientY + 'px';
+  }, { passive: true });
+
+  /* Ambient particle system on page */
+  var canvas = document.createElement('canvas');
+  canvas.id  = 'wl-particles';
+  canvas.style.cssText = [
+    'position:fixed', 'inset:0',
+    'pointer-events:none', 'z-index:1',
+    'opacity:.35',
+  ].join(';');
+  document.body.insertBefore(canvas, document.body.firstChild);
+
+  var ctx = canvas.getContext('2d');
+  var particles = [];
+  var W, H;
+
+  function resizePCanvas() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resizePCanvas();
+  window.addEventListener('resize', resizePCanvas);
+
+  for (var i = 0; i < 55; i++) {
+    particles.push({
+      x: Math.random() * 1920,
+      y: Math.random() * 1080,
+      vx: (Math.random() - .5) * .3,
+      vy: (Math.random() - .5) * .3,
+      r: Math.random() * 1.2 + .3,
+      a: Math.random() * .6 + .1,
+    });
+  }
+
+  function drawParticles() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(function(p) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,229,255,' + p.a + ')';
+      ctx.fill();
+    });
+
+    /* Draw faint connection lines between close particles */
+    for (var i = 0; i < particles.length; i++) {
+      for (var j = i + 1; j < particles.length; j++) {
+        var dx  = particles[i].x - particles[j].x;
+        var dy  = particles[i].y - particles[j].y;
+        var dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 90) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = 'rgba(0,229,255,' + (.06 * (1 - dist/90)) + ')';
+          ctx.lineWidth   = .5;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(drawParticles);
+  }
+  drawParticles();
+
+})();
+</script>
+
+</body>
+</html>
