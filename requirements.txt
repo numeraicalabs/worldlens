@@ -1,0 +1,52 @@
+# ── Core web framework ─────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# ── Auth ───────────────────────────────────────────────────────
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=3.2.0,<4.0.0
+
+# ── Async / DB ─────────────────────────────────────────────────
+apscheduler>=3.10.4
+aiosqlite>=0.20.0
+aiofiles>=23.2.1
+
+# ── HTTP ───────────────────────────────────────────────────────
+httpx>=0.27.0
+
+# ── Config ─────────────────────────────────────────────────────
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+python-dotenv>=1.0.1
+
+# ── Finance data ───────────────────────────────────────────────
+yfinance>=0.2.40
+feedparser>=6.0.11
+
+# ── AI providers (lightweight - just API calls) ────────────────
+anthropic>=0.25.0
+
+# ── Knowledge graph (pure Python, small) ──────────────────────
+networkx>=3.3
+
+# ── ML / NLP (OPTIONAL - comment out if image too large) ───────
+# Uncomment on paid plan with 4GB+ RAM:
+# torch>=2.1.0
+# transformers>=4.40.0
+# spacy>=3.7.0
+# ── Macro data & notifications ─────────────────────────────────────────────
+# resend: email notifications via Resend.com (3000/month free)
+# No additional packages needed for FRED/World Bank/ECB/CoinGecko (pure httpx)
+# httpx is already a dependency
+# resend is optional — uncomment if you set RESEND_API_KEY
+# resend>=0.7.0
+# ── Sprint 4 ML features (lightweight, no GPU) ─────────────────────────────
+# Required for TF-IDF user profiles and alert classifier:
+scikit-learn>=1.4.0
+numpy>=1.26.0
+
+# Optional for semantic similarity (61MB model download on first use):
+# Set ENABLE_SEMANTIC_SEARCH=true in Render env vars to activate.
+# sentence-transformers>=3.0.0
