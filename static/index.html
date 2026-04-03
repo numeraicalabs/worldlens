@@ -15,6 +15,7 @@
 <!-- WorldLens Styles -->
 <link rel="stylesheet" href="/static/css/worldlens.css">
 <link rel="stylesheet" href="/static/css/worldlens_neo.css">
+<link rel="stylesheet" href="/static/css/worldlens_mobile.css">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -2947,6 +2948,200 @@
 
 })();
 </script>
+
+
+<!-- ════════════════════════════════════════════════════
+     WORLDLENS MOBILE BOTTOM NAV — Holographic Projector
+     ════════════════════════════════════════════════════ -->
+<nav id="wl-mobile-nav" aria-label="Mobile navigation">
+
+  <button class="wl-mnav-btn active" data-mv="dash" onclick="mobileNav('dash',this)" aria-label="Dashboard">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
+      <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
+    </svg>
+    <span class="wl-mnav-label">Dash</span>
+  </button>
+
+  <button class="wl-mnav-btn" data-mv="map" onclick="mobileNav('map',this)" aria-label="Map">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="8" cy="7" r="5.5"/>
+      <path d="M2.5 7h11M8 1.5c-2 2-3 3.5-3 5.5s1 4 3 5.5M8 1.5c2 2 3 3.5 3 5.5s-1 4-3 5.5"/>
+    </svg>
+    <span class="wl-mnav-label">Map</span>
+  </button>
+
+  <button class="wl-mnav-btn" data-mv="feed" onclick="mobileNav('feed',this)" aria-label="Feed">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M1 3h14M1 7h10M1 11h12"/>
+    </svg>
+    <span class="wl-mnav-label">Feed</span>
+  </button>
+
+  <button class="wl-mnav-btn" data-mv="markets" onclick="mobileNav('markets',this)" aria-label="Markets">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <polyline points="1,11 5,7 8,9 11,4 15,2"/><line x1="1" y1="14" x2="15" y2="14"/>
+    </svg>
+    <span class="wl-mnav-label">Markets</span>
+  </button>
+
+  <button class="wl-mnav-btn" data-mv="ai" onclick="mobileNav('ai',this)" aria-label="AI Analyst">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="8" cy="6" r="3.5"/><path d="M8 9.5v3M5 14h6"/>
+    </svg>
+    <span class="wl-mnav-label">AI</span>
+  </button>
+
+  <button class="wl-mnav-btn" id="wl-mnav-more-btn" onclick="toggleMoreDrawer()" aria-label="More">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="3" cy="8" r="1.2" fill="currentColor" stroke="none"/>
+      <circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/>
+      <circle cx="13" cy="8" r="1.2" fill="currentColor" stroke="none"/>
+    </svg>
+    <span class="wl-mnav-label">More</span>
+  </button>
+
+</nav>
+
+<!-- More drawer overlay -->
+<div id="wl-more-overlay" onclick="toggleMoreDrawer()"></div>
+
+<!-- More drawer -->
+<div id="wl-more-drawer">
+  <div class="more-drawer-handle"></div>
+  <div class="more-drawer-grid">
+
+    <div class="more-drawer-item" onclick="mobileNav('macro',null);toggleMoreDrawer()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M1 12L5 8l3 3 4-5 3-2"/><rect x="1" y="1" width="14" height="14" rx="1"/>
+      </svg><span>Macro</span>
+    </div>
+
+    <div class="more-drawer-item" onclick="mobileNav('graph',null);toggleMoreDrawer()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/>
+        <line x1="8" y1="6" x2="3" y2="10"/><line x1="8" y1="6" x2="13" y2="10"/>
+      </svg><span>Graph</span>
+    </div>
+
+    <div class="more-drawer-item" onclick="mobileNav('portfolio',null);toggleMoreDrawer()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="1" y="4" width="14" height="10" rx="1"/>
+        <path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/>
+      </svg><span>Portfolio</span>
+    </div>
+
+    <div class="more-drawer-item" onclick="mobileNav('insiders',null);toggleMoreDrawer()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/>
+      </svg><span>Insiders</span>
+    </div>
+
+    <div class="more-drawer-item" onclick="mobileNav('earlywarning',null);toggleMoreDrawer()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M8 1l1.5 4h4l-3.2 2.3 1.2 3.7L8 8.8l-3.5 2.2 1.2-3.7L2.5 5h4z"/>
+      </svg><span>EW</span>
+    </div>
+
+    <div class="more-drawer-item" onclick="mobileNav('gamification',null);toggleMoreDrawer()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M8 1l2 4 4.5.7-3.3 3.2.8 4.6L8 11.5l-4 2 .8-4.6L1.5 5.7 6 5z"/>
+      </svg><span>Achieve</span>
+    </div>
+
+    <div class="more-drawer-item" onclick="mobileNav('alerts',null);toggleMoreDrawer()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M8 1a5 5 0 0 1 5 5c0 4 1.5 5 1.5 5h-13s1.5-1 1.5-5a5 5 0 0 1 5-5z"/>
+        <path d="M6.5 13.5a1.5 1.5 0 0 0 3 0"/>
+      </svg><span id="wl-mnav-alert-label">Alerts</span>
+    </div>
+
+    <div class="more-drawer-item" onclick="mobileNav('profile',null);toggleMoreDrawer()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="6" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/>
+      </svg><span>Profile</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- Holographic XP popup -->
+<div id="wl-holo-xp" class="holo-xp-popup">
+  <div class="holo-xp-inner">
+    <div class="holo-xp-sparkle" id="wl-xp-sparkle"></div>
+    <div class="holo-xp-label">Experience Points</div>
+    <div class="holo-xp-amount" id="wl-xp-amount">+50</div>
+    <div class="holo-xp-reason" id="wl-xp-reason">Action completed</div>
+  </div>
+</div>
+
+<!-- Holographic event info overlay (mobile) -->
+<div class="holo-popup-overlay" id="wl-holo-event-overlay" onclick="closeHoloEvent(event)">
+  <div class="holo-popup" id="wl-holo-event-popup">
+    <div class="holo-popup-inner">
+      <div class="holo-popup-handle"></div>
+      <div class="holo-popup-header">
+        <div class="holo-popup-title" id="wl-holo-ev-cat">GEOPOLITICS</div>
+        <button class="holo-popup-close" onclick="closeHoloEvent()">✕</button>
+      </div>
+      <div class="holo-popup-body">
+        <!-- Severity ring + title -->
+        <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
+          <div class="holo-sev-ring" id="wl-holo-sev-ring">
+            <svg viewBox="0 0 60 60">
+              <circle class="ring-bg" cx="30" cy="30" r="26"/>
+              <circle class="ring-fill" id="wl-holo-ring-fill" cx="30" cy="30" r="26"
+                stroke="var(--cy)" style="--ring-offset:164"
+                transform="rotate(-90 30 30)"/>
+            </svg>
+            <span class="ring-val" id="wl-holo-sev-val" style="color:var(--cy)">5.0</span>
+          </div>
+          <div style="flex:1">
+            <div id="wl-holo-ev-title" style="font-family:var(--fh);font-size:13px;font-weight:700;letter-spacing:-.015em;line-height:1.3;color:var(--t1)"></div>
+            <div id="wl-holo-ev-meta" style="font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--fm)"></div>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div id="wl-holo-ev-summary" style="font-size:11px;color:var(--t2);line-height:1.65;margin-bottom:12px"></div>
+
+        <!-- AI strip (loads asynchronously) -->
+        <div class="holo-ai-strip" id="wl-holo-ai-strip" style="display:none">
+          <div class="holo-ai-label">⬡ AI ANALYSIS</div>
+          <div class="holo-ai-text" id="wl-holo-ai-text"></div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="holo-actions">
+          <div class="holo-action-btn" onclick="holoEvAction('map')">
+            <div class="holo-action-icon">🗺</div>
+            <div class="holo-action-label">Map View</div>
+          </div>
+          <div class="holo-action-btn" onclick="holoEvAction('save')">
+            <div class="holo-action-icon" id="wl-holo-save-icon">🔖</div>
+            <div class="holo-action-label" id="wl-holo-save-label">Save</div>
+          </div>
+          <div class="holo-action-btn" onclick="holoEvAction('ai')">
+            <div class="holo-action-icon">🤖</div>
+            <div class="holo-action-label">AI Ask</div>
+          </div>
+          <div class="holo-action-btn" onclick="holoEvAction('similar')">
+            <div class="holo-action-icon">🔗</div>
+            <div class="holo-action-label">Similar</div>
+          </div>
+          <div class="holo-action-btn" onclick="holoEvAction('alert')">
+            <div class="holo-action-icon">🔔</div>
+            <div class="holo-action-label">Alert</div>
+          </div>
+          <div class="holo-action-btn" onclick="holoEvAction('full')">
+            <div class="holo-action-icon">↗</div>
+            <div class="holo-action-label">Full View</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
