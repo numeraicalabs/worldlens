@@ -2931,72 +2931,40 @@
 <script src="/static/js/15_knowledge_explorer.js"></script>
 <script src="/static/js/16_timeline_graph.js"></script>
 <script src="/static/js/17_cascade.js"></script>
-
+<script src="/static/js/18_network_hub.js"></script>
+<script src="/static/js/19_continent_streams.js"></script>
+<script src="/static/js/20_nav_ux.js"></script>
 
 <script>
-/* ── WORLDLENS NEO: Holographic 3D Hover Engine ─────────────────────── */
+/* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
 (function() {
-  var MAX_TILT = 8;   // max degrees tilt
-  var MAX_LIFT = 16;  // max translateZ pixels
-
-  function applyHolo(el, e) {
-    var r  = el.getBoundingClientRect();
-    var mx = (e.clientX - r.left) / r.width;   // 0–1
-    var my = (e.clientY - r.top)  / r.height;  // 0–1
-    var rx = (my - .5) * -MAX_TILT;   // tilt X
-    var ry = (mx - .5) *  MAX_TILT;   // tilt Y
-    el.style.setProperty('--rx', rx.toFixed(2) + 'deg');
-    el.style.setProperty('--ry', ry.toFixed(2) + 'deg');
-    el.style.setProperty('--tz', MAX_LIFT + 'px');
-    el.style.setProperty('--mx', (mx * 100).toFixed(1) + '%');
-    el.style.setProperty('--my', (my * 100).toFixed(1) + '%');
-  }
-
-  function resetHolo(el) {
-    el.style.removeProperty('--rx');
-    el.style.removeProperty('--ry');
-    el.style.removeProperty('--tz');
-  }
-
-  function addHoloSheen(el) {
-    if (el.querySelector('.holo-sheen')) return;
-    var sheen = document.createElement('div');
-    sheen.className = 'holo-sheen';
-    el.appendChild(sheen);
-  }
-
-  function initHolo() {
-    /* Apply to KPI cards, event cards, bento cells, standard cards */
-    var selectors = [
-      '.db-kpi', '.evcard', '.db-bento-cell',
-      '.card', '.fcard', '.sprint-card'
-    ];
+  /* Subtle hover lift for interactive cards — no 3D tilt or particles */
+  function initCards() {
+    var selectors = ['.db-kpi', '.evcard', '.db-bento-cell', '.card', '.fcard'];
     selectors.forEach(function(sel) {
       document.querySelectorAll(sel).forEach(function(el) {
-        el.classList.add('holo-card');
-        addHoloSheen(el);
-        el.addEventListener('mousemove', function(e) { applyHolo(el, e); }, { passive: true });
-        el.addEventListener('mouseleave', function()  { resetHolo(el); });
+        /* Ensure clean state — remove any legacy holo elements */
+        var sheen = el.querySelector('.holo-sheen');
+        if (sheen) sheen.remove();
       });
     });
   }
 
-  /* Run on init and after dynamic renders */
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initHolo);
+    document.addEventListener('DOMContentLoaded', initCards);
   } else {
-    initHolo();
+    initCards();
   }
 
-  /* Re-init after section switch (dynamic content) */
+  /* Re-init after section switch */
   var _origSv = window.sv;
   window.sv = function(name, btn) {
     if (typeof _origSv === 'function') _origSv(name, btn);
-    setTimeout(initHolo, 200);
+    setTimeout(initCards, 200);
   };
 
-  /* Re-init after feed/dashboard render */
-  var _holoTimer;
+  /* Re-init after dynamic content */
+  var _timer;
   var observer = new MutationObserver(function(mutations) {
     var hasCards = mutations.some(function(m) {
       return Array.from(m.addedNodes).some(function(n) {
@@ -3007,169 +2975,17 @@
       });
     });
     if (hasCards) {
-      clearTimeout(_holoTimer);
-      _holoTimer = setTimeout(initHolo, 80);
+      clearTimeout(_timer);
+      _timer = setTimeout(initCards, 80);
     }
   });
   observer.observe(document.body, { childList: true, subtree: true });
-
-  /* Custom cursor: crosshair dot that follows mouse */
-  var cursor = document.createElement('div');
-  cursor.id  = 'wl-cursor';
-  cursor.style.cssText = [
-    'position:fixed', 'pointer-events:none', 'z-index:99999',
-    'width:20px', 'height:20px', 'border-radius:50%',
-    'border:1px solid rgba(0,229,255,.6)',
-    'box-shadow:0 0 8px rgba(0,229,255,.3), inset 0 0 4px rgba(0,229,255,.1)',
-    'transform:translate(-50%,-50%)',
-    'transition:width .15s, height .15s, opacity .15s',
-    'mix-blend-mode:screen', 'left:-100px', 'top:-100px',
-  ].join(';');
-
-  var cursorDot = document.createElement('div');
-  cursorDot.style.cssText = [
-    'position:fixed', 'pointer-events:none', 'z-index:99999',
-    'width:4px', 'height:4px', 'border-radius:50%',
-    'background:rgba(0,229,255,.9)',
-    'box-shadow:0 0 6px rgba(0,229,255,.8)',
-    'transform:translate(-50%,-50%)',
-    'left:-100px', 'top:-100px',
-  ].join(';');
-
-  document.body.appendChild(cursor);
-  document.body.appendChild(cursorDot);
-
-  var cx = -100, cy = -100;
-  var tx = -100, ty = -100;
-
-  document.addEventListener('mousemove', function(e) {
-    tx = e.clientX; ty = e.clientY;
-    cursorDot.style.left = tx + 'px';
-    cursorDot.style.top  = ty + 'px';
-  }, { passive: true });
-
-  /* Smooth cursor lag */
-  (function animCursor() {
-    cx += (tx - cx) * .18;
-    cy += (ty - cy) * .18;
-    cursor.style.left = cx + 'px';
-    cursor.style.top  = cy + 'px';
-    requestAnimationFrame(animCursor);
-  })();
-
-  /* Cursor grow on hoverable elements */
-  var hoverables = 'button, a, .evcard, .db-kpi, .card, .ni, input, select, [onclick]';
-  document.addEventListener('mouseover', function(e) {
-    if (e.target.closest(hoverables)) {
-      cursor.style.width  = '36px';
-      cursor.style.height = '36px';
-      cursor.style.borderColor = 'rgba(0,229,255,.9)';
-      cursor.style.boxShadow = '0 0 16px rgba(0,229,255,.5), inset 0 0 8px rgba(0,229,255,.15)';
-    }
-  });
-  document.addEventListener('mouseout', function(e) {
-    if (e.target.closest(hoverables)) {
-      cursor.style.width  = '20px';
-      cursor.style.height = '20px';
-      cursor.style.borderColor = 'rgba(0,229,255,.6)';
-      cursor.style.boxShadow = '0 0 8px rgba(0,229,255,.3), inset 0 0 4px rgba(0,229,255,.1)';
-    }
-  });
-
-  /* Cursor crosshair lines (vertical + horizontal) */
-  var hLine = document.createElement('div');
-  hLine.style.cssText = [
-    'position:fixed', 'pointer-events:none', 'z-index:99998',
-    'width:30px', 'height:1px',
-    'background:rgba(0,229,255,.25)',
-    'transform:translate(-50%,-50%)',
-    'left:-100px', 'top:-100px',
-  ].join(';');
-  var vLine = document.createElement('div');
-  vLine.style.cssText = hLine.style.cssText.replace('30px', '1px').replace('1px', '1px').replace('30px', '1px');
-  vLine.style.width  = '1px';
-  vLine.style.height = '30px';
-
-  document.body.appendChild(hLine);
-  document.body.appendChild(vLine);
-
-  document.addEventListener('mousemove', function(e) {
-    hLine.style.left = e.clientX + 'px';
-    hLine.style.top  = e.clientY + 'px';
-    vLine.style.left = e.clientX + 'px';
-    vLine.style.top  = e.clientY + 'px';
-  }, { passive: true });
-
-  /* Ambient particle system on page */
-  var canvas = document.createElement('canvas');
-  canvas.id  = 'wl-particles';
-  canvas.style.cssText = [
-    'position:fixed', 'inset:0',
-    'pointer-events:none', 'z-index:1',
-    'opacity:.35',
-  ].join(';');
-  document.body.insertBefore(canvas, document.body.firstChild);
-
-  var ctx = canvas.getContext('2d');
-  var particles = [];
-  var W, H;
-
-  function resizePCanvas() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-  }
-  resizePCanvas();
-  window.addEventListener('resize', resizePCanvas);
-
-  for (var i = 0; i < 55; i++) {
-    particles.push({
-      x: Math.random() * 1920,
-      y: Math.random() * 1080,
-      vx: (Math.random() - .5) * .3,
-      vy: (Math.random() - .5) * .3,
-      r: Math.random() * 1.2 + .3,
-      a: Math.random() * .6 + .1,
-    });
-  }
-
-  function drawParticles() {
-    ctx.clearRect(0, 0, W, H);
-    particles.forEach(function(p) {
-      p.x += p.vx; p.y += p.vy;
-      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
-      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0,229,255,' + p.a + ')';
-      ctx.fill();
-    });
-
-    /* Draw faint connection lines between close particles */
-    for (var i = 0; i < particles.length; i++) {
-      for (var j = i + 1; j < particles.length; j++) {
-        var dx  = particles[i].x - particles[j].x;
-        var dy  = particles[i].y - particles[j].y;
-        var dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < 90) {
-          ctx.beginPath();
-          ctx.moveTo(particles[i].x, particles[i].y);
-          ctx.lineTo(particles[j].x, particles[j].y);
-          ctx.strokeStyle = 'rgba(0,229,255,' + (.06 * (1 - dist/90)) + ')';
-          ctx.lineWidth   = .5;
-          ctx.stroke();
-        }
-      }
-    }
-    requestAnimationFrame(drawParticles);
-  }
-  drawParticles();
-
 })();
 </script>
 
 
 <!-- ════════════════════════════════════════════════════
-     WORLDLENS MOBILE BOTTOM NAV — Holographic Projector
+     WORLDLENS MOBILE BOTTOM NAV
      ════════════════════════════════════════════════════ -->
 <nav id="wl-mobile-nav" aria-label="Mobile navigation">
 
