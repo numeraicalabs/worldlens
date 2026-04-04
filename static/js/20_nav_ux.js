@@ -13,17 +13,21 @@
 
 /* ── Dropdown group map ─────────────────────────────────────── */
 var NAV_GROUP_MAP = {
-  dash:         'intelligence',
-  map:          'intelligence',
-  feed:         'intelligence',
-  earlywarning: 'intelligence',
-  supplychain:  'intelligence',
-  graph:        'analysis',
-  macro:        'analysis',
-  ai:           'analysis',
-  markets:      'markets',
-  insiders:     'markets',
-  portfolio:    'markets',
+  dash:           'intelligence',
+  map:            'intelligence',
+  feed:           'intelligence',
+  earlywarning:   'intelligence',
+  supplychain:    'intelligence',
+  graph:          'analysis',
+  'graph-graph':    'analysis',
+  'graph-explorer': 'analysis',
+  'graph-timeline': 'analysis',
+  'graph-cascade':  'analysis',
+  macro:          'analysis',
+  ai:             'analysis',
+  markets:        'markets',
+  insiders:       'markets',
+  portfolio:      'markets',
 };
 
 /* ── Open/close logic ──────────────────────────────────────── */
@@ -91,7 +95,22 @@ function navGroupActivate(groupId) {
   closeAllDropdowns();
 }
 
-/* ── Update nav active state + graph canvas fix when sv() is called ─ */
+/* ── Graph sub-mode helper ───────────────────────────────────── */
+/*  Replaces the brittle sv()+setTimeout(200)+closeAll inline pattern in
+    the nav dropdown. Uses rAF instead of an arbitrary 200ms timeout so
+    the sub-tab switches as soon as the view is painted.            */
+function svGraph(mode) {
+  sv('graph', document.querySelector('[data-v=graph]'));
+  /* rAF fires after the view is display:flex — safer than setTimeout(200) */
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      var tabId = 'ng-tab-' + mode;
+      ngSwitchMode(mode, document.getElementById(tabId));
+      /* Mark the correct nd-item active */
+      _updateNavActiveState('graph-' + mode);
+    });
+  });
+}
 /* FIX: merged two separate sv() wrappers into one to avoid 5-level chain */
 (function() {
   var _origSv = window.sv;
@@ -122,9 +141,21 @@ function _updateNavActiveState(viewName) {
   document.querySelectorAll('.ni[data-v]').forEach(function(b) {
     b.classList.toggle('on', b.dataset.v === viewName);
   });
-  /* Update nd-item active state */
-  document.querySelectorAll('.nd-item[data-v]').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.v === viewName);
+  /* Update nd-item active state — supports both plain data-v and graph-* sub-modes */
+  var ndView = viewName;            /* e.g. 'macro', 'ai' */
+  var ndMode = null;                /* e.g. 'cascade' for 'graph-cascade' */
+  if (viewName.indexOf('graph-') === 0) {
+    ndView = 'graph';
+    ndMode = viewName.replace('graph-', '');   /* 'cascade' | 'explorer' | 'timeline' | 'graph' */
+  }
+  document.querySelectorAll('.nd-item').forEach(function(b) {
+    var match = false;
+    if (b.dataset.v) {
+      match = b.dataset.v === ndView;
+    } else if (ndMode && b.dataset.graphMode) {
+      match = b.dataset.graphMode === ndMode;
+    }
+    b.classList.toggle('active', match);
   });
   /* Highlight group button */
   document.querySelectorAll('.nav-group-btn').forEach(function(b) {
@@ -137,7 +168,7 @@ function _updateNavActiveState(viewName) {
   }
   /* Update mobile nav */
   document.querySelectorAll('.wl-mnav-btn[data-mv]').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.mv === viewName);
+    b.classList.toggle('active', b.dataset.mv === ndView);
   });
 }
 
@@ -171,7 +202,10 @@ setInterval(updateNavXpPill, 5000);
 
 /* ── Keyboard shortcuts ─────────────────────────────────────── */
 var NAV_SHORTCUTS = {
-  'd': 'dash', 'm': 'map', 'f': 'feed', 'g': 'graph',
+  'd': 'dash', 'm': 'map', 'f': 'feed',
+  'g': function(){ svGraph('graph'); },
+  'x': function(){ svGraph('explorer'); },
+  'c': function(){ svGraph('cascade'); },
   'k': function(){ ngSwitchMode('cascade', document.getElementById('ng-tab-cascade')); },
   'n': function(){ ngSwitchMode('graph',   document.getElementById('ng-tab-graph'));   },
   'e': 'earlywarning', 'a': 'ai',
@@ -204,20 +238,24 @@ document.addEventListener('keydown', function(e) {
 
 /* ── View titles for breadcrumb ─────────────────────────────── */
 var VIEW_META = {
-  dash:         { label: 'Dashboard',       icon: '🏠', group: 'Intelligence' },
-  map:          { label: 'Global Map',      icon: '🗺', group: 'Intelligence' },
-  feed:         { label: 'Event Feed',      icon: '📋', group: 'Intelligence' },
-  earlywarning: { label: 'Early Warning',   icon: '📡', group: 'Intelligence' },
-  supplychain:  { label: 'Supply Chain',    icon: '🏭', group: 'Intelligence' },
-  graph:        { label: 'Analysis Suite',  icon: '🕸', group: 'Analysis' },
-  macro:        { label: 'Macro',           icon: '📊', group: 'Analysis' },
-  ai:           { label: 'AI Analyst',      icon: '🤖', group: 'Analysis' },
-  markets:      { label: 'Markets',         icon: '📈', group: 'Markets' },
-  insiders:     { label: 'Insider Trades',  icon: '🕵', group: 'Markets' },
-  portfolio:    { label: 'Portfolio',       icon: '💼', group: 'Markets' },
-  gamification: { label: 'Achievements',   icon: '⭐', group: 'Profile' },
-  alerts:       { label: 'Alerts',          icon: '🔔', group: 'Profile' },
-  profile:      { label: 'Profile',         icon: '👤', group: 'Profile' },
+  dash:            { label: 'Dashboard',          icon: '🏠', group: 'Intelligence' },
+  map:             { label: 'Global Map',          icon: '🗺', group: 'Intelligence' },
+  feed:            { label: 'Event Feed',          icon: '📋', group: 'Intelligence' },
+  earlywarning:    { label: 'Early Warning',       icon: '📡', group: 'Intelligence' },
+  supplychain:     { label: 'Supply Chain',        icon: '🏭', group: 'Intelligence' },
+  graph:           { label: 'News Graph',          icon: '🕸', group: 'Analysis' },
+  'graph-graph':   { label: 'News Graph',          icon: '🕸', group: 'Analysis' },
+  'graph-explorer':{ label: 'Knowledge Explorer',  icon: '🔍', group: 'Analysis' },
+  'graph-timeline':{ label: 'Timeline Graph',      icon: '📅', group: 'Analysis' },
+  'graph-cascade': { label: 'Cascade Simulator',   icon: '⚡', group: 'Analysis' },
+  macro:           { label: 'Macro',               icon: '📊', group: 'Analysis' },
+  ai:              { label: 'AI Analyst',          icon: '🤖', group: 'Analysis' },
+  markets:         { label: 'Markets',             icon: '📈', group: 'Markets' },
+  insiders:        { label: 'Insider Trades',      icon: '🕵', group: 'Markets' },
+  portfolio:       { label: 'Portfolio',           icon: '💼', group: 'Markets' },
+  gamification:    { label: 'Achievements',        icon: '⭐', group: 'Profile' },
+  alerts:          { label: 'Alerts',              icon: '🔔', group: 'Profile' },
+  profile:         { label: 'Profile',             icon: '👤', group: 'Profile' },
 };
 
 /* ── Init on load ────────────────────────────────────────────── */
