@@ -119,26 +119,138 @@
 <!-- SHELL -->
 <div id="shell">
 <nav id="nav">
-  <div class="nlogo">WorldLens</div>
-  <button class="ni on" data-v="dash" onclick="sv('dash',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Dashboard</button>
-  <button class="ni" data-v="map" onclick="sv('map',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="7" r="5.5"/><path d="M2.5 7h11M8 1.5c-2 2-3 3.5-3 5.5s1 4 3 5.5M8 1.5c2 2 3 3.5 3 5.5s-1 4-3 5.5"/></svg>Global Map</button>
-  <button class="ni" data-v="graph" onclick="sv('graph',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><line x1="8" y1="6" x2="3" y2="10"/><line x1="8" y1="6" x2="13" y2="10"/><line x1="3" y1="12" x2="13" y2="12"/></svg> Graph</button>
-<button class="ni" data-v="markets" onclick="sv('markets',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,11 5,7 8,9 11,4 15,2"/><line x1="1" y1="14" x2="15" y2="14"/></svg>Markets</button>
-  <button class="ni" data-v="insiders" onclick="sv('insiders',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/><path d="M11 7l2 2-2 2" stroke-width="1.3"/></svg> Insiders</button>
-<button class="ni" data-v="feed" onclick="sv('feed',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 3h14M1 7h10M1 11h12"/></svg>Event Feed</button>
-  <button class="ni" data-v="macro" onclick="sv('macro',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12L5 8l3 3 4-5 3-2"/><rect x="1" y="1" width="14" height="14" rx="1"/></svg>Macro</button>
-  <button class="ni" data-v="ai" onclick="sv('ai',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3.5"/><path d="M8 9.5v3M5 14h6"/></svg>AI Analyst</button>
-  <button class="ni" data-v="portfolio" onclick="sv('portfolio',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="14" height="10" rx="1"/><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/></svg>Portfolio</button>
-  <button class="ni" data-v="gamification" onclick="sv('gamification',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l2 4 4.5.7-3.3 3.2.8 4.6L8 11.5l-4 2 .8-4.6L1.5 5.7 6 5z"/></svg>Achievements</button>
-  <button class="ni" data-v="earlywarning" onclick="sv('earlywarning',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l1.5 4h4l-3.2 2.3 1.2 3.7L8 8.8l-3.5 2.2 1.2-3.7L2.5 5h4z"/></svg>Early Warning</button>
-  <button class="ni" data-v="supplychain" onclick="sv('supplychain',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="3" cy="8" r="2"/><circle cx="13" cy="4" r="2"/><circle cx="13" cy="12" r="2"/><path d="M5 8h3l2-4M5 8h3l2 4"/></svg>Supply Chain</button>
-  <button class="ni" data-v="alerts"   onclick="sv('alerts',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 4 1.5 5 1.5 5h-13s1.5-1 1.5-5a5 5 0 0 1 5-5z"/><path d="M6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>Alerts<span id="al-badge" style="display:none;background:var(--or);color:#fff;font-size:8px;padding:1px 5px;border-radius:100px;margin-left:2px">0</span></button>
+
+  <!-- Logo -->
+  <div class="nlogo" onclick="sv('dash',document.querySelector('[data-v=dash]'))" style="cursor:pointer">
+    <span class="nlogo-wl">World</span><span class="nlogo-lens">Lens</span>
+  </div>
+
+  <!-- ── PRIMARY NAV GROUPS ── -->
+  <div class="nav-groups" id="nav-groups">
+
+    <!-- 1. Intelligence (with dropdown) -->
+    <div class="nav-group" id="ng-intelligence">
+      <button class="ni nav-group-btn" data-v="dash" onclick="sv('dash',this);navGroupActivate('intelligence')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v4l2.5 1.5"/></svg>
+        Intelligence
+        <svg class="nav-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+      </button>
+      <div class="nav-dropdown" id="nd-intelligence">
+        <div class="nd-section-label">Live Data</div>
+        <button class="nd-item active" data-v="dash" onclick="sv('dash',document.querySelector('[data-v=dash]'));closeAllDropdowns()">
+          <span class="nd-icon">🏠</span><span class="nd-label">Dashboard</span>
+          <span class="nd-badge nd-badge-live">LIVE</span>
+        </button>
+        <button class="nd-item" data-v="map" onclick="sv('map',document.querySelector('[data-v=map]'));closeAllDropdowns()">
+          <span class="nd-icon">🗺</span><span class="nd-label">Global Map</span>
+          <span class="nd-desc">Live event pins</span>
+        </button>
+        <button class="nd-item" data-v="feed" onclick="sv('feed',document.querySelector('[data-v=feed]'));closeAllDropdowns()">
+          <span class="nd-icon">📋</span><span class="nd-label">Event Feed</span>
+          <span class="nd-desc">Filter + search</span>
+        </button>
+        <div class="nd-section-label">Early Intelligence</div>
+        <button class="nd-item" data-v="earlywarning" onclick="sv('earlywarning',document.querySelector('[data-v=earlywarning]'));closeAllDropdowns()">
+          <span class="nd-icon">📡</span><span class="nd-label">Early Warning</span>
+          <span class="nd-desc">Crisis signals</span>
+        </button>
+        <button class="nd-item" data-v="supplychain" onclick="sv('supplychain',document.querySelector('[data-v=supplychain]'));closeAllDropdowns()">
+          <span class="nd-icon">🏭</span><span class="nd-label">Supply Chain</span>
+          <span class="nd-desc">Trade disruptions</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. Analysis (with dropdown + sub-tabs) -->
+    <div class="nav-group" id="ng-analysis">
+      <button class="ni nav-group-btn" data-v="graph" onclick="sv('graph',this);navGroupActivate('analysis')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><line x1="8" y1="6" x2="3" y2="10"/><line x1="8" y1="6" x2="13" y2="10"/></svg>
+        Analysis
+        <svg class="nav-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+      </button>
+      <div class="nav-dropdown" id="nd-analysis">
+        <div class="nd-section-label">Graph Suite</div>
+        <button class="nd-item" onclick="sv('graph',document.querySelector('[data-v=graph]'));setTimeout(function(){ngSwitchMode('graph',document.getElementById('ng-tab-graph'))},200);closeAllDropdowns()">
+          <span class="nd-icon">🕸</span><span class="nd-label">News Graph</span>
+          <span class="nd-desc">Entity relationships</span>
+        </button>
+        <button class="nd-item" onclick="sv('graph',document.querySelector('[data-v=graph]'));setTimeout(function(){ngSwitchMode('explorer',document.getElementById('ng-tab-explorer'))},200);closeAllDropdowns()">
+          <span class="nd-icon">🔍</span><span class="nd-label">Knowledge Explorer</span>
+          <span class="nd-desc">Radial / force layout</span>
+        </button>
+        <button class="nd-item" onclick="sv('graph',document.querySelector('[data-v=graph]'));setTimeout(function(){ngSwitchMode('timeline',document.getElementById('ng-tab-timeline'))},200);closeAllDropdowns()">
+          <span class="nd-icon">📅</span><span class="nd-label">Timeline Graph</span>
+          <span class="nd-desc">Narrative arcs</span>
+        </button>
+        <button class="nd-item" onclick="sv('graph',document.querySelector('[data-v=graph]'));setTimeout(function(){ngSwitchMode('cascade',document.getElementById('ng-tab-cascade'))},200);closeAllDropdowns()">
+          <span class="nd-icon">⚡</span><span class="nd-label">Cascade Simulator</span>
+          <span class="nd-desc nd-desc-highlight">Shock propagation</span>
+        </button>
+        <div class="nd-section-label">Intelligence</div>
+        <button class="nd-item" data-v="macro" onclick="sv('macro',document.querySelector('[data-v=macro]'));closeAllDropdowns()">
+          <span class="nd-icon">📊</span><span class="nd-label">Macro Indicators</span>
+          <span class="nd-desc">FRED · ECB · World Bank</span>
+        </button>
+        <button class="nd-item" data-v="ai" onclick="sv('ai',document.querySelector('[data-v=ai]'));closeAllDropdowns()">
+          <span class="nd-icon">🤖</span><span class="nd-label">AI Analyst</span>
+          <span class="nd-desc">Ask anything</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. Markets (with dropdown) -->
+    <div class="nav-group" id="ng-markets">
+      <button class="ni nav-group-btn" data-v="markets" onclick="sv('markets',this);navGroupActivate('markets')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,11 5,7 8,9 11,4 15,2"/><line x1="1" y1="14" x2="15" y2="14"/></svg>
+        Markets
+        <svg class="nav-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+      </button>
+      <div class="nav-dropdown" id="nd-markets">
+        <div class="nd-section-label">Financial Data</div>
+        <button class="nd-item" data-v="markets" onclick="sv('markets',document.querySelector('[data-v=markets]'));closeAllDropdowns()">
+          <span class="nd-icon">📈</span><span class="nd-label">Markets</span>
+          <span class="nd-desc">114 assets · Quant suite</span>
+        </button>
+        <button class="nd-item" data-v="insiders" onclick="sv('insiders',document.querySelector('[data-v=insiders]'));closeAllDropdowns()">
+          <span class="nd-icon">🕵</span><span class="nd-label">Insider Trades</span>
+          <span class="nd-desc">Congress · Billionaires</span>
+        </button>
+        <button class="nd-item" data-v="portfolio" onclick="sv('portfolio',document.querySelector('[data-v=portfolio]'));closeAllDropdowns()">
+          <span class="nd-icon">💼</span><span class="nd-label">Portfolio</span>
+          <span class="nd-desc">Risk · Forecast · PCA</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. Direct items (no dropdown) -->
+    <button class="ni" data-v="ai" onclick="sv('ai',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3.5"/><path d="M8 9.5v3M5 14h6"/></svg>
+      AI
+    </button>
+
+    <button class="ni" data-v="alerts" onclick="sv('alerts',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 4 1.5 5 1.5 5h-13s1.5-1 1.5-5a5 5 0 0 1 5-5z"/><path d="M6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>
+      Alerts<span id="al-badge" style="display:none;background:var(--or);color:#fff;font-size:8px;padding:1px 5px;border-radius:100px;margin-left:2px">0</span>
+    </button>
+
+  </div><!-- nav-groups -->
+
+  <!-- ── RIGHT SIDE ── -->
   <div id="navr">
     <div class="wsi"><div class="wsd" id="wsd"></div><span id="wst">Connecting</span></div>
-    <div class="uch" onclick="sv('profile',null)"><div class="uav" id="uav">U</div><span id="un">User</span></div>
+    <div class="uch" onclick="sv('profile',null)" title="Profile & Settings">
+      <div class="uav" id="uav">U</div>
+      <span id="un">User</span>
+    </div>
+    <!-- Gamification XP pill -->
+    <div id="nav-xp-pill" style="display:none;align-items:center;gap:4px;padding:3px 10px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.2);border-radius:100px;cursor:pointer" onclick="sv('gamification',document.querySelector('[data-v=gamification]'))">
+      <span style="font-size:10px">⭐</span>
+      <span id="nav-xp-val" style="font-family:var(--fm);font-size:10px;font-weight:700;color:#A78BFA">0 XP</span>
+    </div>
     <button class="btn btn-g btn-sm" onclick="openRiskRadar()">Risk Radar</button>
     <button class="btn btn-g btn-sm" onclick="logout()">Sign Out</button>
   </div>
+
 </nav>
 <div id="content">
 
