@@ -205,7 +205,6 @@ function renderDash() {
   var riskBar = el('d-risk-b');
   if (riskBar) { riskBar.style.width = Math.min(100,risk)+'%'; riskBar.style.background = rc; }
   setEl('d-risk-l', risk>60?'Critical — High Alert':risk>35?'Elevated — Monitor':'Stable');
-  setEl('d-risk-l', risk>60?'Critical — High Alert':risk>35?'Elevated — Monitor':'Stable');
 
   // KPI: Events
   setEl('d-ev', st.last_24h||'—');
