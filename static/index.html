@@ -357,6 +357,96 @@
       <div id="d-hot" class="db-hotspot-grid"></div>
     </div>
 
+
+    <!-- H: Live Continent News Streams (full width) -->
+    <div class="db-bento-cell db-cell-continents">
+      <div class="db-cell-header" style="margin-bottom:12px">
+        <div class="db-cell-title">
+          <span class="db-cell-icon" style="background:rgba(0,229,255,.12);color:var(--cy)">🌐</span>
+          Live Intelligence — 24h Continent Streams
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="cont-live-indicator">
+            <div class="cont-live-dot"></div>
+            <span class="cont-live-label">LIVE FEED</span>
+          </div>
+          <span id="cont-total-count" style="font-family:var(--fm);font-size:9px;color:var(--t3)">— events</span>
+        </div>
+      </div>
+
+      <div class="cont-streams-grid">
+
+        <!-- Americas -->
+        <div class="cont-stream" data-continent="americas">
+          <div class="cont-stream-header" style="--cont-color:#10B981">
+            <div class="cont-stream-flag">🌎</div>
+            <div class="cont-stream-info">
+              <div class="cont-stream-name">Americas</div>
+              <div class="cont-stream-sub">N·S America</div>
+            </div>
+            <div class="cont-stream-stats">
+              <div class="cont-stat-val" id="cont-am-count">—</div>
+              <div class="cont-stat-lbl">events</div>
+            </div>
+            <div class="cont-pulse" style="--cont-color:#10B981"></div>
+          </div>
+          <div class="cont-stream-feed" id="cont-feed-americas"></div>
+        </div>
+
+        <!-- Europe -->
+        <div class="cont-stream" data-continent="europe">
+          <div class="cont-stream-header" style="--cont-color:#3B82F6">
+            <div class="cont-stream-flag">🌍</div>
+            <div class="cont-stream-info">
+              <div class="cont-stream-name">Europe</div>
+              <div class="cont-stream-sub">EU · Russia</div>
+            </div>
+            <div class="cont-stream-stats">
+              <div class="cont-stat-val" id="cont-eu-count">—</div>
+              <div class="cont-stat-lbl">events</div>
+            </div>
+            <div class="cont-pulse" style="--cont-color:#3B82F6"></div>
+          </div>
+          <div class="cont-stream-feed" id="cont-feed-europe"></div>
+        </div>
+
+        <!-- Asia-Pacific -->
+        <div class="cont-stream" data-continent="asiapac">
+          <div class="cont-stream-header" style="--cont-color:#F59E0B">
+            <div class="cont-stream-flag">🌏</div>
+            <div class="cont-stream-info">
+              <div class="cont-stream-name">Asia-Pacific</div>
+              <div class="cont-stream-sub">China · ASEAN · AU</div>
+            </div>
+            <div class="cont-stream-stats">
+              <div class="cont-stat-val" id="cont-ap-count">—</div>
+              <div class="cont-stat-lbl">events</div>
+            </div>
+            <div class="cont-pulse" style="--cont-color:#F59E0B"></div>
+          </div>
+          <div class="cont-stream-feed" id="cont-feed-asiapac"></div>
+        </div>
+
+        <!-- Middle East & Africa -->
+        <div class="cont-stream" data-continent="mea">
+          <div class="cont-stream-header" style="--cont-color:#EF4444">
+            <div class="cont-stream-flag">🌍</div>
+            <div class="cont-stream-info">
+              <div class="cont-stream-name">Middle East · Africa</div>
+              <div class="cont-stream-sub">MENA · Sub-Saharan</div>
+            </div>
+            <div class="cont-stream-stats">
+              <div class="cont-stat-val" id="cont-mea-count">—</div>
+              <div class="cont-stat-lbl">events</div>
+            </div>
+            <div class="cont-pulse" style="--cont-color:#EF4444"></div>
+          </div>
+          <div class="cont-stream-feed" id="cont-feed-mea"></div>
+        </div>
+
+      </div><!-- cont-streams-grid -->
+    </div><!-- db-cell-continents -->
+
   </div><!-- db-bento -->
 
 </div><!-- db-root -->
@@ -518,6 +608,22 @@
         <div style="display:flex;align-items:center;gap:7px;font-size:10px"><div style="width:18px;height:3px;background:#94A3B8;border-radius:2px;flex-shrink:0;opacity:.6"></div>Temporal</div>
       </div>
     </div>
+  </div>
+
+  <!-- ── Network Arc SVG Overlay ── -->
+  <svg id="wl-arcs-svg" aria-hidden="true"></svg>
+
+  <!-- ── Category Floating Labels ── -->
+  <div id="wl-cat-labels" aria-hidden="true"></div>
+
+  <!-- ── Active View Status Bar ── -->
+  <div id="wl-active-view-bar">
+    <div class="avb-dot"></div>
+    <span class="avb-text">Active View: <span class="avb-val" id="avb-mode">Global Network</span></span>
+    <div class="avb-sep"></div>
+    <span class="avb-text"><span class="avb-val" id="avb-count">—</span> Nodes</span>
+    <div class="avb-sep"></div>
+    <span class="avb-text">Severity <span class="avb-val" id="avb-sev">—</span> avg</span>
   </div>
 
   <div id="map-zoom-overlay"></div>
