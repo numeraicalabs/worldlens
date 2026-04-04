@@ -52,19 +52,18 @@ function initMap() {
 
   G.map = L.map('map', { center:[25,15], zoom:3, zoomControl:false, minZoom:2, maxZoom:14 });
 
-  // Dark tile filter
-  var sty = document.createElement('style');
-  sty.textContent = '.leaflet-tile-pane{filter:invert(1) hue-rotate(200deg) brightness(.7) saturate(.6)}';
-  document.head.appendChild(sty);
-
+  // Dark tile providers — native dark maps, no CSS filter needed
+  // CartoDB Dark Matter: purpose-built dark map, sharp and fast
   var providers = [
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+    'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
     'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   ];
   var tileLoaded = false;
   function tryProvider(i) {
     if (i >= providers.length) return;
-    var layer = L.tileLayer(providers[i], {subdomains:'abc',maxZoom:19,attribution:'OSM',crossOrigin:false});
+    var layer = L.tileLayer(providers[i], {subdomains:'abcd',maxZoom:19,attribution:'© CartoDB © OSM',crossOrigin:true,detectRetina:true});
     layer.on('tileload', function() { tileLoaded = true; });
     layer.on('tileerror', function() {
       if (!tileLoaded) { try{G.map.removeLayer(layer);}catch(e){} setTimeout(function(){tryProvider(i+1);},200); }
