@@ -388,3 +388,58 @@ body {
   .db-greeting-title { font-size: 20px !important; }
   .db-kpi-val { font-size: 18px !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   COMPONENT STYLES — Migrated from original neo, cleaned up
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Ticker ── */
+#ticker-wrap {
+  background: var(--bg1) !important;
+  border-bottom: 1px solid var(--bd) !important;
+}
+
+/* ── Continent Streams ── */
+.cont-live-indicator { display: flex; align-items: center; gap: 6px; padding: 3px 10px; background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.15); border-radius: 100px; }
+.cont-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gr); animation: livePulse 2s infinite; }
+.cont-live-label { font-family: var(--fm); font-size: 8px; font-weight: 700; letter-spacing: .14em; color: var(--gr); }
+
+.cont-streams-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+.cont-stream { background: var(--bg1); border: 1px solid var(--bd); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; min-height: 280px; max-height: 340px; position: relative; transition: border-color .2s; }
+.cont-stream:hover { border-color: rgba(255,255,255,.1); }
+
+.cont-stream-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--bd); flex-shrink: 0; position: relative; }
+.cont-stream-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--cont-color, var(--b5)); opacity: .5; }
+
+.cont-stream-flag { font-size: 18px; line-height: 1; flex-shrink: 0; }
+.cont-stream-info { flex: 1; min-width: 0; }
+.cont-stream-name { font-family: var(--fh); font-size: 11px; font-weight: 700; color: var(--t1); letter-spacing: -.01em; }
+.cont-stream-sub { font-family: var(--fm); font-size: 8px; color: var(--t3); letter-spacing: .04em; margin-top: 1px; }
+
+.cont-stream-stats { text-align: right; flex-shrink: 0; }
+.cont-stat-val { font-family: var(--fm); font-size: 16px; font-weight: 700; color: var(--t1); font-variant-numeric: tabular-nums; line-height: 1; }
+.cont-stat-lbl { font-family: var(--fm); font-size: 7px; color: var(--t3); letter-spacing: .06em; text-transform: uppercase; }
+
+.cont-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--cont-color, var(--b5)); flex-shrink: 0; animation: livePulse 2.5s ease-in-out infinite; }
+
+.cont-stream-feed { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 4px 0; scroll-behavior: smooth; }
+.cont-stream-feed::-webkit-scrollbar { width: 2px; }
+.cont-stream-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 1px; }
+
+.cont-ev-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,.03); cursor: pointer; transition: background .12s; }
+.cont-ev-row:hover { background: rgba(255,255,255,.04); }
+.cont-ev-sev { font-family: var(--fm); font-size: 11px; font-weight: 700; flex-shrink: 0; min-width: 24px; text-align: center; padding: 2px 0; border-radius: 4px; line-height: 1; }
+.cont-ev-title { font-size: 10px; color: var(--t2); line-height: 1.4; flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cont-ev-row:hover .cont-ev-title { color: var(--t1); }
+.cont-ev-cat { font-family: var(--fm); font-size: 7px; letter-spacing: .08em; text-transform: uppercase; color: var(--t3); margin-top: 2px; }
+.cont-ev-time { font-family: var(--fm); font-size: 8px; color: var(--t3); flex-shrink: 0; white-space: nowrap; }
+
+/* ── Dashboard specifics ── */
+.db-evlist { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; min-height: 0; }
+.db-mktlist { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; flex: 1; min-height: 0; }
+.db-hotspot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+/* ── Continent grid responsive ── */
+@media (max-width: 1200px) { .cont-streams-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) { .cont-streams-grid { grid-template-columns: 1fr !important; } }
