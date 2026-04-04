@@ -1,0 +1,467 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   WORLDLENS — Ring of Fire Dashboard Theme
+   ═══════════════════════════════════════════════════════════════════════
+   Eclipse-infographic aesthetic applied ONLY to #view-dash.
+   All other views inherit from worldlens_neo.css unchanged.
+   
+   Design DNA from the eclipse reference image:
+   - Near-black (#050505) with warm amber corona accents
+   - Editorial typography: Cormorant Garamond for hero KPIs
+   - JetBrains Mono for data labels — tiny, tracked-out, uppercase
+   - DM Sans for body text
+   - Amber/orange gradient borders instead of cool blue
+   - Corona glow on critical elements
+   - High contrast between KPI numbers and surrounding darkness
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── FIRE TOKENS (scoped to dashboard) ── */
+#view-dash {
+  --fire-bg: #050505;
+  --fire-surface: rgba(255,255,255,0.015);
+  --fire-border: rgba(255,143,0,0.06);
+  --fire-border-hover: rgba(255,143,0,0.14);
+  --fire-glow: rgba(255,109,0,0.08);
+  --fire-corona: #FF8F00;
+  --fire-ember: #DD2C00;
+  --fire-core: #FFAB00;
+  --fire-text: #E8E0D4;
+  --fire-text2: rgba(255,255,255,0.45);
+  --fire-text3: rgba(255,143,0,0.45);
+  --fire-label: rgba(255,143,0,0.5);
+  --fire-serif: 'Cormorant Garamond', Georgia, serif;
+  --fire-sans: 'DM Sans', system-ui, sans-serif;
+  --fire-mono: 'JetBrains Mono', 'Space Mono', monospace;
+}
+
+/* ── DASHBOARD ROOT ── */
+#view-dash {
+  background: var(--fire-bg) !important;
+  color: var(--fire-text) !important;
+}
+
+/* Ambient corona glow — top-right radial like the eclipse */
+.db-root {
+  position: relative !important;
+  padding: 20px 28px 40px !important;
+}
+.db-root::before {
+  content: '';
+  position: absolute;
+  top: -15%;
+  right: -8%;
+  width: 55vw;
+  height: 55vw;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,109,0,0.035) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+.db-root::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  left: -12%;
+  width: 45vw;
+  height: 45vw;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(191,54,12,0.025) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+.db-root > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── TICKER ── */
+#view-dash #ticker-wrap {
+  background: rgba(255,143,0,0.02) !important;
+  border-bottom: 1px solid rgba(255,143,0,0.06) !important;
+}
+#view-dash .ticker-label {
+  background: var(--fire-ember) !important;
+}
+
+/* ── GREETING ── */
+#view-dash .db-greeting {
+  background: linear-gradient(145deg, rgba(255,143,0,0.06) 0%, rgba(191,54,12,0.03) 100%) !important;
+  border: 1px solid rgba(255,143,0,0.1) !important;
+  border-radius: 16px !important;
+  padding: 20px 24px !important;
+}
+#view-dash .db-greeting-time {
+  font-family: var(--fire-mono) !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2em !important;
+  text-transform: uppercase !important;
+  color: var(--fire-corona) !important;
+  margin-bottom: 8px !important;
+}
+#view-dash .db-greeting-title {
+  font-family: var(--fire-serif) !important;
+  font-size: 26px !important;
+  font-weight: 300 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.15 !important;
+  color: var(--fire-text) !important;
+}
+#view-dash .db-greeting-sub {
+  font-family: var(--fire-mono) !important;
+  font-size: 9px !important;
+  color: var(--fire-text2) !important;
+}
+
+/* ── KPI CARDS — Editorial oversized numbers ── */
+#view-dash .db-kpi {
+  background: var(--fire-surface) !important;
+  border: 1px solid var(--fire-border) !important;
+  border-radius: 14px !important;
+  padding: 16px 18px !important;
+  transition: border-color 0.2s, box-shadow 0.3s !important;
+}
+#view-dash .db-kpi:hover {
+  border-color: var(--fire-border-hover) !important;
+  box-shadow: 0 4px 24px rgba(255,109,0,0.06) !important;
+}
+
+#view-dash .db-kpi-icon {
+  font-size: 14px !important;
+  opacity: 0.7 !important;
+}
+
+#view-dash .db-kpi-lbl {
+  font-family: var(--fire-mono) !important;
+  font-size: 8px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.2em !important;
+  text-transform: uppercase !important;
+  color: var(--fire-label) !important;
+}
+
+#view-dash .db-kpi-val {
+  font-family: var(--fire-serif) !important;
+  font-size: 36px !important;
+  font-weight: 300 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 0.9 !important;
+  color: var(--fire-text) !important;
+}
+
+/* Risk Index KPI — special amber treatment */
+#view-dash #dbk-risk .db-kpi-val {
+  color: var(--fire-corona) !important;
+  text-shadow: 0 0 40px rgba(255,143,0,0.25) !important;
+}
+
+#view-dash .db-kpi-sub {
+  font-family: var(--fire-mono) !important;
+  font-size: 10px !important;
+  margin-top: 4px !important;
+}
+
+#view-dash .db-kpi-bar {
+  background: rgba(255,143,0,0.06) !important;
+  border-radius: 2px !important;
+  height: 3px !important;
+  margin-top: 6px !important;
+}
+#view-dash .db-kpi-bar-fill {
+  background: linear-gradient(90deg, var(--fire-core), var(--fire-ember)) !important;
+  border-radius: 2px !important;
+}
+
+/* ── CRISIS SPOTLIGHT — Incandescent glow ── */
+#view-dash #crisis-spotlight {
+  background: linear-gradient(135deg, rgba(191,54,12,0.06), rgba(255,109,0,0.03)) !important;
+  border: 1px solid rgba(255,109,0,0.1) !important;
+  border-radius: 16px !important;
+  margin-bottom: 24px !important;
+}
+#view-dash .cs-overline {
+  font-family: var(--fire-mono) !important;
+  font-size: 8px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2em !important;
+  color: var(--fire-ember) !important;
+}
+#view-dash .cs-title {
+  font-family: var(--fire-sans) !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  color: var(--fire-text) !important;
+  line-height: 1.35 !important;
+}
+#view-dash .cs-sev-num {
+  font-family: var(--fire-serif) !important;
+  font-size: 48px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  text-shadow: 0 0 30px rgba(255,23,68,0.3) !important;
+}
+#view-dash .cs-sev-label {
+  font-family: var(--fire-mono) !important;
+  font-size: 8px !important;
+  letter-spacing: 0.15em !important;
+  text-transform: uppercase !important;
+  color: var(--fire-label) !important;
+}
+
+/* ── BENTO GRID — Warm dark panels ── */
+#view-dash .db-bento {
+  gap: 14px !important;
+}
+#view-dash .db-bento-cell {
+  background: var(--fire-surface) !important;
+  border: 1px solid var(--fire-border) !important;
+  border-radius: 14px !important;
+  padding: 16px 18px !important;
+  transition: border-color 0.2s !important;
+}
+#view-dash .db-bento-cell:hover {
+  border-color: var(--fire-border-hover) !important;
+}
+
+/* Cell headers */
+#view-dash .db-cell-title {
+  font-family: var(--fire-sans) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--fire-text) !important;
+}
+#view-dash .db-cell-icon {
+  background: rgba(255,143,0,0.06) !important;
+  border-radius: 8px !important;
+}
+#view-dash .db-cell-link {
+  font-family: var(--fire-mono) !important;
+  font-size: 10px !important;
+  color: var(--fire-corona) !important;
+  letter-spacing: 0.02em !important;
+}
+#view-dash .db-cell-link:hover {
+  color: var(--fire-core) !important;
+}
+
+/* ── AI BRIEFING CELL — Purple/amber gradient ── */
+#view-dash .db-cell-ai {
+  background: linear-gradient(135deg, rgba(124,77,255,0.04), rgba(255,109,0,0.03)) !important;
+  border-color: rgba(124,77,255,0.1) !important;
+}
+#view-dash .db-ai-badge {
+  font-family: var(--fire-mono) !important;
+  font-size: 8px !important;
+  letter-spacing: 0.1em !important;
+  padding: 2px 8px !important;
+  border-radius: 4px !important;
+  background: rgba(124,77,255,0.12) !important;
+  color: #B388FF !important;
+}
+#view-dash .aib-txt {
+  font-family: var(--fire-sans) !important;
+  font-size: 12px !important;
+  color: var(--fire-text2) !important;
+  line-height: 1.65 !important;
+}
+
+/* ── EVENT CARDS ── */
+#view-dash .evcard {
+  background: rgba(255,255,255,0.01) !important;
+  border: 1px solid rgba(255,143,0,0.04) !important;
+  border-radius: 10px !important;
+  transition: background 0.15s, border-color 0.15s !important;
+}
+#view-dash .evcard:hover {
+  background: rgba(255,143,0,0.03) !important;
+  border-color: rgba(255,143,0,0.1) !important;
+}
+
+/* ── CONTINENT STREAMS ── */
+#view-dash .cont-stream {
+  background: var(--fire-surface) !important;
+  border: 1px solid var(--fire-border) !important;
+}
+#view-dash .cont-stream:hover {
+  border-color: var(--fire-border-hover) !important;
+}
+#view-dash .cont-stream-header {
+  border-bottom: 1px solid var(--fire-border) !important;
+}
+#view-dash .cont-stream-name {
+  font-family: var(--fire-sans) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--fire-text) !important;
+}
+#view-dash .cont-stat-val {
+  font-family: var(--fire-serif) !important;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  color: var(--fire-text) !important;
+}
+#view-dash .cont-stat-lbl {
+  font-family: var(--fire-mono) !important;
+  font-size: 7px !important;
+  color: var(--fire-text3) !important;
+}
+#view-dash .cont-live-indicator {
+  background: rgba(255,143,0,0.06) !important;
+  border-color: rgba(255,143,0,0.12) !important;
+}
+#view-dash .cont-live-dot {
+  background: var(--fire-corona) !important;
+}
+#view-dash .cont-live-label {
+  color: var(--fire-corona) !important;
+}
+
+/* Event rows in continent feeds */
+#view-dash .cont-ev-row:hover {
+  background: rgba(255,143,0,0.03) !important;
+}
+#view-dash .cont-ev-title {
+  font-family: var(--fire-sans) !important;
+  font-size: 10px !important;
+  color: rgba(255,255,255,0.45) !important;
+}
+#view-dash .cont-ev-row:hover .cont-ev-title {
+  color: var(--fire-text) !important;
+}
+#view-dash .cont-ev-sev {
+  font-family: var(--fire-mono) !important;
+}
+#view-dash .cont-ev-time {
+  font-family: var(--fire-mono) !important;
+  color: rgba(255,255,255,0.2) !important;
+}
+
+/* ── BUTTONS IN DASHBOARD ── */
+#view-dash .btn-ai {
+  background: linear-gradient(135deg, rgba(255,109,0,0.2), rgba(191,54,12,0.15)) !important;
+  border: 1px solid rgba(255,109,0,0.25) !important;
+  color: var(--fire-core) !important;
+  font-family: var(--fire-sans) !important;
+}
+#view-dash .btn-ai:hover {
+  background: linear-gradient(135deg, rgba(255,109,0,0.3), rgba(191,54,12,0.25)) !important;
+  border-color: rgba(255,109,0,0.35) !important;
+}
+#view-dash .btn-g {
+  border-color: var(--fire-border) !important;
+  color: var(--fire-text2) !important;
+  font-family: var(--fire-sans) !important;
+}
+#view-dash .btn-g:hover {
+  border-color: rgba(255,143,0,0.2) !important;
+  color: var(--fire-corona) !important;
+}
+#view-dash .btn-d {
+  background: rgba(191,54,12,0.15) !important;
+  border: 1px solid rgba(221,44,0,0.25) !important;
+  color: #FCA5A5 !important;
+}
+
+/* Crisis spotlight load button */
+#view-dash .cs-load-btn {
+  background: rgba(124,77,255,0.1) !important;
+  border: 1px solid rgba(124,77,255,0.2) !important;
+  border-radius: 8px !important;
+  color: #B388FF !important;
+  font-family: var(--fire-sans) !important;
+  cursor: pointer !important;
+}
+
+/* ── TAGS ── */
+#view-dash .tagH {
+  background: rgba(255,23,68,0.1) !important;
+  color: #FF1744 !important;
+  border-color: rgba(255,23,68,0.2) !important;
+}
+#view-dash .tagM {
+  background: rgba(255,143,0,0.1) !important;
+  color: var(--fire-corona) !important;
+  border-color: rgba(255,143,0,0.2) !important;
+}
+#view-dash .tagL {
+  background: rgba(0,230,118,0.08) !important;
+  color: #00E676 !important;
+  border-color: rgba(0,230,118,0.15) !important;
+}
+
+/* ── STAGGER ENTRANCE ANIMATION ── */
+#view-dash .db-header-row {
+  animation: fireIn 0.6s cubic-bezier(0.16,1,0.3,1) both !important;
+}
+#view-dash #crisis-spotlight {
+  animation: fireIn 0.6s 0.1s cubic-bezier(0.16,1,0.3,1) both !important;
+}
+#view-dash .db-bento {
+  animation: fireIn 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both !important;
+}
+#view-dash .db-cell-continents {
+  animation: fireIn 0.6s 0.3s cubic-bezier(0.16,1,0.3,1) both !important;
+}
+
+@keyframes fireIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── KPI STRIP LAYOUT — 3 cols to give room for bigger numbers ── */
+#view-dash .db-kpi-strip {
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 10px !important;
+}
+
+/* Second row of 3 KPIs */
+@media (min-width: 1000px) {
+  #view-dash .db-kpi-strip {
+    grid-template-columns: repeat(6, 1fr) !important;
+  }
+  #view-dash .db-kpi-val {
+    font-size: 32px !important;
+  }
+}
+
+/* ── HOTSPOT GRID ── */
+#view-dash .db-hotspot-grid {
+  gap: 8px !important;
+}
+
+/* ── SCROLLBARS in dashboard ── */
+#view-dash ::-webkit-scrollbar-thumb {
+  background: rgba(255,143,0,0.12) !important;
+}
+
+/* ── THREAT MATRIX ── */
+#view-dash .threat-matrix {
+  gap: 6px !important;
+}
+
+/* ── MOBILE OVERRIDES ── */
+@media (max-width: 768px) {
+  #view-dash .db-kpi-val {
+    font-size: 28px !important;
+  }
+  #view-dash .db-greeting-title {
+    font-size: 22px !important;
+  }
+  #view-dash .db-kpi-strip {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  #view-dash .cs-sev-num {
+    font-size: 36px !important;
+  }
+  .db-root::before, .db-root::after {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  #view-dash .db-kpi-val {
+    font-size: 24px !important;
+  }
+  #view-dash .db-greeting-title {
+    font-size: 18px !important;
+  }
+}
