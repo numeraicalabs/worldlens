@@ -3343,7 +3343,7 @@ input[type="checkbox"], input[type="radio"] {
 
 /* ── Canvas area ─────────────────────────────────────────── */
 .ng-canvas-wrap {
-  flex: 1; position: relative; overflow: hidden;
+  flex: 1; min-height: 0; position: relative; overflow: hidden;
   background: radial-gradient(ellipse at center, var(--bg1) 0%, var(--bg0) 100%);
 }
 #ng-canvas { position: absolute; top: 0; left: 0; }
@@ -4537,7 +4537,8 @@ input[type="checkbox"], input[type="radio"] {
 /* All mode panels: fill sidebar, flex-column, own scroll  */
 #ng-mode-graph,
 #ng-mode-explorer,
-#ng-mode-timeline {
+#ng-mode-timeline,
+#ng-mode-cascade {
   flex: 1;
   min-height: 0;
   flex-direction: column;
@@ -4552,6 +4553,10 @@ input[type="checkbox"], input[type="radio"] {
 .ng-canvas-wrap {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
 }
 
 /* ── Cascade Simulator ────────────────────────────── */
