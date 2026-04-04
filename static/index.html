@@ -171,19 +171,19 @@
       </button>
       <div class="nav-dropdown" id="nd-analysis">
         <div class="nd-section-label">Graph Suite</div>
-        <button class="nd-item" onclick="sv('graph',document.querySelector('[data-v=graph]'));setTimeout(function(){ngSwitchMode('graph',document.getElementById('ng-tab-graph'))},200);closeAllDropdowns()">
+        <button class="nd-item" data-graph-mode="graph" onclick="svGraph('graph')">
           <span class="nd-icon">🕸</span><span class="nd-label">News Graph</span>
           <span class="nd-desc">Entity relationships</span>
         </button>
-        <button class="nd-item" onclick="sv('graph',document.querySelector('[data-v=graph]'));setTimeout(function(){ngSwitchMode('explorer',document.getElementById('ng-tab-explorer'))},200);closeAllDropdowns()">
+        <button class="nd-item" data-graph-mode="explorer" onclick="svGraph('explorer')">
           <span class="nd-icon">🔍</span><span class="nd-label">Knowledge Explorer</span>
           <span class="nd-desc">Radial / force layout</span>
         </button>
-        <button class="nd-item" onclick="sv('graph',document.querySelector('[data-v=graph]'));setTimeout(function(){ngSwitchMode('timeline',document.getElementById('ng-tab-timeline'))},200);closeAllDropdowns()">
+        <button class="nd-item" data-graph-mode="timeline" onclick="svGraph('timeline')">
           <span class="nd-icon">📅</span><span class="nd-label">Timeline Graph</span>
           <span class="nd-desc">Narrative arcs</span>
         </button>
-        <button class="nd-item" onclick="sv('graph',document.querySelector('[data-v=graph]'));setTimeout(function(){ngSwitchMode('cascade',document.getElementById('ng-tab-cascade'))},200);closeAllDropdowns()">
+        <button class="nd-item" data-graph-mode="cascade" onclick="svGraph('cascade')">
           <span class="nd-icon">⚡</span><span class="nd-label">Cascade Simulator</span>
           <span class="nd-desc nd-desc-highlight">Shock propagation</span>
         </button>
@@ -3052,11 +3052,23 @@
       </svg><span>Macro</span>
     </div>
 
-    <div class="more-drawer-item" onclick="mobileNav('graph',null)">
+    <div class="more-drawer-item" onclick="mobileNav('graph',null);svGraph('graph')">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/>
         <line x1="8" y1="6" x2="3" y2="10"/><line x1="8" y1="6" x2="13" y2="10"/>
-      </svg><span>Graph</span>
+      </svg><span>News Graph</span>
+    </div>
+
+    <div class="more-drawer-item" onclick="mobileNav('graph',null);svGraph('explorer')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="2"/><line x1="8" y1="1.5" x2="8" y2="5.5"/><line x1="8" y1="10.5" x2="8" y2="14.5"/>
+      </svg><span>Explorer</span>
+    </div>
+
+    <div class="more-drawer-item" onclick="mobileNav('graph',null);svGraph('cascade')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M8 1v5M4 4l4 2 4-2M2 9l4 2M10 9l4 2M3 14h2M11 14h2"/>
+      </svg><span>Cascade</span>
     </div>
 
     <div class="more-drawer-item" onclick="mobileNav('portfolio',null)">
