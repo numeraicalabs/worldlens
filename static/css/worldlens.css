@@ -2975,13 +2975,45 @@ input[type="checkbox"], input[type="radio"] {
   /* Event panel as bottom-sheet on small mobile — doesn't block map */
   #evpanel {
     top: auto !important;
-    bottom: 70px !important;
+    bottom: 58px !important;
     left: 0 !important; right: 0 !important;
     width: 100% !important;
-    max-height: 55vh !important;
+    max-height: 72vh !important;
     border-radius: 20px 20px 0 0 !important;
     border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    padding-top: 0 !important;
+    box-shadow: 0 -8px 40px rgba(0,0,0,.6) !important;
+    animation: epSlideUp .28s cubic-bezier(0.16,1,0.3,1) !important;
   }
+  @keyframes epSlideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  /* Show drag handle on mobile */
+  #evpanel-handle { display: block !important; }
+  /* Sticky header needs enough top padding */
+  #evpanel .eph { padding-top: 10px !important; }
+  /* Bigger tabs for touch */
+  #evpanel .ep-tab { padding: 10px 12px !important; font-size: 12px !important; min-height: 40px !important; }
+  /* AI buttons — full width, bigger tap targets */
+  #evpanel .aibtn, #evpanel .impact-btn {
+    min-height: 44px !important;
+    font-size: 12px !important;
+    padding: 10px 12px !important;
+    width: 100% !important;
+    margin-bottom: 6px !important;
+  }
+  /* evpanel backdrop — tap outside to close */
+  #evpanel-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 999;
+  }
+  #evpanel-backdrop.on { display: block; }
 
   /* Markets sidebar as bottom drawer */
   .mkt-sidebar { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--bd); }
