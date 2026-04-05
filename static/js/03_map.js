@@ -479,18 +479,9 @@ function addMarker(ev) {
 
   var eid = ev.id;
   mk.on('click', function(e) {
-    /* Detect mobile via _isMobile() OR touch capability */
-    var isMob = (typeof _isMobile === 'function' && _isMobile())
-                || ('ontouchstart' in window && window.innerWidth <= 900);
-    if (isMob) {
-      /* Stop propagation — prevents touch event reaching overlay's closeHoloEvent */
-      if (e && e.originalEvent) {
-        e.originalEvent.stopPropagation();
-        e.originalEvent.preventDefault();
-      }
-      if (typeof showHoloEvent === 'function') showHoloEvent(eid);
-      return;
-    }
+    /* On mobile: open the evpanel directly as a bottom sheet.
+       openEP() is reliable; evpanel is position:fixed so it always renders. */
+    if (e && e.originalEvent) e.originalEvent.stopPropagation();
     openEP(eid);
   });
   mk.bindPopup(
@@ -560,13 +551,24 @@ function openEP(id) {
   var mn=el('ai-market-note');
   if (mn) { if(ev.ai_market_note){mn.style.display='block';mn.textContent=ev.ai_market_note;}else mn.style.display='none'; }
   var ans=el('panelans'); if(ans){ans.textContent='';ans.classList.remove('on');}
+
+  /* Show backdrop on mobile */
+  var isMobile = window.innerWidth <= 768;
+  var bd = document.getElementById('evpanel-backdrop');
+  if (bd) bd.classList.toggle('on', isMobile);
+
   el('evpanel').classList.add('on');
-  if (G.map&&ev.latitude&&ev.longitude)
+  /* Only fly to location on desktop — on mobile it disorients the user */
+  if (!isMobile && G.map && ev.latitude && ev.longitude)
     G.map.flyTo([ev.latitude,ev.longitude],Math.max(G.map.getZoom(),5),{duration:1.1});
   rq('/api/portfolio/track',{method:'POST',body:{action:'map_view'}});
 }
 
-function closeEP() { el('evpanel').classList.remove('on'); }
+function closeEP() {
+  el('evpanel').classList.remove('on');
+  var bd = document.getElementById('evpanel-backdrop');
+  if (bd) bd.classList.remove('on');
+}
 
 function qf(cat) {
   document.querySelectorAll('#mcats .cpill').forEach(function(p){
