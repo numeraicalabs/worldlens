@@ -2972,8 +2972,8 @@ input[type="checkbox"], input[type="radio"] {
   /* Country panel full width on mobile */
   #country-panel { width: calc(100% - 24px); right: 12px; left: 12px; }
 
-  /* Event panel — fixed, full width on tablet */
-  #evpanel { width: calc(100% - 24px); left: 12px; right: 12px; top: 68px; }
+  /* Event panel — slightly wider on tablet, desktop sizing handles the rest */
+  /* (768px and below uses the bottom-sheet rule defined separately) */
 
   /* KG panel full width */
   #kg-panel { width: 100%; }
@@ -2983,6 +2983,54 @@ input[type="checkbox"], input[type="radio"] {
   .dash-grid-3 { grid-template-columns: 1fr; }
   .dash-grid-2 { grid-template-columns: 1fr; }
   .cs-grid { grid-template-columns: 1fr; }
+}
+
+/* ── EVPANEL — Mobile bottom sheet (applies on all mobile widths ≤768px) ── */
+@media (max-width: 768px) {
+  #evpanel {
+    top: auto !important;
+    bottom: 68px !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-height: 72vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    border: none !important;
+    border-top: 1px solid rgba(255,255,255,.1) !important;
+    box-shadow: 0 -8px 40px rgba(0,0,0,.75) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  #evpanel.on {
+    display: flex !important;
+    flex-direction: column !important;
+    animation: epSlideUp .3s cubic-bezier(0.16,1,0.3,1) both !important;
+  }
+  @keyframes epSlideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  #evpanel-handle { display: block !important; }
+  #evpanel .eph {
+    padding-top: 8px !important;
+    background: rgba(6,11,18,.98) !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2 !important;
+  }
+  .ep-tab {
+    padding: 10px 14px !important;
+    font-size: 12px !important;
+    min-height: 44px !important;
+  }
+  .aibtn, .impact-btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    font-size: 12px !important;
+    padding: 10px 12px !important;
+    margin-bottom: 6px !important;
+  }
+  .impact-row { flex-direction: column !important; }
 }
 
 @media (max-width: 600px) {
@@ -2997,54 +3045,7 @@ input[type="checkbox"], input[type="radio"] {
   /* Hide non-essential nav items */
   .ni[data-view="supply"], .ni[data-view="gamification"] { display: none; }
 
-  /* ── EVPANEL MOBILE BOTTOM SHEET ── */
-  #evpanel {
-    top: auto !important;
-    bottom: 68px !important;   /* sits just above mobile nav (68px tall) */
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    max-height: 70vh !important;
-    border-radius: 20px 20px 0 0 !important;
-    border: none !important;
-    border-top: 1px solid rgba(255,255,255,.08) !important;
-    box-shadow: 0 -8px 40px rgba(0,0,0,.7) !important;
-    overflow-y: auto !important;
-  }
-  /* Override desktop .on animation — slide up instead of slide right */
-  #evpanel.on {
-    display: flex !important;
-    flex-direction: column !important;
-    animation: epSlideUp .3s cubic-bezier(0.16,1,0.3,1) both !important;
-  }
-  @keyframes epSlideUp {
-    from { transform: translateY(100%); opacity: 0; }
-    to   { transform: translateY(0);    opacity: 1; }
-  }
-  /* Drag handle */
-  #evpanel-handle { display: block !important; }
-  /* Sticky header background */
-  #evpanel .eph {
-    padding-top: 8px !important;
-    background: rgba(6,11,18,.98) !important;
-  }
-  /* Tabs — bigger touch targets */
-  .ep-tab {
-    padding: 10px 14px !important;
-    font-size: 12px !important;
-    min-height: 44px !important;
-  }
-  /* AI / impact buttons — full width, bigger */
-  .aibtn, .impact-btn {
-    width: 100% !important;
-    min-height: 44px !important;
-    font-size: 12px !important;
-    padding: 10px 12px !important;
-    margin-bottom: 6px !important;
-  }
-  .impact-row {
-    flex-direction: column !important;
-  }
+
 
   /* Markets sidebar as bottom drawer */
   .mkt-sidebar { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--bd); }

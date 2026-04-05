@@ -23,9 +23,10 @@
 
   #content {
     flex: 1 !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
+    overflow: hidden !important;
+    /* NOTE: do NOT add -webkit-overflow-scrolling:touch here — it creates
+       a containing block for position:fixed on iOS Safari, which clips
+       the evpanel and other fixed overlays. Views scroll internally. */
   }
 
   /* Bottom nav */
