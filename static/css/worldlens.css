@@ -104,8 +104,8 @@ input,textarea,select{font-family:var(--fb);outline:none}
 .ferr{font-size:11px;color:var(--re);margin-top:3px;min-height:14px}
 
 /* ─── SHELL ─── */
-#shell{display:none;height:100vh;flex-direction:column}
-#shell.on{display:flex;flex-direction:column}
+#shell{display:none;height:100vh;height:100dvh;flex-direction:column;overflow:hidden}
+#shell.on{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
 #nav{background:var(--bg1);border-bottom:1px solid var(--bd);padding:0 16px;display:flex;align-items:center;gap:2px;height:50px;flex-shrink:0;position:relative;z-index:200;overflow:visible}
 #nav::-webkit-scrollbar{height:0}
 .nlogo{font-family:var(--fh);font-size:16px;font-weight:800;background:linear-gradient(135deg,var(--b4),var(--cy));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:12px;letter-spacing:-.02em;white-space:nowrap;flex-shrink:0}
@@ -122,8 +122,8 @@ input,textarea,select{font-family:var(--fb);outline:none}
 .uav{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0}
 
 /* ─── CONTENT ─── */
-#content{flex:1;overflow:hidden;min-height:0;position:relative;display:flex;flex-direction:column}
-.view{display:none;width:100%;flex:1;min-height:0;flex-direction:column}
+#content{flex:1;overflow:hidden;min-height:0;height:0;position:relative;display:flex;flex-direction:column}
+.view{display:none;width:100%;flex:1;min-height:0;flex-direction:column;overflow:hidden}
 .view.on{display:flex;flex:1;min-height:0}
 
 /* ─── SHARED ─── */
@@ -305,7 +305,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
   100% { transform: scale(2.6); opacity: 0;  }
 }
 
-#view-map{position:relative;overflow:hidden;width:100%;min-height:0}
+#view-map{position:relative;overflow:hidden;width:100%;flex:1;min-height:0}
 #map{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
 .leaflet-container{background:#0D1B2A!important;width:100%!important;height:100%!important}
 .leaflet-control-zoom{display:none!important}
@@ -3334,10 +3334,10 @@ input[type="checkbox"], input[type="radio"] {
    GRAPH ANALYTICS VIEW  (view-graph)
 ═══════════════════════════════════════════════════════════ */
 
-#view-graph { padding: 0; overflow: hidden; ;width:100%;min-height:0}
+#view-graph { padding: 0; overflow: hidden; width:100%; flex:1; min-height:0; display:flex; flex-direction:column; }
 
 .ng-root {
-  display: flex; height: 100%; width: 100%;
+  display: flex; flex: 1; min-height: 0; width: 100%;
   background: var(--bg0);
   overflow: hidden;
 }
