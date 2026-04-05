@@ -37,35 +37,27 @@ function toggleNavGroup(groupId) {
   if (_openGroup === groupId) {
     closeAllDropdowns();
   } else {
-    closeAllDropdowns(true);
+    closeAllDropdowns();
     _openGroup = groupId;
     var group = document.getElementById('ng-' + groupId);
     var dd    = document.getElementById('nd-' + groupId);
     if (group) group.classList.add('open');
     if (dd)    dd.classList.add('open');
-    /* Backdrop */
-    _ensureBackdrop();
   }
 }
 
-function closeAllDropdowns(keepBackdrop) {
+function closeAllDropdowns() {
   _openGroup = null;
   document.querySelectorAll('.nav-group.open').forEach(function(g) { g.classList.remove('open'); });
   document.querySelectorAll('.nav-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
-  if (!keepBackdrop) _removeBackdrop();
 }
 
-function _ensureBackdrop() {
-  if (document.getElementById('nav-backdrop')) return;
-  var bd = document.createElement('div');
-  bd.id  = 'nav-backdrop';
-  bd.addEventListener('click', closeAllDropdowns);
-  document.body.appendChild(bd);
-}
-function _removeBackdrop() {
-  var bd = document.getElementById('nav-backdrop');
-  if (bd) bd.parentNode.removeChild(bd);
-}
+/* Close on click outside nav — no backdrop needed */
+document.addEventListener('click', function(e) {
+  if (_openGroup && !e.target.closest('#nav')) {
+    closeAllDropdowns();
+  }
+}, true);
 
 /* Wire group buttons to toggle */
 document.addEventListener('DOMContentLoaded', function() {

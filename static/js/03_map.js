@@ -478,9 +478,15 @@ function addMarker(ev) {
   );
 
   var eid = ev.id;
-  mk.on('click', function(){
-    if (typeof _isMobile === 'function' && _isMobile()) {
-      if (typeof showHoloEvent === 'function' && showHoloEvent(eid)) return;
+  mk.on('click', function(e) {
+    /* Detect mobile via _isMobile() OR touch capability */
+    var isMob = (typeof _isMobile === 'function' && _isMobile())
+                || ('ontouchstart' in window && window.innerWidth <= 900);
+    if (isMob) {
+      /* Prevent Leaflet from opening its popup (it conflicts with holo sheet) */
+      if (e && e.originalEvent) e.originalEvent.preventDefault();
+      if (typeof showHoloEvent === 'function') showHoloEvent(eid);
+      return;
     }
     openEP(eid);
   });
@@ -494,6 +500,9 @@ function addMarker(ev) {
     {maxWidth:290, minWidth:240}
   );
   mk.on('popupopen', function() {
+    /* Close popup immediately on mobile — holo sheet handles the detail view */
+    var isMob = ('ontouchstart' in window && window.innerWidth <= 900);
+    if (isMob) { mk.closePopup(); return; }
     var btn = document.getElementById('pcb-'+eid);
     if (btn) btn.onclick = function(){ openEP(eid); };
   });
