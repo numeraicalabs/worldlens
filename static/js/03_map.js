@@ -478,7 +478,12 @@ function addMarker(ev) {
   );
 
   var eid = ev.id;
-  mk.on('click', function(){ openEP(eid); });
+  mk.on('click', function(){
+    if (typeof _isMobile === 'function' && _isMobile()) {
+      if (typeof showHoloEvent === 'function' && showHoloEvent(eid)) return;
+    }
+    openEP(eid);
+  });
   mk.bindPopup(
     '<div class="pc">'
     + '<div class="pc-cat" style="color:'+m.c+'">'+m.i+' '+ev.category+(isGroup?' ('+ev._groupCount+' sources)':'')+'</div>'

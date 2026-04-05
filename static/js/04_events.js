@@ -1473,6 +1473,22 @@ function showHoloEvent(evId) {
     catEl.style.color = m.c;
   }
 
+  // Impact badge (High / Medium / Low)
+  var impactBadge = document.getElementById('wl-holo-ev-impact-badge');
+  if (impactBadge && ev.impact) {
+    var imp = ev.impact;
+    var impCol = imp === 'High' ? '#EF4444' : imp === 'Medium' ? '#F59E0B' : '#10B981';
+    var impBg  = imp === 'High' ? 'rgba(239,68,68,.15)' : imp === 'Medium' ? 'rgba(245,158,11,.12)' : 'rgba(16,185,129,.10)';
+    impactBadge.textContent = imp.toUpperCase();
+    impactBadge.style.color = impCol;
+    impactBadge.style.background = impBg;
+    impactBadge.style.border = '1px solid ' + impCol + '44';
+  }
+
+  // Source link
+  var srcLink = document.getElementById('wl-holo-source-link');
+  if (srcLink) srcLink.href = ev.url || '#';
+
   // Title
   var titEl = document.getElementById('wl-holo-ev-title');
   if (titEl) titEl.textContent = ev.title || '';
@@ -1613,6 +1629,9 @@ function holoEvAction(action) {
         var alnInput = document.getElementById('aln');
         if (alnInput) alnInput.value = evTitle;
       }, 300);
+      break;
+    case 'markets':
+      mobileNav('markets', null);
       break;
     case 'full':
       mobileNav('map', null);
