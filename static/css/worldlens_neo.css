@@ -128,7 +128,7 @@ body {
   position: absolute !important; top: calc(100% + 8px) !important; left: -4px !important;
   min-width: 240px !important; background: rgba(14,17,23,.98) !important;
   border: 1px solid rgba(255,255,255,.08) !important; border-radius: 14px !important;
-  padding: 6px !important; z-index: 9100 !important;
+  padding: 6px !important; z-index: 500 !important;
   backdrop-filter: blur(24px) !important; -webkit-backdrop-filter: blur(24px) !important;
   box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.03) !important;
   opacity: 0 !important; pointer-events: none !important;
@@ -169,7 +169,7 @@ body {
 #nav > .nav-groups > .ni.on { color: var(--b4) !important; background: rgba(59,130,246,.08) !important; border-color: rgba(59,130,246,.15) !important; }
 #nav > .nav-groups > .ni::before { display: none !important; }
 
-#nav-backdrop { position: fixed !important; inset: 0 !important; z-index: 9050 !important; background: transparent !important; }
+#nav-backdrop { position: fixed !important; top: 56px !important; left: 0 !important; right: 0 !important; bottom: 0 !important; z-index: 150 !important; background: transparent !important; }
 
 #navr { gap: 8px !important; }
 .wsi { background: var(--bg2) !important; border: 1px solid var(--bd) !important; border-radius: 8px !important; padding: 4px 10px !important; font-size: 11px !important; }

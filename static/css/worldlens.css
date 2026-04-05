@@ -106,7 +106,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 /* ─── SHELL ─── */
 #shell{display:none;height:100vh;flex-direction:column}
 #shell.on{display:flex;flex-direction:column}
-#nav{background:var(--bg1);border-bottom:1px solid var(--bd);padding:0 16px;display:flex;align-items:center;gap:2px;height:50px;flex-shrink:0;z-index:200;overflow:visible}
+#nav{background:var(--bg1);border-bottom:1px solid var(--bd);padding:0 16px;display:flex;align-items:center;gap:2px;height:50px;flex-shrink:0;position:relative;z-index:200;overflow:visible}
 #nav::-webkit-scrollbar{height:0}
 .nlogo{font-family:var(--fh);font-size:16px;font-weight:800;background:linear-gradient(135deg,var(--b4),var(--cy));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:12px;letter-spacing:-.02em;white-space:nowrap;flex-shrink:0}
 .ni{display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:var(--r8);font-size:11px;font-weight:500;color:var(--t3);cursor:pointer;transition:all .15s;background:transparent;border:none;white-space:nowrap;flex-shrink:0}
