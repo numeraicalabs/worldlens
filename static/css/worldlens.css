@@ -330,7 +330,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 .cpill{display:inline-flex;align-items:center;gap:2px;padding:2px 5px;border-radius:100px;border:1px solid;font-size:9px;cursor:pointer;background:transparent;margin:2px;transition:all .15s}
 .cpill.on{color:#fff!important;border-color:transparent!important}
 .cpill:not(.on){opacity:.35}
-#evpanel{position:absolute;top:12px;right:12px;z-index:10;width:310px;background:rgba(6,11,18,.97);border:1px solid var(--bdb);border-radius:var(--r16);backdrop-filter:blur(18px);box-shadow:0 10px 36px rgba(0,0,0,.65);display:none;max-height:calc(100% - 24px);overflow-y:auto}
+#evpanel{position:absolute;top:12px;right:12px;z-index:1000;width:310px;background:rgba(6,11,18,.97);border:1px solid var(--bdb);border-radius:var(--r16);backdrop-filter:blur(18px);box-shadow:0 10px 36px rgba(0,0,0,.65);display:none;max-height:calc(100% - 24px);overflow-y:auto}
 #evpanel.on{display:block;animation:sin .22s ease-out}
 @keyframes sin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
 .eph{padding:13px 13px 9px;border-bottom:1px solid rgba(255,255,255,.07);position:sticky;top:0;background:rgba(6,11,18,.97);z-index:2}
@@ -2788,7 +2788,7 @@ input[type="checkbox"], input[type="radio"] {
 
 /* ── Country panel ──────────────────────────────────────────── */
 #country-panel {
-  position: absolute; top: 12px; right: 12px; z-index: 15;
+  position: absolute; top: 12px; right: 12px; z-index: 1000;
   width: 280px; background: rgba(6,11,24,.97);
   border: 1px solid rgba(59,130,246,.25);
   border-radius: var(--r16); backdrop-filter: blur(18px);
@@ -3275,7 +3275,7 @@ input[type="checkbox"], input[type="radio"] {
 .ng-sidebar {
   width: 230px; flex-shrink: 0;
   background: var(--bg1); border-right: 1px solid var(--bd);
-  overflow: hidden; display: flex; flex-direction: column;
+  overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column;
   padding: 0;
 }
 .ng-sidebar-title {
@@ -3443,6 +3443,8 @@ input[type="checkbox"], input[type="radio"] {
 }
 @media (max-width: 600px) {
   .ng-sidebar { display: none; }
+  /* Show sidebar when cascade is active — added by ngSwitchMode */
+  .ng-sidebar.cascade-active { display: flex !important; width: 100% !important; border-right: none !important; border-bottom: 1px solid var(--bd) !important; max-height: 55vh; overflow-y: auto; }
   .ng-detail  { width: 100%; position: absolute; bottom: 0; left: 0; right: 0;
                 height: 40%; border-left: none; border-top: 1px solid var(--bd); }
 }
