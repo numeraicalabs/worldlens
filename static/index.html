@@ -33,7 +33,7 @@
   <style>
     /* Critical: hide all views until JS boots.
        Overrides if external CSS fails to load. */
-    .view { display: none !important; width: 100%; height: 100%; }
+    .view { display: none !important; width: 100%; }
     .view.on { display: flex !important; }
     body { background: #060B12; color: #F0F6FF; margin: 0; overflow: hidden; }
     #loader { position: fixed; inset: 0; background: #060B12; display: flex;
@@ -2035,7 +2035,7 @@
 <!-- FEED -->
 <!-- ── INSIDERS VIEW (standalone nav page) ── -->
 <div class="view" id="view-insiders">
-  <div style="display:flex;flex-direction:column;height:100%;overflow-y:auto;background:var(--bg0)">
+  <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;background:var(--bg0)">
     <!-- Header -->
     <div style="padding:16px 20px 10px;border-bottom:1px solid var(--bd);background:var(--bg1);flex-shrink:0">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
