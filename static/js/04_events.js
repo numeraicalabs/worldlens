@@ -140,6 +140,8 @@ function sv(name, btn) {
   if (el2) el2.classList.add('on');
   if (btn) btn.classList.add('on');
   G.currentView = name;
+  /* Always close event panel + backdrop when switching views */
+  if (typeof closeEP === 'function') closeEP();
   track('section_opened', name, name);
   if (name==='map') {
     requestAnimationFrame(function() {
