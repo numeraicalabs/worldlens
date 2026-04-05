@@ -3126,14 +3126,23 @@
 <div class="holo-popup-overlay" id="wl-holo-event-overlay" onclick="closeHoloEvent(event)">
   <div class="holo-popup" id="wl-holo-event-popup">
     <div class="holo-popup-inner">
+
+      <!-- Swipe handle -->
       <div class="holo-popup-handle"></div>
+
+      <!-- Header: category + impact badge + close -->
       <div class="holo-popup-header">
-        <div class="holo-popup-title" id="wl-holo-ev-cat">GEOPOLITICS</div>
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+          <div class="holo-popup-title" id="wl-holo-ev-cat">GEOPOLITICS</div>
+          <span id="wl-holo-ev-impact-badge" style="font-size:9px;padding:2px 7px;border-radius:100px;font-weight:700;letter-spacing:.05em;flex-shrink:0"></span>
+        </div>
         <button class="holo-popup-close" onclick="closeHoloEvent()">✕</button>
       </div>
+
       <div class="holo-popup-body">
-        <!-- Severity ring + title -->
-        <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
+
+        <!-- Severity ring + title + meta -->
+        <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:12px">
           <div class="holo-sev-ring" id="wl-holo-sev-ring">
             <svg viewBox="0 0 60 60">
               <circle class="ring-bg" cx="30" cy="30" r="26"/>
@@ -3143,34 +3152,42 @@
             </svg>
             <span class="ring-val" id="wl-holo-sev-val" style="color:var(--cy)">5.0</span>
           </div>
-          <div style="flex:1">
-            <div id="wl-holo-ev-title" style="font-family:var(--fh);font-size:13px;font-weight:700;letter-spacing:-.015em;line-height:1.3;color:var(--t1)"></div>
-            <div id="wl-holo-ev-meta" style="font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--fm)"></div>
+          <div style="flex:1;min-width:0">
+            <div id="wl-holo-ev-title" style="font-family:var(--fh);font-size:14px;font-weight:700;letter-spacing:-.015em;line-height:1.3;color:var(--t1);margin-bottom:5px"></div>
+            <div id="wl-holo-ev-meta" style="font-size:10px;color:var(--t3);font-family:var(--fm);line-height:1.5"></div>
           </div>
         </div>
 
         <!-- Summary -->
-        <div id="wl-holo-ev-summary" style="font-size:11px;color:var(--t2);line-height:1.65;margin-bottom:12px"></div>
+        <div id="wl-holo-ev-summary" style="font-size:12px;color:var(--t2);line-height:1.65;margin-bottom:12px"></div>
 
-        <!-- AI strip (loads asynchronously) -->
+        <!-- AI strip (loads async) -->
         <div class="holo-ai-strip" id="wl-holo-ai-strip" style="display:none">
           <div class="holo-ai-label">⬡ AI ANALYSIS</div>
           <div class="holo-ai-text" id="wl-holo-ai-text"></div>
         </div>
 
-        <!-- Action buttons -->
+        <!-- Primary CTA row -->
+        <div style="display:flex;gap:8px;margin-top:12px;margin-bottom:10px">
+          <a id="wl-holo-source-link" target="_blank" rel="noopener"
+             style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:10px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;font-size:11px;font-weight:600;color:var(--t2);text-decoration:none;-webkit-tap-highlight-color:transparent">
+            ↗ Read Source
+          </a>
+          <button onclick="holoEvAction('ai')"
+             style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:10px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.2);border-radius:10px;font-size:11px;font-weight:600;color:#A78BFA;cursor:pointer;-webkit-tap-highlight-color:transparent">
+            🤖 AI Analysis
+          </button>
+        </div>
+
+        <!-- Secondary action grid -->
         <div class="holo-actions">
           <div class="holo-action-btn" onclick="holoEvAction('map')">
             <div class="holo-action-icon">🗺</div>
-            <div class="holo-action-label">Map View</div>
+            <div class="holo-action-label">Focus Map</div>
           </div>
           <div class="holo-action-btn" onclick="holoEvAction('save')">
             <div class="holo-action-icon" id="wl-holo-save-icon">🔖</div>
             <div class="holo-action-label" id="wl-holo-save-label">Save</div>
-          </div>
-          <div class="holo-action-btn" onclick="holoEvAction('ai')">
-            <div class="holo-action-icon">🤖</div>
-            <div class="holo-action-label">AI Ask</div>
           </div>
           <div class="holo-action-btn" onclick="holoEvAction('similar')">
             <div class="holo-action-icon">🔗</div>
@@ -3180,11 +3197,16 @@
             <div class="holo-action-icon">🔔</div>
             <div class="holo-action-label">Alert</div>
           </div>
+          <div class="holo-action-btn" onclick="holoEvAction('markets')">
+            <div class="holo-action-icon">📈</div>
+            <div class="holo-action-label">Markets</div>
+          </div>
           <div class="holo-action-btn" onclick="holoEvAction('full')">
-            <div class="holo-action-icon">↗</div>
+            <div class="holo-action-icon">⊞</div>
             <div class="holo-action-label">Full View</div>
           </div>
         </div>
+
       </div>
     </div>
   </div>
