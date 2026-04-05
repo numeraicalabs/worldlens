@@ -330,7 +330,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 .cpill{display:inline-flex;align-items:center;gap:2px;padding:2px 5px;border-radius:100px;border:1px solid;font-size:9px;cursor:pointer;background:transparent;margin:2px;transition:all .15s}
 .cpill.on{color:#fff!important;border-color:transparent!important}
 .cpill:not(.on){opacity:.35}
-#evpanel{position:absolute;top:12px;right:12px;z-index:1000;width:310px;background:rgba(6,11,18,.97);border:1px solid var(--bdb);border-radius:var(--r16);backdrop-filter:blur(18px);box-shadow:0 10px 36px rgba(0,0,0,.65);display:none;max-height:calc(100% - 24px);overflow-y:auto}
+#evpanel{position:fixed;top:68px;right:12px;z-index:1000;width:310px;background:rgba(6,11,18,.97);border:1px solid var(--bdb);border-radius:var(--r16);backdrop-filter:blur(18px);box-shadow:0 10px 36px rgba(0,0,0,.65);display:none;max-height:calc(100vh - 90px);overflow-y:auto}
 #evpanel.on{display:block;animation:sin .22s ease-out}
 @keyframes sin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
 .eph{padding:13px 13px 9px;border-bottom:1px solid rgba(255,255,255,.07);position:sticky;top:0;background:rgba(6,11,18,.97);z-index:2}
@@ -2788,7 +2788,7 @@ input[type="checkbox"], input[type="radio"] {
 
 /* ── Country panel ──────────────────────────────────────────── */
 #country-panel {
-  position: absolute; top: 12px; right: 12px; z-index: 1000;
+  position: fixed; top: 68px; right: 12px; z-index: 1000;
   width: 280px; background: rgba(6,11,24,.97);
   border: 1px solid rgba(59,130,246,.25);
   border-radius: var(--r16); backdrop-filter: blur(18px);
@@ -2947,8 +2947,8 @@ input[type="checkbox"], input[type="radio"] {
   /* Country panel full width on mobile */
   #country-panel { width: calc(100% - 24px); right: 12px; left: 12px; }
 
-  /* Event panel full width */
-  #evpanel { width: calc(100% - 24px); left: 12px; right: 12px; top: 12px; }
+  /* Event panel — fixed, full width on tablet */
+  #evpanel { width: calc(100% - 24px); left: 12px; right: 12px; top: 68px; }
 
   /* KG panel full width */
   #kg-panel { width: 100%; }
@@ -2972,8 +2972,16 @@ input[type="checkbox"], input[type="radio"] {
   /* Hide non-essential nav items */
   .ni[data-view="supply"], .ni[data-view="gamification"] { display: none; }
 
-  /* Full-width panels */
-  #evpanel, #country-panel { width: calc(100% - 16px); left: 8px; right: 8px; }
+  /* Event panel as bottom-sheet on small mobile — doesn't block map */
+  #evpanel {
+    top: auto !important;
+    bottom: 70px !important;
+    left: 0 !important; right: 0 !important;
+    width: 100% !important;
+    max-height: 55vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-bottom: none !important;
+  }
 
   /* Markets sidebar as bottom drawer */
   .mkt-sidebar { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--bd); }

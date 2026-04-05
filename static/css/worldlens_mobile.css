@@ -1341,38 +1341,40 @@
   font-weight: 700 !important;
 }
 
-/* Actions: 3×2 grid */
+/* Actions: 3×2 grid — 6 buttons */
 .holo-actions {
   display: grid !important;
   grid-template-columns: repeat(3, 1fr) !important;
-  gap: 8px !important;
-  margin-top: 14px !important;
+  gap: 7px !important;
+  margin-top: 10px !important;
 }
 .holo-action-btn {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 5px !important;
-  padding: 12px 6px !important;
+  gap: 4px !important;
+  padding: 10px 6px !important;
   background: var(--bg2) !important;
   border: 1px solid var(--bd) !important;
   border-radius: 12px !important;
-  min-height: 60px !important;
+  min-height: 56px !important;
   cursor: pointer !important;
   -webkit-tap-highlight-color: transparent !important;
+  transition: background .12s !important;
 }
 .holo-action-btn:active {
   background: var(--bg3) !important;
   transform: scale(.96) !important;
 }
-.holo-action-icon { font-size: 20px !important; }
+.holo-action-icon { font-size: 18px !important; line-height: 1 !important; }
 .holo-action-label {
   font-family: var(--fb) !important;
   font-size: 9px !important;
   font-weight: 500 !important;
-  letter-spacing: .04em !important;
+  letter-spacing: .03em !important;
   text-transform: uppercase !important;
   color: var(--t3) !important;
+  text-align: center !important;
 }
 
 /* AI strip — clean */
