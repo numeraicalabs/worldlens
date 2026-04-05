@@ -330,8 +330,33 @@ input,textarea,select{font-family:var(--fb);outline:none}
 .cpill{display:inline-flex;align-items:center;gap:2px;padding:2px 5px;border-radius:100px;border:1px solid;font-size:9px;cursor:pointer;background:transparent;margin:2px;transition:all .15s}
 .cpill.on{color:#fff!important;border-color:transparent!important}
 .cpill:not(.on){opacity:.35}
-#evpanel{position:fixed;top:68px;right:12px;z-index:1000;width:310px;background:rgba(6,11,18,.97);border:1px solid var(--bdb);border-radius:var(--r16);backdrop-filter:blur(18px);box-shadow:0 10px 36px rgba(0,0,0,.65);display:none;max-height:calc(100vh - 90px);overflow-y:auto}
-#evpanel.on{display:block;animation:sin .22s ease-out}
+/* ── EVPANEL — Desktop sidebar ── */
+#evpanel{
+  position:fixed;
+  top:68px; right:12px;
+  z-index:1000;
+  width:320px;
+  background:rgba(6,11,18,.98);
+  border:1px solid var(--bdb);
+  border-radius:var(--r16);
+  backdrop-filter:blur(18px);
+  box-shadow:0 10px 36px rgba(0,0,0,.65);
+  display:none;
+  max-height:calc(100vh - 90px);
+  overflow-y:auto;
+}
+#evpanel.on{display:flex;flex-direction:column;animation:epIn .22s ease-out both}
+@keyframes epIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+/* ── EVPANEL MOBILE BACKDROP ── */
+#evpanel-backdrop{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.5);
+  z-index:998; /* below evpanel(1000) and mobile nav(9000), above content */
+}
+#evpanel-backdrop.on{display:block}
 @keyframes sin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
 .eph{padding:13px 13px 9px;border-bottom:1px solid rgba(255,255,255,.07);position:sticky;top:0;background:rgba(6,11,18,.97);z-index:2}
 .epx{float:right;background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;line-height:1;margin-left:8px}
@@ -2972,48 +2997,54 @@ input[type="checkbox"], input[type="radio"] {
   /* Hide non-essential nav items */
   .ni[data-view="supply"], .ni[data-view="gamification"] { display: none; }
 
-  /* Event panel as bottom-sheet on small mobile — doesn't block map */
+  /* ── EVPANEL MOBILE BOTTOM SHEET ── */
   #evpanel {
     top: auto !important;
-    bottom: 58px !important;
-    left: 0 !important; right: 0 !important;
+    bottom: 68px !important;   /* sits just above mobile nav (68px tall) */
+    left: 0 !important;
+    right: 0 !important;
     width: 100% !important;
-    max-height: 72vh !important;
+    max-height: 70vh !important;
     border-radius: 20px 20px 0 0 !important;
-    border-bottom: none !important;
-    border-left: none !important;
-    border-right: none !important;
-    padding-top: 0 !important;
-    box-shadow: 0 -8px 40px rgba(0,0,0,.6) !important;
-    animation: epSlideUp .28s cubic-bezier(0.16,1,0.3,1) !important;
+    border: none !important;
+    border-top: 1px solid rgba(255,255,255,.08) !important;
+    box-shadow: 0 -8px 40px rgba(0,0,0,.7) !important;
+    overflow-y: auto !important;
+  }
+  /* Override desktop .on animation — slide up instead of slide right */
+  #evpanel.on {
+    display: flex !important;
+    flex-direction: column !important;
+    animation: epSlideUp .3s cubic-bezier(0.16,1,0.3,1) both !important;
   }
   @keyframes epSlideUp {
     from { transform: translateY(100%); opacity: 0; }
     to   { transform: translateY(0);    opacity: 1; }
   }
-  /* Show drag handle on mobile */
+  /* Drag handle */
   #evpanel-handle { display: block !important; }
-  /* Sticky header needs enough top padding */
-  #evpanel .eph { padding-top: 10px !important; }
-  /* Bigger tabs for touch */
-  #evpanel .ep-tab { padding: 10px 12px !important; font-size: 12px !important; min-height: 40px !important; }
-  /* AI buttons — full width, bigger tap targets */
-  #evpanel .aibtn, #evpanel .impact-btn {
+  /* Sticky header background */
+  #evpanel .eph {
+    padding-top: 8px !important;
+    background: rgba(6,11,18,.98) !important;
+  }
+  /* Tabs — bigger touch targets */
+  .ep-tab {
+    padding: 10px 14px !important;
+    font-size: 12px !important;
+    min-height: 44px !important;
+  }
+  /* AI / impact buttons — full width, bigger */
+  .aibtn, .impact-btn {
+    width: 100% !important;
     min-height: 44px !important;
     font-size: 12px !important;
     padding: 10px 12px !important;
-    width: 100% !important;
     margin-bottom: 6px !important;
   }
-  /* evpanel backdrop — tap outside to close */
-  #evpanel-backdrop {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.45);
-    z-index: 999;
+  .impact-row {
+    flex-direction: column !important;
   }
-  #evpanel-backdrop.on { display: block; }
 
   /* Markets sidebar as bottom drawer */
   .mkt-sidebar { width: 100%; max-height: 45vh; border-right: none; border-bottom: 1px solid var(--bd); }
