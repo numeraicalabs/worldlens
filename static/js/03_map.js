@@ -50,7 +50,7 @@ function initMap() {
   var mapEl = document.getElementById('map');
   if (!mapEl || mapEl.offsetWidth === 0) { setTimeout(initMap, 120); return; }
 
-  G.map = L.map('map', { center:[25,15], zoom:3, zoomControl:false, minZoom:2, maxZoom:14 });
+  G.map = L.map('map', { center:[25,15], zoom:3, zoomControl:false, minZoom:2, maxZoom:14, tap:false, tapTolerance:15 });
 
   // Dark tile providers — native dark maps, no CSS filter needed
   // CartoDB Dark Matter: purpose-built dark map, sharp and fast
@@ -483,8 +483,11 @@ function addMarker(ev) {
     var isMob = (typeof _isMobile === 'function' && _isMobile())
                 || ('ontouchstart' in window && window.innerWidth <= 900);
     if (isMob) {
-      /* Prevent Leaflet from opening its popup (it conflicts with holo sheet) */
-      if (e && e.originalEvent) e.originalEvent.preventDefault();
+      /* Stop propagation — prevents touch event reaching overlay's closeHoloEvent */
+      if (e && e.originalEvent) {
+        e.originalEvent.stopPropagation();
+        e.originalEvent.preventDefault();
+      }
       if (typeof showHoloEvent === 'function') showHoloEvent(eid);
       return;
     }

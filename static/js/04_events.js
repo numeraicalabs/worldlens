@@ -1457,6 +1457,8 @@ function _spawnSparkles(containerId) {
 // ── Holographic event popup ──────────────────────────────────────────
 var _holoEvId = null;
 
+var _holoOpenedAt = 0;
+
 function showHoloEvent(evId) {
   if (!_isMobile()) return false;   // desktop handles normally
 
@@ -1464,6 +1466,7 @@ function showHoloEvent(evId) {
   if (!ev) return false;
 
   _holoEvId = evId;
+  _holoOpenedAt = Date.now(); /* timestamp for close guard */
 
   // Category
   var m   = (window.CATS && CATS[ev.category]) || { i:'●', c:'var(--cy)', bg:'rgba(0,229,255,.12)' };
@@ -1569,6 +1572,8 @@ function _loadHoloEventAI(ev) {
 }
 
 function closeHoloEvent(e) {
+  /* Guard: ignore close attempts within 400ms of opening (prevents propagated touch events) */
+  if (Date.now() - _holoOpenedAt < 400) return;
   if (e && e.target !== document.getElementById('wl-holo-event-overlay')) return;
   var overlay = document.getElementById('wl-holo-event-overlay');
   if (overlay) overlay.classList.remove('open');
