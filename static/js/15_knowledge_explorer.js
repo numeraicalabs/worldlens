@@ -217,12 +217,17 @@ function ngSwitchMode(mode, btn) {
 
   } else if (mode === 'cascade') {
     if (modePanels.cascade) modePanels.cascade.style.display = 'flex';
-    if (casCanvas)  casCanvas.style.display  = 'flex';
+    if (casCanvas) casCanvas.style.display = 'flex';
     requestAnimationFrame(function() {
       _casInitSVG();
       if (!CAS.nodes.length) _casShowEmpty();
     });
   }
+
+  // ── Mobile cascade sidebar visibility ──────────────────
+  // Adds .cascade-active on sidebar so the CSS media query shows it on mobile
+  var sidebar = document.querySelector('.ng-sidebar');
+  if (sidebar) sidebar.classList.toggle('cascade-active', mode === 'cascade');
 }
 
 // ══════════════════════════════════════════════════════
