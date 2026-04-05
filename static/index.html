@@ -742,195 +742,6 @@
   <div id="map-zoom-overlay"></div>
 
   <!-- ── Event Detail Panel ── -->
-<!-- evpanel mobile backdrop — tap to close -->
-<div id="evpanel-backdrop" onclick="closeEP()"></div>
-
-<!-- Event detail panel -->
-    <!-- Mobile swipe handle -->
-    <div id="evpanel-handle" style="display:none;width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:10px auto 0;cursor:grab"></div>
-    <div class="eph">
-      <button class="epx" onclick="closeEP()">×</button>
-      <div class="epcat" id="epcat"></div>
-      <div class="eptit" id="eptit"></div>
-      <!-- Severity meter bar -->
-      <div class="ep-sev-bar-wrap">
-        <div class="ep-sev-bar" id="ep-sev-bar" style="width:0%"></div>
-        <span class="ep-sev-num" id="ep-sev-num">—</span>
-      </div>
-      <!-- Panel tabs -->
-      <div class="ep-tabs">
-        <button class="ep-tab on" data-tab="overview" onclick="switchEPTab('overview',this)">Overview</button>
-        <button class="ep-tab" data-tab="analysis"  onclick="switchEPTab('analysis',this)">AI Analysis</button>
-        <button class="ep-tab" data-tab="markets"   onclick="switchEPTab('markets',this)">Markets</button>
-        <button class="ep-tab" data-tab="related"   onclick="switchEPTab('related',this)">Related</button>
-      </div>
-    </div>
-    <!-- TAB: overview -->
-    <div class="ep-tab-panel on" id="ept-overview">
-    <div class="epbody">
-      <div id="ep-dedup" style="display:none" class="dedup-badge">
-        <span>📰</span><span id="ep-dedup-txt">Multiple sources</span>
-      </div>
-      <div class="epsum" id="epsum"></div>
-      <div id="ep-sources" style="display:none">
-        <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Sources</div>
-        <div class="source-list" id="ep-source-list"></div>
-      </div>
-      <div class="epg">
-        <div class="epi"><div class="epil">Source</div><div class="epiv" id="epsrc"></div></div>
-        <div class="epi"><div class="epil">Impact</div><div class="epiv" id="epimp"></div></div>
-        <div class="epi"><div class="epil">Region</div><div class="epiv" id="epreg"></div></div>
-        <div class="epi"><div class="epil">Time</div><div class="epiv" id="eptime"></div></div>
-      </div>
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Related Markets</div>
-      <div class="mkts" id="epmkts"></div>
-      <div id="ai-market-note" style="font-size:11px;color:var(--am);margin-bottom:9px;display:none"></div>
-
-      <!-- Multi-dimensional sentiment panel -->
-      <div id="ep-sentiment" style="display:none;margin-bottom:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Sentiment</div>
-          <div id="ep-sent-badge" class="sent-badge">—</div>
-        </div>
-        <div class="sent-score-bar" id="ep-sent-bar-wrap" style="margin-bottom:8px">
-          <span style="font-size:9px;color:var(--re)">−1</span>
-          <div class="sent-bar-track"><div id="ep-sent-bar" class="sent-bar-fill" style="width:50%;left:50%;background:var(--t3)"></div></div>
-          <span style="font-size:9px;color:var(--gr)">+1</span>
-          <span id="ep-sent-score" style="font-size:10px;font-weight:700;min-width:30px;text-align:right">0.0</span>
-        </div>
-        <div class="sent-multidim" id="ep-sent-multidim" style="display:none">
-          <div class="sent-dim-row">
-            <div class="sent-dim-label">Uncertainty</div>
-            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-uncertainty" style="width:0%;background:#F59E0B"></div></div>
-            <div class="sent-dim-val" id="sdim-uncertainty-v" style="color:#F59E0B">—</div>
-          </div>
-          <div class="sent-dim-row">
-            <div class="sent-dim-label">Market Stress</div>
-            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-stress" style="width:0%;background:#EF4444"></div></div>
-            <div class="sent-dim-val" id="sdim-stress-v" style="color:#EF4444">—</div>
-          </div>
-          <div class="sent-dim-row">
-            <div class="sent-dim-label">Narrative Momentum</div>
-            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-momentum" style="width:50%;background:#60A5FA"></div></div>
-            <div class="sent-dim-val" id="sdim-momentum-v" style="color:#60A5FA">—</div>
-          </div>
-          <div class="sent-dim-row">
-            <div class="sent-dim-label">Source Credibility</div>
-            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-cred" style="width:70%;background:#10B981"></div></div>
-            <div class="sent-dim-val" id="sdim-cred-v" style="color:#10B981">—</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
-          <span class="sent-info-type" id="ep-info-type"></span>
-          <span style="font-size:9px;color:var(--t3)" id="ep-intensity"></span>
-        </div>
-        <div id="ep-entities" style="margin-top:8px"></div>
-        <div id="ep-ner" style="margin-top:8px;display:none">
-          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Named Entities</div>
-          <div id="ep-ner-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
-        </div>
-      </div>
-
-      <!-- Related Events -->
-      <div id="ep-related" style="display:none;margin-bottom:10px">
-        <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Related Events <span id="ep-rel-count" style="color:var(--b4);font-weight:600"></span></div>
-        <div id="ep-related-list"></div>
-      </div>
-
-      <div class="epact">
-        <a id="eplink" target="_blank" class="btn btn-g btn-sm" style="flex:1;justify-content:center">Read Source</a>
-        <button class="btn btn-o btn-sm" onclick="watchEv()">+ Watch</button>
-        <button class="btn btn-g btn-sm" id="ep-save-btn" onclick="toggleSaveEvent()" title="Save to reading list">🔖 Save</button>
-      </div>
-    </div><!-- end epbody -->
-    </div><!-- end ept-overview -->
-
-    <!-- TAB: AI analysis -->
-    <div class="ep-tab-panel" id="ept-analysis">
-      <div class="epbody" style="padding-top:8px">
-        <div class="impact-row">
-          <button class="impact-btn" style="flex:1" onclick="showImpact()">📊 Market Impact</button>
-          <button class="impact-btn" style="flex:1" onclick="loadSimilarEvents()">🔗 Similar Events</button>
-          <button class="aibtn" style="flex:1" onclick="scoreEvent()">🎯 AI Score</button>
-        </div>
-        <div class="aisec" style="margin-top:8px">
-          <div class="aisec-t">Quick Analysis</div>
-          <button class="aibtn" onclick="panelAI('Summarize this event and its global significance in 3 bullet points.',true)">📋 Executive Summary</button>
-          <button class="aibtn" onclick="panelAI('What are the market impacts? Which assets and sectors are most affected?',true)">📈 Market Impact</button>
-          <button class="aibtn" onclick="panelAI('Assess geopolitical risk for this region. What escalation scenarios are possible?',true)">🌐 Geopolitical Risk</button>
-          <button class="aibtn" onclick="panelAI('What historical events are comparable? How did they resolve?',true)">📚 Historical Parallels</button>
-          <button class="aibtn" onclick="panelAI('What are likely developments in the next 30 days?',true)">🔮 30-Day Outlook</button>
-          <div class="aians" id="panelans"></div>
-        </div>
-        <div style="display:flex;gap:5px;margin-top:8px">
-          <button class="aibtn" style="flex:1;justify-content:center" onclick="runSentimentFull()">💬 Sentiment</button>
-          <button class="aibtn" style="flex:1;justify-content:center" onclick="panelAI('Classify the credibility of sources covering this event.',true)">🔍 Credibility</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Similar events panel (injected by loadSimilarEvents) -->
-    <div id="ep-similar" style="display:none;margin-bottom:10px">
-      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Similar Events</div>
-      <div id="ep-similar-list"></div>
-    </div>
-
-    <!-- TAB: markets -->
-    <div class="ep-tab-panel" id="ept-markets">
-      <div class="epbody" style="padding-top:8px">
-        <div class="aisec">
-          <div class="aisec-t">Related Assets</div>
-          <div class="mkts" id="epmkts" style="margin-bottom:10px"></div>
-          <div id="ai-market-note" style="font-size:11px;color:var(--am);margin-bottom:9px;display:none"></div>
-          <button class="aibtn" onclick="panelAI('Detailed market impact: which assets, by how much, and why?',true)">📈 Detailed Analysis</button>
-          <button class="aibtn" onclick="panelAI('What commodity, forex and equity correlations are relevant?',true)">🔗 Correlations</button>
-          <button class="aibtn" onclick="panelAI('Suggest 3 specific hedging strategies for this event type.',true)">🛡 Hedging Strategies</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB: related -->
-    <div class="ep-tab-panel" id="ept-related">
-      <div class="epbody" style="padding-top:8px">
-        <div style="display:flex;gap:5px;margin-bottom:8px">
-          <button class="aibtn" style="flex:1;justify-content:center" onclick="loadRelatedEvents()">🔗 Find Related</button>
-          <button class="aibtn" style="flex:1;justify-content:center" onclick="openCountryPanelForEv()">🌍 Country Profile</button>
-        </div>
-        <div id="ep-sentiment" style="display:none;margin-bottom:10px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Sentiment</div>
-            <div id="ep-sent-badge" class="sent-badge">—</div>
-          </div>
-          <div class="sent-score-bar" id="ep-sent-bar-wrap" style="margin-bottom:8px">
-            <span style="font-size:9px;color:var(--re)">−1</span>
-            <div class="sent-bar-track"><div id="ep-sent-bar" class="sent-bar-fill" style="width:50%;left:0;background:var(--b5)"></div></div>
-            <span style="font-size:9px;color:var(--gr)">+1</span>
-            <span id="ep-sent-score" style="font-size:10px;font-weight:700;min-width:30px;text-align:right">—</span>
-          </div>
-          <div class="sent-multidim" id="ep-sent-multidim" style="display:none">
-            <div class="sent-dim-row"><div class="sent-dim-label">Uncertainty</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-uncertainty" style="width:0%;background:var(--am)"></div></div><div class="sent-dim-val" id="sdim-uncertainty-v" style="color:#F59E0B">—</div></div>
-            <div class="sent-dim-row"><div class="sent-dim-label">Market Stress</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-stress" style="width:0%;background:var(--re)"></div></div><div class="sent-dim-val" id="sdim-stress-v" style="color:#EF4444">—</div></div>
-            <div class="sent-dim-row"><div class="sent-dim-label">Narrative Momentum</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-momentum" style="width:50%;background:var(--b5)"></div></div><div class="sent-dim-val" id="sdim-momentum-v" style="color:#60A5FA">—</div></div>
-            <div class="sent-dim-row"><div class="sent-dim-label">Source Credibility</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-cred" style="width:70%;background:var(--gr)"></div></div><div class="sent-dim-val" id="sdim-cred-v" style="color:#10B981">—</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <span class="sent-info-type" id="ep-info-type"></span>
-            <span style="font-size:9px;color:var(--t3)" id="ep-intensity"></span>
-          </div>
-          <div id="ep-entities" style="margin-top:8px"></div>
-          <div id="ep-ner" style="margin-top:8px;display:none">
-            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Entities</div>
-            <div id="ep-ner-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
-          </div>
-        </div>
-        <div id="ep-related" style="display:none;margin-bottom:10px">
-          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin:0 0 6px">Related Events</div>
-          <div id="ep-related-list"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Timeline slider -->
   <div id="map-timeline-wrap">
     <span style="font-size:10px;color:var(--t3);white-space:nowrap">⏱ Last</span>
@@ -3216,6 +3027,201 @@
     </div>
   </div>
 </div>
+
+
+<!-- ══ EVPANEL — outside #content so position:fixed works on iOS Safari ══ -->
+<!-- evpanel mobile backdrop — tap to close -->
+<div id="evpanel-backdrop" onclick="closeEP()"></div>
+
+<!-- Event detail panel -->
+<div id="evpanel">
+
+    <!-- Mobile swipe handle -->
+    <div id="evpanel-handle" style="display:none;width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:10px auto 0;cursor:grab"></div>
+    <div class="eph">
+      <button class="epx" onclick="closeEP()">×</button>
+      <div class="epcat" id="epcat"></div>
+      <div class="eptit" id="eptit"></div>
+      <!-- Severity meter bar -->
+      <div class="ep-sev-bar-wrap">
+        <div class="ep-sev-bar" id="ep-sev-bar" style="width:0%"></div>
+        <span class="ep-sev-num" id="ep-sev-num">—</span>
+      </div>
+      <!-- Panel tabs -->
+      <div class="ep-tabs">
+        <button class="ep-tab on" data-tab="overview" onclick="switchEPTab('overview',this)">Overview</button>
+        <button class="ep-tab" data-tab="analysis"  onclick="switchEPTab('analysis',this)">AI Analysis</button>
+        <button class="ep-tab" data-tab="markets"   onclick="switchEPTab('markets',this)">Markets</button>
+        <button class="ep-tab" data-tab="related"   onclick="switchEPTab('related',this)">Related</button>
+      </div>
+    </div>
+    <!-- TAB: overview -->
+    <div class="ep-tab-panel on" id="ept-overview">
+    <div class="epbody">
+      <div id="ep-dedup" style="display:none" class="dedup-badge">
+        <span>📰</span><span id="ep-dedup-txt">Multiple sources</span>
+      </div>
+      <div class="epsum" id="epsum"></div>
+      <div id="ep-sources" style="display:none">
+        <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Sources</div>
+        <div class="source-list" id="ep-source-list"></div>
+      </div>
+      <div class="epg">
+        <div class="epi"><div class="epil">Source</div><div class="epiv" id="epsrc"></div></div>
+        <div class="epi"><div class="epil">Impact</div><div class="epiv" id="epimp"></div></div>
+        <div class="epi"><div class="epil">Region</div><div class="epiv" id="epreg"></div></div>
+        <div class="epi"><div class="epil">Time</div><div class="epiv" id="eptime"></div></div>
+      </div>
+      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Related Markets</div>
+      <div class="mkts" id="epmkts"></div>
+      <div id="ai-market-note" style="font-size:11px;color:var(--am);margin-bottom:9px;display:none"></div>
+
+      <!-- Multi-dimensional sentiment panel -->
+      <div id="ep-sentiment" style="display:none;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Sentiment</div>
+          <div id="ep-sent-badge" class="sent-badge">—</div>
+        </div>
+        <div class="sent-score-bar" id="ep-sent-bar-wrap" style="margin-bottom:8px">
+          <span style="font-size:9px;color:var(--re)">−1</span>
+          <div class="sent-bar-track"><div id="ep-sent-bar" class="sent-bar-fill" style="width:50%;left:50%;background:var(--t3)"></div></div>
+          <span style="font-size:9px;color:var(--gr)">+1</span>
+          <span id="ep-sent-score" style="font-size:10px;font-weight:700;min-width:30px;text-align:right">0.0</span>
+        </div>
+        <div class="sent-multidim" id="ep-sent-multidim" style="display:none">
+          <div class="sent-dim-row">
+            <div class="sent-dim-label">Uncertainty</div>
+            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-uncertainty" style="width:0%;background:#F59E0B"></div></div>
+            <div class="sent-dim-val" id="sdim-uncertainty-v" style="color:#F59E0B">—</div>
+          </div>
+          <div class="sent-dim-row">
+            <div class="sent-dim-label">Market Stress</div>
+            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-stress" style="width:0%;background:#EF4444"></div></div>
+            <div class="sent-dim-val" id="sdim-stress-v" style="color:#EF4444">—</div>
+          </div>
+          <div class="sent-dim-row">
+            <div class="sent-dim-label">Narrative Momentum</div>
+            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-momentum" style="width:50%;background:#60A5FA"></div></div>
+            <div class="sent-dim-val" id="sdim-momentum-v" style="color:#60A5FA">—</div>
+          </div>
+          <div class="sent-dim-row">
+            <div class="sent-dim-label">Source Credibility</div>
+            <div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-cred" style="width:70%;background:#10B981"></div></div>
+            <div class="sent-dim-val" id="sdim-cred-v" style="color:#10B981">—</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <span class="sent-info-type" id="ep-info-type"></span>
+          <span style="font-size:9px;color:var(--t3)" id="ep-intensity"></span>
+        </div>
+        <div id="ep-entities" style="margin-top:8px"></div>
+        <div id="ep-ner" style="margin-top:8px;display:none">
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Named Entities</div>
+          <div id="ep-ner-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+        </div>
+      </div>
+
+      <!-- Related Events -->
+      <div id="ep-related" style="display:none;margin-bottom:10px">
+        <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Related Events <span id="ep-rel-count" style="color:var(--b4);font-weight:600"></span></div>
+        <div id="ep-related-list"></div>
+      </div>
+
+      <div class="epact">
+        <a id="eplink" target="_blank" class="btn btn-g btn-sm" style="flex:1;justify-content:center">Read Source</a>
+        <button class="btn btn-o btn-sm" onclick="watchEv()">+ Watch</button>
+        <button class="btn btn-g btn-sm" id="ep-save-btn" onclick="toggleSaveEvent()" title="Save to reading list">🔖 Save</button>
+      </div>
+    </div><!-- end epbody -->
+    </div><!-- end ept-overview -->
+
+    <!-- TAB: AI analysis -->
+    <div class="ep-tab-panel" id="ept-analysis">
+      <div class="epbody" style="padding-top:8px">
+        <div class="impact-row">
+          <button class="impact-btn" style="flex:1" onclick="showImpact()">📊 Market Impact</button>
+          <button class="impact-btn" style="flex:1" onclick="loadSimilarEvents()">🔗 Similar Events</button>
+          <button class="aibtn" style="flex:1" onclick="scoreEvent()">🎯 AI Score</button>
+        </div>
+        <div class="aisec" style="margin-top:8px">
+          <div class="aisec-t">Quick Analysis</div>
+          <button class="aibtn" onclick="panelAI('Summarize this event and its global significance in 3 bullet points.',true)">📋 Executive Summary</button>
+          <button class="aibtn" onclick="panelAI('What are the market impacts? Which assets and sectors are most affected?',true)">📈 Market Impact</button>
+          <button class="aibtn" onclick="panelAI('Assess geopolitical risk for this region. What escalation scenarios are possible?',true)">🌐 Geopolitical Risk</button>
+          <button class="aibtn" onclick="panelAI('What historical events are comparable? How did they resolve?',true)">📚 Historical Parallels</button>
+          <button class="aibtn" onclick="panelAI('What are likely developments in the next 30 days?',true)">🔮 30-Day Outlook</button>
+          <div class="aians" id="panelans"></div>
+        </div>
+        <div style="display:flex;gap:5px;margin-top:8px">
+          <button class="aibtn" style="flex:1;justify-content:center" onclick="runSentimentFull()">💬 Sentiment</button>
+          <button class="aibtn" style="flex:1;justify-content:center" onclick="panelAI('Classify the credibility of sources covering this event.',true)">🔍 Credibility</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Similar events panel (injected by loadSimilarEvents) -->
+    <div id="ep-similar" style="display:none;margin-bottom:10px">
+      <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Similar Events</div>
+      <div id="ep-similar-list"></div>
+    </div>
+
+    <!-- TAB: markets -->
+    <div class="ep-tab-panel" id="ept-markets">
+      <div class="epbody" style="padding-top:8px">
+        <div class="aisec">
+          <div class="aisec-t">Related Assets</div>
+          <div class="mkts" id="epmkts" style="margin-bottom:10px"></div>
+          <div id="ai-market-note" style="font-size:11px;color:var(--am);margin-bottom:9px;display:none"></div>
+          <button class="aibtn" onclick="panelAI('Detailed market impact: which assets, by how much, and why?',true)">📈 Detailed Analysis</button>
+          <button class="aibtn" onclick="panelAI('What commodity, forex and equity correlations are relevant?',true)">🔗 Correlations</button>
+          <button class="aibtn" onclick="panelAI('Suggest 3 specific hedging strategies for this event type.',true)">🛡 Hedging Strategies</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: related -->
+    <div class="ep-tab-panel" id="ept-related">
+      <div class="epbody" style="padding-top:8px">
+        <div style="display:flex;gap:5px;margin-bottom:8px">
+          <button class="aibtn" style="flex:1;justify-content:center" onclick="loadRelatedEvents()">🔗 Find Related</button>
+          <button class="aibtn" style="flex:1;justify-content:center" onclick="openCountryPanelForEv()">🌍 Country Profile</button>
+        </div>
+        <div id="ep-sentiment" style="display:none;margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Sentiment</div>
+            <div id="ep-sent-badge" class="sent-badge">—</div>
+          </div>
+          <div class="sent-score-bar" id="ep-sent-bar-wrap" style="margin-bottom:8px">
+            <span style="font-size:9px;color:var(--re)">−1</span>
+            <div class="sent-bar-track"><div id="ep-sent-bar" class="sent-bar-fill" style="width:50%;left:0;background:var(--b5)"></div></div>
+            <span style="font-size:9px;color:var(--gr)">+1</span>
+            <span id="ep-sent-score" style="font-size:10px;font-weight:700;min-width:30px;text-align:right">—</span>
+          </div>
+          <div class="sent-multidim" id="ep-sent-multidim" style="display:none">
+            <div class="sent-dim-row"><div class="sent-dim-label">Uncertainty</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-uncertainty" style="width:0%;background:var(--am)"></div></div><div class="sent-dim-val" id="sdim-uncertainty-v" style="color:#F59E0B">—</div></div>
+            <div class="sent-dim-row"><div class="sent-dim-label">Market Stress</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-stress" style="width:0%;background:var(--re)"></div></div><div class="sent-dim-val" id="sdim-stress-v" style="color:#EF4444">—</div></div>
+            <div class="sent-dim-row"><div class="sent-dim-label">Narrative Momentum</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-momentum" style="width:50%;background:var(--b5)"></div></div><div class="sent-dim-val" id="sdim-momentum-v" style="color:#60A5FA">—</div></div>
+            <div class="sent-dim-row"><div class="sent-dim-label">Source Credibility</div><div class="sent-dim-bar"><div class="sent-dim-fill" id="sdim-cred" style="width:70%;background:var(--gr)"></div></div><div class="sent-dim-val" id="sdim-cred-v" style="color:#10B981">—</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <span class="sent-info-type" id="ep-info-type"></span>
+            <span style="font-size:9px;color:var(--t3)" id="ep-intensity"></span>
+          </div>
+          <div id="ep-entities" style="margin-top:8px"></div>
+          <div id="ep-ner" style="margin-top:8px;display:none">
+            <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Entities</div>
+            <div id="ep-ner-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+          </div>
+        </div>
+        <div id="ep-related" style="display:none;margin-bottom:10px">
+          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin:0 0 6px">Related Events</div>
+          <div id="ep-related-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #evpanel -->
 
 </body>
 </html>
