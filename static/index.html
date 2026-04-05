@@ -742,7 +742,12 @@
   <div id="map-zoom-overlay"></div>
 
   <!-- ── Event Detail Panel ── -->
-  <div id="evpanel">
+<!-- evpanel mobile backdrop — tap to close -->
+<div id="evpanel-backdrop" onclick="closeEP()"></div>
+
+<!-- Event detail panel -->
+    <!-- Mobile swipe handle -->
+    <div id="evpanel-handle" style="display:none;width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:10px auto 0;cursor:grab"></div>
     <div class="eph">
       <button class="epx" onclick="closeEP()">×</button>
       <div class="epcat" id="epcat"></div>
