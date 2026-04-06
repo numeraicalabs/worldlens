@@ -50,7 +50,7 @@ function initMap() {
   var mapEl = document.getElementById('map');
   if (!mapEl || mapEl.offsetWidth === 0) { setTimeout(initMap, 120); return; }
 
-  G.map = L.map('map', { center:[25,15], zoom:3, zoomControl:false, minZoom:2, maxZoom:14, tap:false, tapTolerance:15 });
+  G.map = L.map('map', { center:[25,15], zoom:3, zoomControl:false, minZoom:2, maxZoom:14 });
 
   // Dark tile providers — native dark maps, no CSS filter needed
   // CartoDB Dark Matter: purpose-built dark map, sharp and fast
@@ -478,27 +478,10 @@ function addMarker(ev) {
   );
 
   var eid = ev.id;
-  mk.on('click', function(e) {
-    /* On mobile: open the evpanel directly as a bottom sheet.
-       openEP() is reliable; evpanel is position:fixed so it always renders. */
-    if (e && e.originalEvent) e.originalEvent.stopPropagation();
+
+  /* Single clean click handler — no popup, no stopPropagation interference */
+  mk.on('click', function() {
     openEP(eid);
-  });
-  mk.bindPopup(
-    '<div class="pc">'
-    + '<div class="pc-cat" style="color:'+m.c+'">'+m.i+' '+ev.category+(isGroup?' ('+ev._groupCount+' sources)':'')+'</div>'
-    + '<div class="pc-tit">'+ev.title+'</div>'
-    + '<div class="pc-meta">'+(ev.country_name||ev.country_code||'Global')+' &bull; '+tAgo(new Date(ev.timestamp))+'</div>'
-    + (ev.summary?'<div class="pc-sum">'+ev.summary+'</div>':'')
-    + '<button class="pc-btn" id="pcb-'+eid+'">View Details + AI</button></div>',
-    {maxWidth:290, minWidth:240}
-  );
-  mk.on('popupopen', function() {
-    /* Close popup immediately on mobile — holo sheet handles the detail view */
-    var isMob = ('ontouchstart' in window && window.innerWidth <= 900);
-    if (isMob) { mk.closePopup(); return; }
-    var btn = document.getElementById('pcb-'+eid);
-    if (btn) btn.onclick = function(){ openEP(eid); };
   });
 
   mk.addTo(G.map);
@@ -552,13 +535,21 @@ function openEP(id) {
   if (mn) { if(ev.ai_market_note){mn.style.display='block';mn.textContent=ev.ai_market_note;}else mn.style.display='none'; }
   var ans=el('panelans'); if(ans){ans.textContent='';ans.classList.remove('on');}
 
+  /* Reset to overview tab */
+  if (typeof switchEPTab === 'function') switchEPTab('overview', document.querySelector('.ep-tab[data-tab="overview"]'));
+
   /* Show backdrop on mobile */
   var isMobile = window.innerWidth <= 768;
   var bd = document.getElementById('evpanel-backdrop');
   if (bd) bd.classList.toggle('on', isMobile);
 
-  el('evpanel').classList.add('on');
-  /* Only fly to location on desktop — on mobile it disorients the user */
+  /* Force animation restart by removing class, forcing reflow, then re-adding */
+  var panel = el('evpanel');
+  panel.classList.remove('on');
+  void panel.offsetWidth; /* trigger reflow */
+  panel.classList.add('on');
+
+  /* Only fly to location on desktop */
   if (!isMobile && G.map && ev.latitude && ev.longitude)
     G.map.flyTo([ev.latitude,ev.longitude],Math.max(G.map.getZoom(),5),{duration:1.1});
   rq('/api/portfolio/track',{method:'POST',body:{action:'map_view'}});
