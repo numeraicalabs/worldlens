@@ -497,66 +497,83 @@ function getMapEvs() {
 }
 
 function openEP(id) {
-  var ev = G.events.find(function(e){return e.id===id;});
-  if (!ev) return;
+  /* Guard: find event */
+  var ev = G.events.find(function(e){ return e.id === id; });
+  if (!ev) { console.warn('openEP: event not found', id); return; }
+
+  /* Guard: find panel */
+  var panel = document.getElementById('evpanel');
+  if (!panel) { console.error('openEP: #evpanel not found'); return; }
+
   G.panelEv = ev;
   track('event_opened', G.currentView || 'map', ev.id + '|' + (ev.category||'') + '|' + (ev.country_code||''));
-  var m = CATS[ev.category]||CATS.GEOPOLITICS;
-  el('epcat').innerHTML = m.i+' '+ev.category;
-  el('epcat').style.cssText = 'background:'+m.bg+';color:'+m.c+';';
-  setEl('eptit', ev.title);
 
-  var dedupEl=el('ep-dedup'), sourcesEl=el('ep-sources'), listEl=el('ep-source-list');
+  /* Fill content with null-safe helpers */
+  var m = CATS[ev.category] || CATS.GEOPOLITICS;
+
+  var epcat = document.getElementById('epcat');
+  if (epcat) { epcat.innerHTML = m.i + ' ' + (ev.category || ''); epcat.style.cssText = 'background:' + m.bg + ';color:' + m.c + ';'; }
+
+  var eptit = document.getElementById('eptit');
+  if (eptit) eptit.textContent = ev.title || '';
+
+  /* Dedup */
+  var dedupEl = document.getElementById('ep-dedup');
+  var sourcesEl = document.getElementById('ep-sources');
+  var listEl = document.getElementById('ep-source-list');
   if (ev._groupCount && ev._groupCount > 1) {
-    if (dedupEl)  { dedupEl.style.display='inline-flex'; setEl('ep-dedup-txt', ev._groupCount+' sources merged'); }
-    if (sourcesEl && listEl) {
-      sourcesEl.style.display='block';
-      listEl.innerHTML = (ev._sources||[ev.source]).map(function(s){
-        return '<span class="source-pill">'+s+'</span>';
-      }).join('');
-    }
+    if (dedupEl)  { dedupEl.style.display = 'inline-flex'; var dt = document.getElementById('ep-dedup-txt'); if (dt) dt.textContent = ev._groupCount + ' sources merged'; }
+    if (sourcesEl) sourcesEl.style.display = 'block';
+    if (listEl) listEl.innerHTML = (ev._sources || [ev.source]).map(function(s){ return '<span class="source-pill">' + s + '</span>'; }).join('');
   } else {
-    if (dedupEl)   dedupEl.style.display='none';
-    if (sourcesEl) sourcesEl.style.display='none';
+    if (dedupEl)   dedupEl.style.display = 'none';
+    if (sourcesEl) sourcesEl.style.display = 'none';
   }
 
-  setEl('epsum', ev.ai_summary||ev.summary||'No summary available.');
-  setEl('epsrc', ev.source);
-  el('epimp').innerHTML = '<span class="tag tag'+ev.impact[0]+'">'+ev.impact+'</span>';
-  setEl('epreg', ev.country_name||ev.country_code||'Global');
-  setEl('eptime', tAgo(new Date(ev.timestamp)));
+  var epsum  = document.getElementById('epsum');  if (epsum)  epsum.textContent  = ev.ai_summary || ev.summary || 'No summary available.';
+  var epsrc  = document.getElementById('epsrc');  if (epsrc)  epsrc.textContent  = ev.source || '';
+  var epimp  = document.getElementById('epimp');  if (epimp)  epimp.innerHTML    = '<span class="tag tag' + (ev.impact||'M')[0] + '">' + (ev.impact||'Medium') + '</span>';
+  var epreg  = document.getElementById('epreg');  if (epreg)  epreg.textContent  = ev.country_name || ev.country_code || 'Global';
+  var eptime = document.getElementById('eptime'); if (eptime) eptime.textContent = tAgo(new Date(ev.timestamp));
+  var eplink = document.getElementById('eplink'); if (eplink) eplink.href        = ev.url || '#';
 
-  var mkts=[];
-  try { mkts=typeof ev.related_markets==='string'?JSON.parse(ev.related_markets||'[]'):(ev.related_markets||[]); } catch(e){}
-  el('epmkts').innerHTML = mkts.map(function(t){ return '<span class="mktg">'+t+'</span>'; }).join('');
-  el('eplink').href = ev.url||'#';
+  var mkts = [];
+  try { mkts = typeof ev.related_markets === 'string' ? JSON.parse(ev.related_markets || '[]') : (ev.related_markets || []); } catch(e) {}
+  var epmkts = document.getElementById('epmkts');
+  if (epmkts) epmkts.innerHTML = mkts.map(function(t){ return '<span class="mktg">' + t + '</span>'; }).join('');
 
-  var mn=el('ai-market-note');
-  if (mn) { if(ev.ai_market_note){mn.style.display='block';mn.textContent=ev.ai_market_note;}else mn.style.display='none'; }
-  var ans=el('panelans'); if(ans){ans.textContent='';ans.classList.remove('on');}
+  var mn = document.getElementById('ai-market-note');
+  if (mn) { if (ev.ai_market_note) { mn.style.display = 'block'; mn.textContent = ev.ai_market_note; } else mn.style.display = 'none'; }
+
+  var ans = document.getElementById('panelans');
+  if (ans) { ans.textContent = ''; ans.classList.remove('on'); }
 
   /* Reset to overview tab */
-  if (typeof switchEPTab === 'function') switchEPTab('overview', document.querySelector('.ep-tab[data-tab="overview"]'));
+  if (typeof switchEPTab === 'function') {
+    var ov = document.querySelector('.ep-tab[data-tab="overview"]');
+    switchEPTab('overview', ov);
+  }
 
-  /* Show backdrop on mobile */
+  /* Backdrop on mobile */
   var isMobile = window.innerWidth <= 768;
   var bd = document.getElementById('evpanel-backdrop');
   if (bd) bd.classList.toggle('on', isMobile);
 
-  /* Force animation restart by removing class, forcing reflow, then re-adding */
-  var panel = el('evpanel');
+  /* Show panel — force animation restart */
   panel.classList.remove('on');
-  void panel.offsetWidth; /* trigger reflow */
+  void panel.offsetWidth;
   panel.classList.add('on');
 
-  /* Only fly to location on desktop */
+  /* Fly to marker on desktop only */
   if (!isMobile && G.map && ev.latitude && ev.longitude)
-    G.map.flyTo([ev.latitude,ev.longitude],Math.max(G.map.getZoom(),5),{duration:1.1});
-  rq('/api/portfolio/track',{method:'POST',body:{action:'map_view'}});
+    G.map.flyTo([ev.latitude, ev.longitude], Math.max(G.map.getZoom(), 5), { duration: 1.1 });
+
+  rq('/api/portfolio/track', { method: 'POST', body: { action: 'map_view' } });
 }
 
 function closeEP() {
-  el('evpanel').classList.remove('on');
+  var panel = document.getElementById('evpanel');
+  if (panel) panel.classList.remove('on');
   var bd = document.getElementById('evpanel-backdrop');
   if (bd) bd.classList.remove('on');
 }
