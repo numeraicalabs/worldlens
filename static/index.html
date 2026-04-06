@@ -273,7 +273,7 @@
 <!-- DASHBOARD -->
 <div class="view on" id="view-dash">
 
-<!-- ── LIVE INTELLIGENCE TICKER ── -->
+<!-- ── TICKER ── -->
 <div id="ticker-wrap">
   <div class="ticker-label">LIVE</div>
   <div id="ticker-track" class="ticker-track"></div>
@@ -281,19 +281,13 @@
 
 <div class="db-root">
 
-  <!-- ═══════════════════════════════════════
-       ROW 1 — Header + 6 KPIs
-  ═══════════════════════════════════════ -->
+  <!-- ═══════════════════════════ ROW 1: Header + KPIs ═══════════════════════════ -->
   <div class="db-header-row">
-
-    <!-- Greeting block -->
     <div class="db-greeting">
       <div class="db-greeting-time" id="db-time-label">Good morning</div>
       <div class="db-greeting-title">Global Intelligence<br>Briefing</div>
       <div class="db-greeting-sub" id="d-last-update"></div>
-      <!-- Personalization chips — filled by applyPersonalization() -->
       <div id="db-affinity-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px;min-height:20px"></div>
-      <!-- Adaptive severity indicator -->
       <div id="db-sev-indicator" style="font-size:9px;color:var(--t3);margin-bottom:6px"></div>
       <div class="db-header-actions">
         <button class="btn btn-ai btn-sm" onclick="sv('ai',document.querySelector('[data-v=ai]'))">
@@ -305,10 +299,7 @@
         </button>
       </div>
     </div>
-
-    <!-- KPI strip -->
     <div class="db-kpi-strip">
-
       <div class="db-kpi" id="dbk-risk">
         <div class="db-kpi-icon">🌡</div>
         <div class="db-kpi-body">
@@ -318,7 +309,6 @@
           <div class="db-kpi-sub" id="d-risk-l">Loading…</div>
         </div>
       </div>
-
       <div class="db-kpi" id="dbk-ev" onclick="sv('feed',document.querySelector('[data-v=feed]'))" style="cursor:pointer">
         <div class="db-kpi-icon">⚡</div>
         <div class="db-kpi-body">
@@ -327,16 +317,14 @@
           <div class="db-kpi-sub" id="d-hi" style="color:var(--re)">— critical</div>
         </div>
       </div>
-
-      <div class="db-kpi" id="dbk-sp" onclick="selectMktAsset('^GSPC','S&P 500');sv('markets',document.querySelector('[data-v=markets]'))" style="cursor:pointer">
+      <div class="db-kpi" id="dbk-sp" onclick="sv('markets',document.querySelector('[data-v=markets]'))" style="cursor:pointer">
         <div class="db-kpi-icon">📈</div>
         <div class="db-kpi-body">
           <div class="db-kpi-lbl">S&amp;P 500</div>
           <div class="db-kpi-val" id="d-sp">—</div>
-          <div class="db-kpi-sub" id="d-sp-c" style="color:var(--gr)">+0.00%</div>
+          <div class="db-kpi-sub" id="d-sp-c">—</div>
         </div>
       </div>
-
       <div class="db-kpi" id="dbk-btc">
         <div class="db-kpi-icon">₿</div>
         <div class="db-kpi-body">
@@ -345,7 +333,6 @@
           <div class="db-kpi-sub" id="d-btc-c">—</div>
         </div>
       </div>
-
       <div class="db-kpi" id="dbk-vix">
         <div class="db-kpi-icon">😨</div>
         <div class="db-kpi-body">
@@ -354,7 +341,6 @@
           <div class="db-kpi-sub" id="d-vix-l">—</div>
         </div>
       </div>
-
       <div class="db-kpi" id="dbk-gold">
         <div class="db-kpi-icon">🥇</div>
         <div class="db-kpi-body">
@@ -363,56 +349,27 @@
           <div class="db-kpi-sub" id="d-gold-c">—</div>
         </div>
       </div>
-
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════
-       ROW 2 — Crisis Spotlight (full width)
-  ═══════════════════════════════════════ -->
-  <div id="crisis-spotlight">
-    <div class="cs-bg"></div>
-    <div class="cs-border-glow"></div>
-    <div class="cs-content">
-      <div class="cs-left">
-        <div class="cs-overline">CRISIS SPOTLIGHT &bull; HIGHEST SEVERITY EVENT</div>
-        <div class="cs-title" id="cs-title">Loading critical event...</div>
-        <div class="cs-summary" id="cs-summary"></div>
-        <div class="cs-meta" id="cs-meta"></div>
-        <div class="cs-ai-note" id="cs-ai-note" style="display:none"></div>
-        <div class="cs-actions" style="margin-top:12px">
-          <button class="btn btn-d btn-sm" onclick="csFlyTo()">🗺 View on Map</button>
-          <button class="cs-load-btn" style="width:auto;padding:5px 12px;font-size:11px" onclick="csGetAI()">🤖 AI Analysis</button>
-          <a id="cs-link" target="_blank" class="btn btn-g btn-sm">Read Source ↗</a>
-        </div>
+  <!-- ═══════════════════════════ AGENT BOTS SECTION ════════════════════════════ -->
+  <div class="agents-section-header">
+    <div>
+      <div class="agents-section-title">
+        ⬡ AI Agent Bots
+        <span class="ast-badge">LIVE</span>
       </div>
-      <div class="cs-right">
-        <div class="cs-sev-bar">
-          <div class="cs-sev-label">AI Severity Score</div>
-          <div class="cs-sev-num" id="cs-sev">—</div>
-          <div class="cs-sev-sub">/10</div>
-          <div style="height:3px;background:rgba(239,68,68,.15);border-radius:2px;margin-top:8px;overflow:hidden">
-            <div id="cs-sev-bar" style="height:100%;border-radius:2px;background:var(--re);width:0%;transition:width 1.5s"></div>
-          </div>
-        </div>
-        <div>
-          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Market Exposure</div>
-          <div class="cs-markets" id="cs-markets"></div>
-        </div>
-        <div>
-          <div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Other Critical Events</div>
-          <div id="cs-others" style="display:flex;flex-direction:column;gap:4px"></div>
-        </div>
-      </div>
+      <div class="agents-section-sub">4 autonomous analysts — continuously monitoring your focus areas</div>
     </div>
+    <button class="agents-refresh-btn" onclick="refreshAgentBriefs && refreshAgentBriefs()">↻ Refresh all</button>
+  </div>
+  <div id="agents-grid">
+    <!-- Populated by 21_agents_dash.js -->
+    <div style="grid-column:1/-1;padding:28px 0;text-align:center;color:var(--t3);font-size:12px">Loading agents…</div>
   </div>
 
-  <!-- ═══════════════════════════════════════
-       ROW 3 — BENTO GRID  (main content)
-  ═══════════════════════════════════════ -->
+  <!-- ═══════════════════════════ ROW 3: BENTO GRID ═════════════════════════════ -->
   <div class="db-bento">
-
-    <!-- A: Events Feed (tall, left) -->
     <div class="db-bento-cell db-cell-events">
       <div class="db-cell-header">
         <div class="db-cell-title">
@@ -421,24 +378,17 @@
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span id="d-pers-badge" style="display:none;font-size:9px;padding:1px 7px;border-radius:100px;background:rgba(59,130,246,.12);color:var(--b4);border:1px solid rgba(59,130,246,.2)">✦ For You</span>
-          <div style="display:flex;gap:8px;align-items:center">
-          <a class="db-cell-link" onclick="exportFeedCSV()" title="Export as CSV" style="font-size:10px">⬇ CSV</a>
           <a class="db-cell-link" onclick="sv('feed',document.querySelector('[data-v=feed]'))">View all →</a>
-        </div>
         </div>
       </div>
       <div id="d-evlist" class="db-evlist"></div>
     </div>
-
-    <!-- B: Threat Matrix (top center) -->
     <div class="db-bento-cell db-cell-threats">
       <div class="db-cell-header">
         <div class="db-cell-title"><span class="db-cell-icon">🎯</span>Threat Matrix</div>
       </div>
       <div class="threat-matrix" id="d-threats"></div>
     </div>
-
-    <!-- C: Markets snapshot (top right) -->
     <div class="db-bento-cell db-cell-markets">
       <div class="db-cell-header">
         <div class="db-cell-title"><span class="db-cell-icon">💹</span>Market Snapshot</div>
@@ -446,8 +396,6 @@
       </div>
       <div id="d-mktlist" class="db-mktlist"></div>
     </div>
-
-    <!-- D: AI Macro Briefing (center bottom) -->
     <div class="db-bento-cell db-cell-ai">
       <div class="db-cell-header">
         <div class="db-cell-title">
@@ -458,8 +406,6 @@
       </div>
       <div class="aib-txt" id="d-brief-txt">Loading AI briefing…</div>
     </div>
-
-    <!-- E: Risk Timeline (right center) -->
     <div class="db-bento-cell db-cell-timeline">
       <div class="db-cell-header">
         <div class="db-cell-title"><span class="db-cell-icon">🕐</span>Risk Timeline</div>
@@ -467,16 +413,12 @@
       </div>
       <div class="timeline" id="d-timeline"></div>
     </div>
-
-    <!-- F: Category breakdown (bottom left) -->
     <div class="db-bento-cell db-cell-cats">
       <div class="db-cell-header">
         <div class="db-cell-title"><span class="db-cell-icon">📊</span>Events by Category</div>
       </div>
       <div id="d-catbars"></div>
     </div>
-
-    <!-- G: Active hotspots (bottom right) -->
     <div class="db-bento-cell db-cell-hotspots">
       <div class="db-cell-header">
         <div class="db-cell-title"><span class="db-cell-icon">🔥</span>Active Hotspots</div>
@@ -484,328 +426,10 @@
       </div>
       <div id="d-hot" class="db-hotspot-grid"></div>
     </div>
-
-
-    <!-- H: Live Continent News Streams (full width) -->
-    <div class="db-bento-cell db-cell-continents">
-      <div class="db-cell-header" style="margin-bottom:12px">
-        <div class="db-cell-title">
-          <span class="db-cell-icon" style="background:rgba(0,229,255,.12);color:var(--cy)">🌐</span>
-          Live Intelligence — 24h Continent Streams
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="cont-live-indicator">
-            <div class="cont-live-dot"></div>
-            <span class="cont-live-label">LIVE FEED</span>
-          </div>
-          <span id="cont-total-count" style="font-family:var(--fm);font-size:9px;color:var(--t3)">— events</span>
-        </div>
-      </div>
-
-      <div class="cont-streams-grid">
-
-        <!-- Americas -->
-        <div class="cont-stream" data-continent="americas">
-          <div class="cont-stream-header" style="--cont-color:#10B981">
-            <div class="cont-stream-flag">🌎</div>
-            <div class="cont-stream-info">
-              <div class="cont-stream-name">Americas</div>
-              <div class="cont-stream-sub">N·S America</div>
-            </div>
-            <div class="cont-stream-stats">
-              <div class="cont-stat-val" id="cont-am-count">—</div>
-              <div class="cont-stat-lbl">events</div>
-            </div>
-            <div class="cont-pulse" style="--cont-color:#10B981"></div>
-          </div>
-          <div class="cont-stream-feed" id="cont-feed-americas"></div>
-        </div>
-
-        <!-- Europe -->
-        <div class="cont-stream" data-continent="europe">
-          <div class="cont-stream-header" style="--cont-color:#3B82F6">
-            <div class="cont-stream-flag">🌍</div>
-            <div class="cont-stream-info">
-              <div class="cont-stream-name">Europe</div>
-              <div class="cont-stream-sub">EU · Russia</div>
-            </div>
-            <div class="cont-stream-stats">
-              <div class="cont-stat-val" id="cont-eu-count">—</div>
-              <div class="cont-stat-lbl">events</div>
-            </div>
-            <div class="cont-pulse" style="--cont-color:#3B82F6"></div>
-          </div>
-          <div class="cont-stream-feed" id="cont-feed-europe"></div>
-        </div>
-
-        <!-- Asia-Pacific -->
-        <div class="cont-stream" data-continent="asiapac">
-          <div class="cont-stream-header" style="--cont-color:#F59E0B">
-            <div class="cont-stream-flag">🌏</div>
-            <div class="cont-stream-info">
-              <div class="cont-stream-name">Asia-Pacific</div>
-              <div class="cont-stream-sub">China · ASEAN · AU</div>
-            </div>
-            <div class="cont-stream-stats">
-              <div class="cont-stat-val" id="cont-ap-count">—</div>
-              <div class="cont-stat-lbl">events</div>
-            </div>
-            <div class="cont-pulse" style="--cont-color:#F59E0B"></div>
-          </div>
-          <div class="cont-stream-feed" id="cont-feed-asiapac"></div>
-        </div>
-
-        <!-- Middle East & Africa -->
-        <div class="cont-stream" data-continent="mea">
-          <div class="cont-stream-header" style="--cont-color:#EF4444">
-            <div class="cont-stream-flag">🌍</div>
-            <div class="cont-stream-info">
-              <div class="cont-stream-name">Middle East · Africa</div>
-              <div class="cont-stream-sub">MENA · Sub-Saharan</div>
-            </div>
-            <div class="cont-stream-stats">
-              <div class="cont-stat-val" id="cont-mea-count">—</div>
-              <div class="cont-stat-lbl">events</div>
-            </div>
-            <div class="cont-pulse" style="--cont-color:#EF4444"></div>
-          </div>
-          <div class="cont-stream-feed" id="cont-feed-mea"></div>
-        </div>
-
-      </div><!-- cont-streams-grid -->
-    </div><!-- db-cell-continents -->
-
-  </div><!-- db-bento -->
+  </div>
 
 </div><!-- db-root -->
-
-</div><!-- view-dash end -->
-
-<!-- MAP -->
-<div class="view" id="view-map">
-  <div id="map"></div>
-
-  <!-- ── Knowledge Graph overlay ── -->
-  <div id="kg-overlay">
-    <canvas id="kg-canvas"></canvas>
-
-    <!-- Top bar -->
-    <div id="kg-topbar">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:11px;font-weight:700;color:var(--t1)">Event Knowledge Graph</span>
-        <span id="kg-stats" style="font-size:10px;color:var(--t3)">Loading…</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:9px;color:var(--t3)">Hover nodes &amp; edges · Click to open event</span>
-        <button id="kg-close-btn" onclick="closeKnowledgeGraph()">✕ Close</button>
-      </div>
-    </div>
-
-    <!-- Side panel: appears on hover -->
-    <div id="kg-panel">
-      <div id="kg-panel-body">
-        <div style="font-size:10px;color:var(--t3);padding:16px;text-align:center">
-          Hover over a node or edge to see details
-        </div>
-      </div>
-    </div>
-
-    <!-- Legend -->
-    <div id="kg-legend-box">
-      <div style="font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">Relationship type</div>
-      <div class="kg-leg-row"><div class="kg-leg-line" style="background:#EF4444"></div><span>Causal</span></div>
-      <div class="kg-leg-row"><div class="kg-leg-line" style="background:#F59E0B"></div><span>Correlated</span></div>
-      <div class="kg-leg-row"><div class="kg-leg-line" style="background:#A78BFA"></div><span>Hierarchical</span></div>
-      <div class="kg-leg-row"><div class="kg-leg-line" style="background:#475569;border-style:dashed"></div><span>Temporal</span></div>
-      <div style="margin-top:8px;font-size:8px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px">Node size = severity</div>
-    </div>
-  </div>
-
-  <!-- ── Breaking news banner ── -->
-  <div id="map-breaking" style="display:none">
-    <div class="breaking-dot"></div>
-    <span class="breaking-label">BREAKING</span>
-    <span id="map-breaking-text" class="breaking-text"></span>
-    <button class="breaking-open" id="map-breaking-btn" onclick="openBreakingEvent()">View →</button>
-    <button class="breaking-close" onclick="this.parentElement.style.display='none'">✕</button>
-  </div>
-
-  <!-- ── Search bar (floats top-center, below toolbar) ── -->
-  <div id="map-search-bar">
-    <div id="map-search-wrap">
-      <span class="msearch-icon">🔍</span>
-      <input id="map-search-inp" type="text" placeholder="Search events, countries, topics…"
-             oninput="mapSearchInput(this.value)"
-             onkeydown="mapSearchKey(event)"
-             autocomplete="off" spellcheck="false"/>
-      <button id="map-search-clear" style="display:none" onclick="mapSearchClear()">✕</button>
-    </div>
-    <div id="map-search-results"></div>
-  </div>
-
-  <!-- ── Top toolbar ── -->
-  <div id="map-toolbar">
-    <button class="mtool-btn on" id="mtool-map"     onclick="setMapMode('map')">🗺 Map</button>
-    <div class="mtool-sep"></div>
-    <button class="mtool-btn"    id="mtool-heatmap"  onclick="setMapMode('heatmap')">🌡 Heat</button>
-    <button class="mtool-btn"    id="mtool-timeline" onclick="setMapMode('timeline')">⏱ Timeline</button>
-    <div class="mtool-sep"></div>
-    <button class="mtool-btn"    id="mtool-sent"     onclick="toggleSentimentOverlay()">💬 Sentiment</button>
-    <div class="mtool-sep"></div>
-    <button class="mtool-btn"    id="mtool-legend"   onclick="toggleMapLegend()">📖 Legend</button>
-  </div>
-
-  <!-- ── Map legend popup ── -->
-  <div id="map-legend-popup" style="display:none"></div>
-
-  <!-- ── Country panel (right side, appears on country focus) ── -->
-  <div id="country-panel">
-    <div id="country-panel-header">
-      <div>
-        <div id="cp-flag" style="font-size:24px;line-height:1"></div>
-        <div id="cp-name" style="font-size:14px;font-weight:700;color:var(--t1);margin-top:3px"></div>
-        <div id="cp-code" style="font-size:10px;color:var(--t3)"></div>
-      </div>
-      <button onclick="closeCountryPanel()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1">✕</button>
-    </div>
-    <div id="country-panel-body">
-      <div class="cp-section">
-        <div class="cp-sec-title">Risk Score</div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div id="cp-risk-score" class="cp-big-num">—</div>
-          <div style="flex:1">
-            <div id="cp-risk-bar-wrap" class="cp-bar-wrap">
-              <div id="cp-risk-bar" class="cp-bar-fill" style="width:0%"></div>
-            </div>
-            <div id="cp-risk-label" style="font-size:9px;color:var(--t3);margin-top:3px">Loading…</div>
-          </div>
-        </div>
-      </div>
-      <div class="cp-section">
-        <div class="cp-sec-title">Active Events</div>
-        <div id="cp-events-list" class="cp-list">
-          <div style="font-size:10px;color:var(--t3)">Loading…</div>
-        </div>
-      </div>
-      <div class="cp-section" id="cp-macro-section" style="display:none">
-        <div class="cp-sec-title">Macro Indicators</div>
-        <div id="cp-macro-list" class="cp-list"></div>
-      </div>
-      <div style="padding:10px 12px">
-        <button class="btn btn-o btn-sm" style="width:100%" onclick="mapFocusCountry(currentCountry)">
-          Focus map on this country
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Left panel ── -->
-  <div id="mleft">
-    <div class="mpc">
-      <div class="mptit">Global Risk Index</div>
-      <div class="risk-n" id="m-risk" style="color:var(--b4)">—</div>
-      <div class="risk-b"><div class="risk-bf" id="m-riskb" style="width:0%;background:var(--b5)"></div></div>
-      <div class="risk-l" id="m-riskl" style="color:var(--t3)">Loading...</div>
-    </div>
-    <div class="mpc"><div class="mptit">Filter</div><div id="mcats" style="display:flex;flex-wrap:wrap"></div></div>
-    <div class="mpc">
-      <div class="mptit">Live Stats</div>
-      <div class="mrow"><span style="color:var(--t2)">Visible</span><span class="mrv" id="m-evn">—</span></div>
-      <div class="mrow"><span style="color:var(--t2)">Clusters</span><span class="mrv" id="m-clusters" style="color:var(--b4)">—</span></div>
-      <div class="mrow"><span style="color:var(--t2)">High impact</span><span class="mrv" style="color:var(--re)" id="m-hin">—</span></div>
-      <div class="mrow"><span style="color:var(--t2)">Deduped</span><span class="mrv" style="color:var(--gr)" id="m-dedup">—</span></div>
-      <div class="mrow"><span style="color:var(--t2)">Updated</span><span class="mrv" id="m-upd">—</span></div>
-    </div>
-    <div class="mpc">
-      <div class="mptit" style="margin-bottom:6px">Zoom Level</div>
-      <div class="density-bar" id="density-bar">
-        <div class="density-seg"></div><div class="density-seg"></div><div class="density-seg"></div>
-        <div class="density-seg"></div><div class="density-seg"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:8px;color:var(--t4)">
-        <span>Global</span><span>Regional</span><span>Local</span>
-      </div>
-      <div style="font-size:10px;color:var(--b4);margin-top:5px;font-weight:600" id="zoom-mode-lbl">Global Overview</div>
-    </div>
-    <div class="mpc" id="kg-legend" style="display:none">
-      <div class="mptit">Relationship Types</div>
-      <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">
-        <div style="display:flex;align-items:center;gap:7px;font-size:10px"><div style="width:18px;height:3px;background:#EF4444;border-radius:2px;flex-shrink:0"></div>Causal</div>
-        <div style="display:flex;align-items:center;gap:7px;font-size:10px"><div style="width:18px;height:3px;background:#F59E0B;border-radius:2px;flex-shrink:0"></div>Correlated</div>
-        <div style="display:flex;align-items:center;gap:7px;font-size:10px"><div style="width:18px;height:3px;background:#60A5FA;border-radius:2px;flex-shrink:0"></div>Hierarchical</div>
-        <div style="display:flex;align-items:center;gap:7px;font-size:10px"><div style="width:18px;height:3px;background:#94A3B8;border-radius:2px;flex-shrink:0;opacity:.6"></div>Temporal</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Network Arc SVG Overlay ── -->
-  <svg id="wl-arcs-svg" aria-hidden="true"></svg>
-
-  <!-- ── Category Floating Labels ── -->
-  <div id="wl-cat-labels" aria-hidden="true"></div>
-
-  <!-- ── Active View Status Bar ── -->
-  <div id="wl-active-view-bar">
-    <div class="avb-dot"></div>
-    <span class="avb-text">Active View: <span class="avb-val" id="avb-mode">Global Network</span></span>
-    <div class="avb-sep"></div>
-    <span class="avb-text"><span class="avb-val" id="avb-count">—</span> Nodes</span>
-    <div class="avb-sep"></div>
-    <span class="avb-text">Severity <span class="avb-val" id="avb-sev">—</span> avg</span>
-  </div>
-
-  <div id="map-zoom-overlay"></div>
-
-  <!-- ── Event Detail Panel ── -->
-  <!-- Timeline slider -->
-  <div id="map-timeline-wrap">
-    <span style="font-size:10px;color:var(--t3);white-space:nowrap">⏱ Last</span>
-    <input type="range" id="timeline-slider" min="1" max="168" value="72" step="1" oninput="document.getElementById('timeline-label').textContent=this.value+'h'">
-    <span id="timeline-label">72h</span>
-    <button class="mtool-btn" onclick="applyTimelineFilter()" style="padding:4px 10px">Apply</button>
-  </div>
-
-  <button id="map-hm-btn" onclick="toggleHeatmap()" style="display:none">Heatmap</button>
-  <div id="mctrl">
-    <button class="mcb" onclick="G.map&&G.map.zoomIn()" title="Zoom in">+</button>
-    <button class="mcb" onclick="G.map&&G.map.zoomOut()" title="Zoom out">−</button>
-    <button class="mcb" onclick="G.map&&G.map.flyTo([25,15],3,{duration:1.5})" title="World view">○</button>
-    <button class="mcb" onclick="qf('CONFLICT')" title="Conflicts only">C</button>
-    <button class="mcb" onclick="qf(null)" title="Show all">A</button>
-  </div>
-  <div id="map-zoom-hud" style="display:none">
-    <div class="zoom-hud-label">View</div>
-    <div class="zoom-hud-mode" id="zoom-hud-text">Global</div>
-    <div class="zoom-hud-dots" id="zoom-hud-dots">
-      <div class="zoom-hud-dot"></div><div class="zoom-hud-dot"></div>
-      <div class="zoom-hud-dot"></div><div class="zoom-hud-dot"></div><div class="zoom-hud-dot"></div>
-    </div>
-    <div style="font-size:9px;color:var(--t3)" id="zoom-hud-count">—</div>
-  </div>
-
-  <!-- ── TIMELINE STRIP ── -->
-  <div id="map-timeline">
-    <div id="timeline-label">Event density — last 48h</div>
-    <div id="timeline-track"></div>
-  </div>
-
-  <!-- ── MARKET STRESS METER ── -->
-  <div id="stress-meter">
-    <div class="stress-title">Market Stress</div>
-    <div class="stress-gauge"><div class="stress-fill" id="stress-fill" style="width:0%;background:#10B981"></div></div>
-    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-bottom:4px">
-      <span id="stress-val">—</span><span id="stress-lbl">—</span>
-    </div>
-    <div class="stress-title" style="margin-top:4px">Avg Uncertainty</div>
-    <div class="stress-gauge"><div class="stress-fill" id="unc-fill" style="width:0%;background:#60A5FA"></div></div>
-    <div style="font-size:9px;color:var(--t3)" id="unc-val">—</div>
-  </div>
-
-</div>
-<!-- MARKETS -->
-<!-- ════════════════════════════════════════════════════
-     GRAPH VIEW — Auto News Knowledge Graph
-════════════════════════════════════════════════════ -->
+</div><!-- view-dash -->
 <div class="view" id="view-graph">
   <div class="ng-root">
 
@@ -2766,6 +2390,7 @@
 <script src="/static/js/18_network_hub.js"></script>
 <script src="/static/js/19_continent_streams.js"></script>
 <script src="/static/js/20_nav_ux.js"></script>
+<script src="/static/js/21_agents_dash.js"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
