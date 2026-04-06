@@ -334,6 +334,16 @@ async def migrate_admin_columns():
         );
 
 
+
+        CREATE TABLE IF NOT EXISTS agent_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            bot_id TEXT NOT NULL,
+            config_json TEXT DEFAULT '{}',
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(user_id, bot_id)
+        );
+
         CREATE TABLE IF NOT EXISTS invites (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             code        TEXT UNIQUE NOT NULL,

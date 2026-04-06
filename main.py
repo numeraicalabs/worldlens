@@ -26,6 +26,7 @@ from routers.dependency import router as dependency_router
 from routers.track import router as track_router
 from routers.ml    import router as ml_router
 from routers.globe import router as globe_router
+from routers.agents import router as agents_router
 from datetime import datetime
 from config import settings
 
@@ -169,6 +170,7 @@ app.include_router(dependency_router)
 app.include_router(track_router)
 app.include_router(ml_router)
 app.include_router(globe_router)
+app.include_router(agents_router)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
