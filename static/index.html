@@ -91,62 +91,16 @@
     </div>
   </section>
 
-<!-- ══ GLOBE SECTION ══════════════════════════════════════════════════════ -->
-<section id="globe-section">
-
-  <!-- Loading overlay -->
-  <div id="gw-loading" class="gw-loading">
-    <div class="gw-loader-ring"></div>
-    <div class="gw-loader-text">Initializing global intelligence feed…</div>
-  </div>
-
-  <!-- Header -->
-  <div class="gw-header">
-    <div class="gw-logo">World<span>Lens</span> <span style="font-family:var(--gw-mono);font-size:11px;color:rgba(255,255,255,.35);font-weight:400;letter-spacing:.1em">LIVE INTEL</span></div>
-    <div class="gw-live-badge">
-      <div class="gw-live-dot"></div>
-      Live Global Feed
-    </div>
-  </div>
-
-  <!-- Main grid: Globe + Sidebar -->
-  <div class="gw-body">
-
-    <!-- 3D Globe -->
-    <div class="gw-globe-panel">
-      <canvas id="globe-canvas"></canvas>
-
-      <!-- Floating controls -->
-      <div class="gw-controls">
-        <button class="gw-ctrl-btn" onclick="GlobeWidget.toggleRotation()" title="Pause/Resume rotation">⏸</button>
-      </div>
-
-      <!-- Stats strip -->
-      <div id="globe-stats">
-        <div class="gs-item"><span class="gs-val">—</span><span class="gs-lbl">Events 24h</span></div>
-        <div class="gs-item"><span class="gs-val gs-red">—</span><span class="gs-lbl">Critical</span></div>
-        <div class="gs-item"><span class="gs-val">—</span><span class="gs-lbl">Countries</span></div>
-        <div class="gs-item"><span class="gs-val">—</span><span class="gs-lbl">Avg Severity</span></div>
-      </div>
-    </div>
-
-    <!-- Regional AI Summaries sidebar -->
-    <div class="gw-sidebar">
-      <div class="gw-sidebar-header">
-        <div class="gw-sidebar-title">⬡ AI Regional Briefings</div>
-        <div class="gw-sidebar-sub">Live summaries · updates every 60s</div>
-      </div>
-      <div id="globe-region-cards">
-        <!-- Populated by globe_widget.js -->
-        <div style="padding:24px 0;text-align:center;font-family:var(--gw-mono);font-size:9px;color:rgba(255,143,0,.4);letter-spacing:.15em">LOADING REGIONS…</div>
-      </div>
-      <div class="gw-ticker">
-        <span class="gw-ticker-label">Feed</span>
-        <span class="gw-ticker-text" id="gw-ticker-text">Connecting to live intelligence stream…</span>
-      </div>
-    </div>
-
-  </div>
+<!-- ══ GLOBE SECTION — iframe embed (standalone globe.html) ══════════ -->
+<section id="globe-section" style="background:#03060f;overflow:hidden">
+  <iframe
+    src="/static/globe.html"
+    id="globe-iframe"
+    title="WorldLens Live Global Intelligence"
+    style="display:block;width:100%;height:620px;border:none;background:#03060f"
+    loading="lazy"
+    allow="fullscreen"
+  ></iframe>
 </section>
 <!-- ═════════════════════════════════════════════════════════════════════ -->
 
@@ -3285,21 +3239,5 @@
 </div><!-- #evpanel -->
 
 
-<!-- Three.js + WorldLens Globe Widget -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/js/globe_widget.js"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    if (typeof GlobeWidget !== 'undefined') {
-      GlobeWidget.init('globe-canvas');
-      // Remove loading overlay after 2.5s
-      setTimeout(function() {
-        var ld = document.getElementById('gw-loading');
-        if (ld) ld.classList.add('fade');
-        setTimeout(function() { if (ld && ld.parentNode) ld.parentNode.removeChild(ld); }, 600);
-      }, 2500);
-    }
-  });
-</script>
 </body>
 </html>
