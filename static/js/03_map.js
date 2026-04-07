@@ -554,19 +554,26 @@ function openEP(id) {
     switchEPTab('overview', ov);
   }
 
-  /* Backdrop on mobile */
+  /* Mobile vs desktop behaviour */
   var isMobile = window.innerWidth <= 768;
-  var bd = document.getElementById('evpanel-backdrop');
-  if (bd) bd.classList.toggle('on', isMobile);
 
   /* Show panel — force animation restart */
   panel.classList.remove('on');
   void panel.offsetWidth;
   panel.classList.add('on');
 
-  /* Fly to marker on desktop only */
-  if (!isMobile && G.map && ev.latitude && ev.longitude)
-    G.map.flyTo([ev.latitude, ev.longitude], Math.max(G.map.getZoom(), 5), { duration: 1.1 });
+  if (isMobile) {
+    /* Lock body scroll so only the panel scrolls */
+    document.body.style.overflow = 'hidden';
+    /* Push a history entry so the browser Back button closes the panel */
+    if (window.history && window.history.pushState) {
+      window.history.pushState({ epOpen: true }, '');
+    }
+  } else {
+    /* Desktop: fly to marker */
+    if (G.map && ev.latitude && ev.longitude)
+      G.map.flyTo([ev.latitude, ev.longitude], Math.max(G.map.getZoom(), 5), { duration: 1.1 });
+  }
 
   rq('/api/portfolio/track', { method: 'POST', body: { action: 'map_view' } });
 }
@@ -576,7 +583,17 @@ function closeEP() {
   if (panel) panel.classList.remove('on');
   var bd = document.getElementById('evpanel-backdrop');
   if (bd) bd.classList.remove('on');
+  /* Restore body scroll (locked on mobile open) */
+  document.body.style.overflow = '';
 }
+
+/* Handle browser back button closing the panel on mobile */
+window.addEventListener('popstate', function(e) {
+  var panel = document.getElementById('evpanel');
+  if (panel && panel.classList.contains('on')) {
+    closeEP();
+  }
+});
 
 function qf(cat) {
   document.querySelectorAll('#mcats .cpill').forEach(function(p){
