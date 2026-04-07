@@ -646,10 +646,12 @@ function ngDraw() {
   ctx.translate(NG.tx, NG.ty);
   ctx.scale(NG.scale, NG.scale);
 
-  var showSim  = NG.showSimilarity !== false;
-  var showCooc = NG.showCooc       !== false;
-  var showNews = NG.showNews       !== false;
-  var showEnt  = NG.showEntities   !== false;
+  var showSim      = NG.showSimilarity !== false;
+  var showCooc     = NG.showCooc       !== false;
+  var showNews     = NG.showNews       !== false;
+  var showEnt      = NG.showEntities   !== false;
+  var showCausal   = NG.showCausal     !== false;
+  var showTemporal = NG.showTemporal   !== false;
 
   // ── Edges ──────────────────────────────────────────────
   var showMentions_ = NG.showMentions !== false;
@@ -658,6 +660,8 @@ function ngDraw() {
     if (e.type === 'mentions'     && !showMentions_) return;
     if (e.type === 'similarity'   && !showSim)       return;
     if (e.type === 'co_occurrence'&& !showCooc)      return;
+    if (e.type === 'causal'       && !showCausal)    return;
+    if (e.type === 'temporal'     && !showTemporal)  return;
     var s = NG.nodeMap[e.src], t = NG.nodeMap[e.tgt];
     if (!s||!t) return;
     if (!_nodeVisible(s)||!_nodeVisible(t)) return;
@@ -666,15 +670,34 @@ function ngDraw() {
 
     var col = NG_EDGE_COLORS[e.type] || 'rgba(148,163,184,0.2)';
     ctx.strokeStyle = col;
-    ctx.lineWidth   = e.type==='mentions' ? 0.8 : 1.2;
+    ctx.lineWidth   = e.type==='mentions' ? 0.8 : e.type==='temporal' ? 0.9 : 1.2;
     if (e.type === 'co_occurrence') { ctx.setLineDash([4,3]); }
     else if (e.type === 'similarity') { ctx.setLineDash([2,2]); }
+    else if (e.type === 'temporal')   { ctx.setLineDash([3,4]); }
     else { ctx.setLineDash([]); }
 
     ctx.beginPath();
     ctx.moveTo(s.x, s.y);
-    ctx.lineTo(t.x, t.y);
-    ctx.stroke();
+    // Causal edges get an arrow mid-point indicator
+    if (e.type === 'causal') {
+      ctx.lineTo(t.x, t.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Draw arrowhead at midpoint
+      var mx = (s.x + t.x) / 2, my = (s.y + t.y) / 2;
+      var ang = Math.atan2(t.y - s.y, t.x - s.x);
+      var aLen = 5;
+      ctx.beginPath();
+      ctx.moveTo(mx + Math.cos(ang)*aLen, my + Math.sin(ang)*aLen);
+      ctx.lineTo(mx + Math.cos(ang+2.4)*aLen*0.7, my + Math.sin(ang+2.4)*aLen*0.7);
+      ctx.lineTo(mx + Math.cos(ang-2.4)*aLen*0.7, my + Math.sin(ang-2.4)*aLen*0.7);
+      ctx.closePath();
+      ctx.fillStyle = col;
+      ctx.fill();
+    } else {
+      ctx.lineTo(t.x, t.y);
+      ctx.stroke();
+    }
     ctx.setLineDash([]);
   });
 
@@ -1214,19 +1237,21 @@ function _ngUpdateStats(nodes, edges, nComm) {
   var statsBody = document.getElementById('ng-stats-body');
   var infoBar   = document.getElementById('ng-info-bar');
 
-  var newsCount = nodes.filter(function(n){return n.type==='news';}).length;
-  var entCount  = nodes.length - newsCount;
-  var simEdges  = edges.filter(function(e){return e.type==='similarity';}).length/2 | 0;
+  var newsCount   = nodes.filter(function(n){return n.type==='news';}).length;
+  var entCount    = nodes.length - newsCount;
+  var simEdges    = edges.filter(function(e){return e.type==='similarity';}).length/2 | 0;
+  var causalEdges = edges.filter(function(e){return e.type==='causal';}).length;
+  var tempEdges   = edges.filter(function(e){return e.type==='temporal';}).length;
 
   // Info bar
   var barNodes = document.getElementById('ng-bar-nodes');
   var barEdges = document.getElementById('ng-bar-edges');
   var barComm  = document.getElementById('ng-bar-communities');
   var barTime  = document.getElementById('ng-bar-time');
-  if (barNodes)   barNodes.textContent   = nodes.length + ' nodes';
-  if (barEdges)   barEdges.textContent   = edges.length + ' edges';
-  if (barComm)    barComm.textContent    = nComm + ' communities';
-  if (barTime)    barTime.textContent    = 'sim ×' + simEdges;
+  if (barNodes) barNodes.textContent = nodes.length + ' nodes';
+  if (barEdges) barEdges.textContent = edges.length + ' edges';
+  if (barComm)  barComm.textContent  = nComm + ' communities';
+  if (barTime)  barTime.textContent  = '⚡' + causalEdges + '  ⏱' + tempEdges;
 
   // Sidebar stats
   if (statsDiv) statsDiv.style.display = 'block';
@@ -1239,6 +1264,8 @@ function _ngUpdateStats(nodes, edges, nComm) {
       + '<div class="ng-stat-row"><span>Entity nodes</span><span>' + entCount + '</span></div>'
       + '<div class="ng-stat-row"><span>Mentions edges</span><span>' + edges.filter(function(e){return e.type==='mentions';}).length + '</span></div>'
       + '<div class="ng-stat-row"><span>Similarity edges</span><span>' + simEdges + '</span></div>'
+      + '<div class="ng-stat-row"><span>⚡ Causal edges</span><span>' + causalEdges + '</span></div>'
+      + '<div class="ng-stat-row"><span>⏱ Temporal edges</span><span>' + tempEdges + '</span></div>'
       + '<div class="ng-stat-row"><span>Communities</span><span>' + nComm + '</span></div>'
       + '<div style="font-size:9px;color:var(--t3);margin-top:8px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em">Top by centrality</div>'
       + top5.map(function(n,i) {
