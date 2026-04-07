@@ -2985,38 +2985,50 @@ input[type="checkbox"], input[type="radio"] {
   .cs-grid { grid-template-columns: 1fr; }
 }
 
-/* ── EVPANEL — Mobile bottom sheet (applies on all mobile widths ≤768px) ── */
+/* ── EVPANEL — Mobile full-screen sheet (≤768px) ── */
 @media (max-width: 768px) {
   #evpanel {
-    top: auto !important;
-    bottom: 68px !important;
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    max-height: 72vh !important;
-    border-radius: 20px 20px 0 0 !important;
+    max-height: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
     border: none !important;
-    border-top: 1px solid rgba(255,255,255,.1) !important;
-    box-shadow: 0 -8px 40px rgba(0,0,0,.75) !important;
+    box-shadow: none !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
+    z-index: 2000 !important;
+    padding-top: env(safe-area-inset-top, 0px);
   }
   #evpanel.on {
     display: flex !important;
     flex-direction: column !important;
-    animation: epSlideUp .3s cubic-bezier(0.16,1,0.3,1) both !important;
+    animation: epSlideUp .28s cubic-bezier(0.16,1,0.3,1) both !important;
   }
   @keyframes epSlideUp {
-    from { transform: translateY(100%); opacity: 0; }
-    to   { transform: translateY(0);    opacity: 1; }
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
   }
-  #evpanel-handle { display: block !important; }
+  /* Back button replaces close X — make it prominent */
+  #evpanel-handle { display: none !important; }
   #evpanel .eph {
-    padding-top: 8px !important;
-    background: rgba(6,11,18,.98) !important;
+    padding: 12px 14px 10px !important;
+    padding-top: max(12px, env(safe-area-inset-top, 12px)) !important;
+    background: rgba(6,11,18,.99) !important;
     position: sticky !important;
     top: 0 !important;
     z-index: 2 !important;
+    border-bottom: 1px solid rgba(255,255,255,.08) !important;
+  }
+  /* Make close button bigger and easier to tap */
+  #evpanel .epx {
+    font-size: 24px !important;
+    padding: 4px 8px !important;
+    color: var(--t2) !important;
   }
   .ep-tab {
     padding: 10px 14px !important;
@@ -3031,6 +3043,8 @@ input[type="checkbox"], input[type="radio"] {
     margin-bottom: 6px !important;
   }
   .impact-row { flex-direction: column !important; }
+  /* Hide backdrop — panel itself covers everything */
+  #evpanel-backdrop { display: none !important; }
 }
 
 @media (max-width: 600px) {
@@ -4703,4 +4717,25 @@ p, .evcard, .epbody, .aimsgs, .aib-txt, .evs {
 input, select, textarea {
   font-family: var(--fb);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ── EVPANEL MOBILE BACK BAR ── */
+@media (max-width: 768px) {
+  #ep-mobile-bar {
+    display: flex !important;
+    background: rgba(6,11,18,.99);
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+  /* Hide the desktop × close button on mobile — use back bar instead */
+  #evpanel .eph .epx {
+    display: none !important;
+  }
+  /* Remove sticky from .eph on mobile since mobile-bar is already sticky */
+  #evpanel .eph {
+    position: relative !important;
+    top: auto !important;
+    border-top: none !important;
+  }
 }
