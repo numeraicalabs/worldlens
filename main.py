@@ -27,6 +27,7 @@ from routers.track import router as track_router
 from routers.ml    import router as ml_router
 from routers.globe import router as globe_router
 from routers.agents import router as agents_router
+from routers.tradgentic.router import router as tradgentic_router
 from datetime import datetime
 from config import settings
 
@@ -116,6 +117,13 @@ async def lifespan(app: FastAPI):
     await init_db()
     await _seed_admin()
     await _load_ai_settings()
+    # Init tradgentic tables
+    try:
+        from routers.tradgentic.portfolio import ensure_tables as tg_init
+        await tg_init()
+        logger.info("Tradgentic tables ready")
+    except Exception as e:
+        logger.warning("Tradgentic init skipped: %s", e)
     # ── Start ML model pre-loading in background threads ──────────────
     # Models are optional — app starts instantly even if ML unavailable.
     if settings.enable_finbert:
@@ -171,6 +179,7 @@ app.include_router(track_router)
 app.include_router(ml_router)
 app.include_router(globe_router)
 app.include_router(agents_router)
+app.include_router(tradgentic_router)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
