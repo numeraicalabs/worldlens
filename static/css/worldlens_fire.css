@@ -522,7 +522,9 @@
 /* ── Canvas wrap ── */
 .db-globe-canvas-wrap {
   position: relative;
-  flex: 0 0 150px;
+  flex: 1 1 0;
+  min-height: 130px;
+  max-height: 180px;
   background: radial-gradient(ellipse at 50% 50%, #040e24 0%, #020510 100%);
   overflow: hidden;
 }
@@ -530,6 +532,7 @@
   width: 100% !important;
   height: 100% !important;
   display: block;
+  touch-action: none;
 }
 
 /* ── Summary area ── */
@@ -628,4 +631,66 @@
   #view-dash .db-header-row {
     grid-template-columns: 1fr !important;
   }
+}
+
+/* ── Globe card additions ── */
+.db-globe-skeleton {
+  padding: 10px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.db-globe-skel-line {
+  height: 10px;
+  background: rgba(255,143,0,.06);
+  border-radius: 4px;
+  animation: skelPulse 1.6s ease-in-out infinite;
+}
+@keyframes skelPulse { 0%,100%{opacity:.4} 50%{opacity:.8} }
+
+.db-globe-top-event {
+  font-size: 9px !important;
+  font-family: var(--fire-mono) !important;
+  color: rgba(239,68,68,.8) !important;
+  background: rgba(239,68,68,.06);
+  border: 1px solid rgba(239,68,68,.15);
+  border-radius: 6px;
+  padding: 4px 8px;
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+
+.db-globe-summary {
+  animation: globeSummaryIn .25s ease-out both;
+}
+@keyframes globeSummaryIn {
+  from { opacity:0; transform:translateY(4px); }
+  to   { opacity:1; transform:none; }
+}
+
+.db-globe-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 13px 8px;
+  flex-shrink: 0;
+}
+#db-globe-footer-label {
+  font-family: var(--fire-mono) !important;
+  font-size: 8px !important;
+  color: rgba(255,143,0,.35) !important;
+  letter-spacing: .06em;
+}
+.db-globe-fullscreen-link {
+  font-family: var(--fire-mono) !important;
+  font-size: 8px !important;
+  color: rgba(255,143,0,.5) !important;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color .15s;
+  letter-spacing: .06em;
+}
+.db-globe-fullscreen-link:hover {
+  color: var(--fire-corona) !important;
 }
