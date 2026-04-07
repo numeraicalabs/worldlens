@@ -233,7 +233,8 @@ function enterApp() {
     connectWS();
     renderDash();
     renderFeed();
-    if (typeof initAgentDash === 'function') initAgentDash();
+    if (typeof initAgentDash  === 'function') initAgentDash();
+    if (typeof initDashGlobe  === 'function') setTimeout(initDashGlobe, 400);
     if (typeof loadSavedIds    === 'function') loadSavedIds();
     if (typeof refreshAffinity === 'function') refreshAffinity();
     renderMkts();
