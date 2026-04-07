@@ -515,497 +515,436 @@
 <div class="view" id="view-graph">
   <div class="ng-root">
 
-    <!-- ── Left controls panel ── -->
-    <div class="ng-sidebar">
-      <!-- ── Mode tab switcher ── -->
-      <div class="ng-tab-bar">
-        <button class="ng-tab on" id="ng-tab-graph" onclick="ngSwitchMode('graph',this)">
-          <span>🕸</span> News Graph
-        </button>
-        <button class="ng-tab" id="ng-tab-explorer" onclick="ngSwitchMode('explorer',this)">
-          <span>🔍</span> Explorer
-        </button>
-        <button class="ng-tab" id="ng-tab-timeline" onclick="ngSwitchMode('timeline',this)">
-          <span>📅</span> Timeline
-        </button>
-        <button class="ng-tab" id="ng-tab-cascade" onclick="ngSwitchMode('cascade',this)">
-          <span>🔗</span> Cascade
-        </button>
-      </div>
+    <!-- ════════════════════════════════════════════════════
+         UNIFIED SIDEBAR
+         ════════════════════════════════════════════════════ -->
+    <div class="ng-sidebar" id="ng-sidebar">
 
-      <div id="ng-mode-graph" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding-bottom:16px">
-      <!-- Build controls -->
-      <div class="ng-section">
-        <div class="ng-sec-title">Build Settings</div>
-        <div class="ng-ctrl-row">
-          <label class="ng-label">Time window</label>
-          <select class="fi ng-select" id="ng-hours">
-            <option value="6">Last 6h</option>
-            <option value="24" selected>Last 24h</option>
-            <option value="48">Last 48h</option>
-            <option value="120">Last 5 days</option>
-          </select>
-        </div>
-        <div class="ng-ctrl-row">
-          <label class="ng-label">Min severity</label>
-          <select class="fi ng-select" id="ng-severity">
-            <option value="3">3.0 — All</option>
-            <option value="4.5" selected>4.5 — Medium+</option>
-            <option value="6">6.0 — High only</option>
-            <option value="7.5">7.5 — Critical</option>
-          </select>
-        </div>
-        <div class="ng-ctrl-row">
-          <label class="ng-label">Max nodes</label>
-          <select class="fi ng-select" id="ng-maxnodes">
-            <option value="40">40 — Fast</option>
-            <option value="80" selected>80 — Balanced</option>
-            <option value="150">150 — Dense</option>
-          </select>
-        </div>
-        <div class="ng-ctrl-row">
-          <label class="ng-label">Similarity edges</label>
-          <input type="range" id="ng-sim-thresh" min="0.1" max="0.8" step="0.05" value="0.25"
-                 oninput="document.getElementById('ng-sim-val').textContent=this.value"
-                 style="flex:1;accent-color:var(--b5)"/>
-          <span id="ng-sim-val" style="font-size:10px;color:var(--b4);min-width:30px;text-align:right">0.25</span>
-        </div>
-        <button class="ng-build-btn" id="ng-build-btn" onclick="ngBuild()">
-          <span id="ng-build-icon">⚡</span> Build Graph
-        </button>
-      </div>
-
-      <!-- Node search -->
-      <div class="ng-section">
-        <div class="ng-sec-title">Search Nodes</div>
-        <div style="position:relative">
-          <input type="text" id="ng-search-inp" class="fi"
-                 placeholder="Entity, person, ticker…"
-                 oninput="ngSearchNodes(this.value)"
-                 style="width:100%;font-size:10px;padding:5px 26px 5px 8px;box-sizing:border-box"/>
-          <span style="position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--t3);pointer-events:none">🔍</span>
-        </div>
-        <div id="ng-search-results" style="display:none;max-height:130px;overflow-y:auto;margin-top:4px;border:1px solid var(--bd);border-radius:var(--r4);background:var(--bg2)"></div>
-      </div>
-
-      <!-- View filters -->
-      <div class="ng-section">
-        <div class="ng-sec-title">Show / Hide</div>
-        <div class="ng-toggle-row">
-          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-news" checked onchange="ngRedraw()"> News</label>
-        </div>
-        <div class="ng-toggle-row">
-          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-entities" checked onchange="ngRedraw()"> Entities</label>
-        </div>
-        <div class="ng-toggle-row">
-          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-similarity" checked onchange="ngRedraw()"> Similarity edges</label>
-        </div>
-        <div class="ng-toggle-row">
-          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-cooc" checked onchange="ngRedraw()"> Co-occurrence edges</label>
-        </div>
-        <div class="ng-toggle-row">
-          <label class="ng-toggle-label"><input type="checkbox" id="ng-show-mentions" checked onchange="ngRedraw()"> Mention edges</label>
-        </div>
-        <div class="ng-ctrl-row" style="margin-top:8px">
-          <label class="ng-label">Category</label>
-          <select class="fi ng-select" id="ng-cat-filter" onchange="ngRedraw()">
-            <option value="ALL">All</option>
-            <option value="ECONOMICS">Economics</option>
-            <option value="FINANCE">Finance</option>
-            <option value="CONFLICT">Conflict</option>
-            <option value="GEOPOLITICS">Geopolitics</option>
-            <option value="POLITICS">Politics</option>
-            <option value="ENERGY">Energy</option>
-            <option value="TECHNOLOGY">Technology</option>
-            <option value="DISASTER">Disaster</option>
-          </select>
-        </div>
-        <div class="ng-ctrl-row">
-          <label class="ng-label">Entity type</label>
-          <select class="fi ng-select" id="ng-entity-filter" onchange="ngRedraw()">
-            <option value="ALL">All entities</option>
-            <option value="company">Organizations</option>
-            <option value="person">Persons</option>
-            <option value="location">Locations</option>
-            <option value="ticker">Tickers</option>
-            <option value="commodity">Commodities</option>
-          </select>
-        </div>
-        <div class="ng-ctrl-row">
-          <label class="ng-label">Min degree</label>
-          <input type="range" id="ng-min-degree" min="0" max="10" step="1" value="0"
-                 oninput="ngSetMinDegree(this.value)" style="flex:1;accent-color:var(--b5)"/>
-          <span id="ng-min-degree-val" style="font-size:10px;color:var(--b4);min-width:18px;text-align:right">0</span>
+      <!-- Engine selector -->
+      <div class="ng-engine-header">
+        <div class="ng-engine-title">⬡ Graph Engine</div>
+        <div class="ng-engine-tabs">
+          <button class="ng-etab on" id="ng-etab-network" onclick="ngSwitchEngine('network',this)">
+            <span>🕸</span><span>News Network</span>
+          </button>
+          <button class="ng-etab" id="ng-etab-knowledge" onclick="ngSwitchEngine('knowledge',this)">
+            <span>💡</span><span>Knowledge Map</span>
+          </button>
         </div>
       </div>
 
-      <!-- Community legend -->
-      <div class="ng-section" id="ng-comm-legend" style="display:none">
-        <div class="ng-sec-title">Communities</div>
-        <div id="ng-comm-legend-body"></div>
-      </div>
+      <!-- ── NEWS NETWORK sidebar ── -->
+      <div id="ng-panel-network" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding-bottom:16px">
 
-      <!-- Layout controls -->
-      <div class="ng-section">
-        <div class="ng-sec-title">Layout</div>
-        <div class="ng-ctrl-row">
-          <label class="ng-label">Force strength</label>
-          <input type="range" id="ng-force" min="0.2" max="2" step="0.1" value="1"
-                 oninput="ngSetForce(this.value)"
-                 style="flex:1;accent-color:var(--b5)"/>
-        </div>
-        <div style="display:flex;gap:5px;margin-top:6px">
-          <button class="btn btn-g btn-xs" style="flex:1" onclick="ngResetLayout()">↺ Reset</button>
-          <button class="btn btn-g btn-xs" style="flex:1" onclick="ngFitToView()">⊞ Fit</button>
-          <button class="btn btn-g btn-xs" style="flex:1" onclick="ngExportJSON()">↓ JSON</button>
-        </div>
-      </div>
-
-      <!-- Stats -->
-      <div class="ng-section" id="ng-stats" style="display:none">
-        <div class="ng-sec-title">Graph Stats</div>
-        <div id="ng-stats-body"></div>
-      </div>
-
-      <!-- Legend -->
-      <div class="ng-section">
-        <div class="ng-sec-title">Legend</div>
-        <div class="ng-legend-items">
-          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#3B82F6"></div><span>News</span></div>
-          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#10B981"></div><span>Organization</span></div>
-          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#F59E0B"></div><span>Person</span></div>
-          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#8B5CF6"></div><span>Location</span></div>
-          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#F97316"></div><span>Ticker</span></div>
-          <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#EC4899"></div><span>Commodity</span></div>
-        </div>
-        <div style="margin-top:8px">
-          <div class="ng-leg-edge" style="border-color:rgba(148,163,184,.5)">── mentions</div>
-          <div class="ng-leg-edge" style="border-color:#60A5FA;border-style:dashed">- - co-occur</div>
-          <div class="ng-leg-edge" style="border-color:#F59E0B;border-style:dotted">··· similar</div>
-        </div>
-        <div style="margin-top:8px;font-size:9px;color:var(--t3);line-height:1.6">
-          Node size = degree centrality<br>
-          Ring color = community ID<br>
-          Drag to reposition nodes<br>
-          Scroll to zoom · Click to inspect
-        </div>
-      </div>
-      </div><!-- ng-mode-graph -->
-
-      <!-- ── Explorer mode sidebar ── -->
-      <div id="ng-mode-explorer" style="display:none;flex-direction:column;gap:0;height:100%;overflow:hidden">
-
-        <!-- Search bar -->
-        <div style="padding:12px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
-          <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--t1);margin-bottom:8px">
-            Knowledge Explorer
+        <div class="ng-section">
+          <div class="ng-sec-title">Build Settings</div>
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Time window</label>
+            <select class="fi ng-select" id="ng-hours">
+              <option value="6">Last 6h</option>
+              <option value="24" selected>Last 24h</option>
+              <option value="48">Last 48h</option>
+              <option value="120">Last 5 days</option>
+            </select>
           </div>
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Min severity</label>
+            <select class="fi ng-select" id="ng-severity">
+              <option value="3">3.0 — All</option>
+              <option value="4">4.0+</option>
+              <option value="5" selected>5.0+</option>
+              <option value="7">7.0 — High</option>
+            </select>
+          </div>
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Max nodes</label>
+            <select class="fi ng-select" id="ng-maxnodes">
+              <option value="40">40</option>
+              <option value="60" selected>60</option>
+              <option value="100">100</option>
+              <option value="150">150</option>
+            </select>
+          </div>
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Sim threshold</label>
+            <input type="range" id="ng-sim-thresh" min="0.1" max="0.9" step="0.05" value="0.25"
+              oninput="document.getElementById('ng-sim-val').textContent=parseFloat(this.value).toFixed(2)"
+              style="flex:1;accent-color:var(--b5)">
+            <span id="ng-sim-val" style="font-size:9px;color:var(--t3);min-width:28px">0.25</span>
+          </div>
+          <button class="ng-build-btn" id="ng-build-btn" onclick="ngBuild()">
+            <span id="ng-build-icon">⚡</span> Build Graph
+          </button>
+        </div>
+
+        <!-- Search nodes -->
+        <div class="ng-section">
+          <div class="ng-sec-title">Search Nodes</div>
+          <input type="text" id="ng-search-inp" class="fi"
+            placeholder="Search entities, topics…"
+            style="width:100%;font-size:10px;padding:5px 8px;box-sizing:border-box;border-radius:var(--r6)"
+            oninput="ngSearchNodes(this.value)">
+          <div id="ng-search-results" style="margin-top:6px;font-size:10px;color:var(--t3)"></div>
+        </div>
+
+        <!-- Edge type controls -->
+        <div class="ng-section">
+          <div class="ng-sec-title">Edge Types</div>
+          <div class="ng-edge-legend">
+            <label class="ng-edge-toggle">
+              <input type="checkbox" id="ng-show-mentions" checked onchange="ngRedraw()">
+              <span class="ng-edge-line" style="background:rgba(148,163,184,0.6)"></span>
+              <span>Mentions</span>
+            </label>
+            <label class="ng-edge-toggle">
+              <input type="checkbox" id="ng-show-cooc" checked onchange="ngRedraw()">
+              <span class="ng-edge-line" style="background:rgba(96,165,250,0.7)"></span>
+              <span>Co-occurrence</span>
+            </label>
+            <label class="ng-edge-toggle">
+              <input type="checkbox" id="ng-show-similarity" checked onchange="ngRedraw()">
+              <span class="ng-edge-line" style="background:rgba(245,158,11,0.7);border-top:2px dashed rgba(245,158,11,0.7);height:0"></span>
+              <span>Similarity</span>
+            </label>
+            <label class="ng-edge-toggle">
+              <input type="checkbox" id="ng-show-causal" checked onchange="ngRedraw()">
+              <span class="ng-edge-line" style="background:rgba(239,68,68,0.6)"></span>
+              <span>Causal</span>
+            </label>
+            <label class="ng-edge-toggle">
+              <input type="checkbox" id="ng-show-temporal" checked onchange="ngRedraw()">
+              <span class="ng-edge-line" style="background:rgba(139,92,246,0.6)"></span>
+              <span>Temporal</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Node type visibility -->
+        <div class="ng-section">
+          <div class="ng-sec-title">Node Types</div>
+          <div class="ng-toggle-row"><label class="ng-toggle-label"><input type="checkbox" id="ng-show-news" checked onchange="ngRedraw()"> <span class="ng-leg-dot" style="background:#60A5FA"></span> News Events</label></div>
+          <div class="ng-toggle-row"><label class="ng-toggle-label"><input type="checkbox" id="ng-show-entities" checked onchange="ngRedraw()"> <span class="ng-leg-dot" style="background:#F59E0B"></span> Entities</label></div>
+          <div class="ng-ctrl-row" style="margin-top:8px">
+            <label class="ng-label">Entity type</label>
+            <select class="fi ng-select" id="ng-entity-filter" onchange="ngRedraw()">
+              <option value="ALL">All</option>
+              <option value="country">Countries</option>
+              <option value="org">Orgs</option>
+              <option value="ticker">Tickers</option>
+              <option value="person">People</option>
+            </select>
+          </div>
+          <div class="ng-ctrl-row">
+            <label class="ng-label">Min degree</label>
+            <input type="range" id="ng-min-degree" min="0" max="10" step="1" value="0"
+              oninput="ngSetMinDegree(this.value)" style="flex:1;accent-color:var(--b5)">
+            <span id="ng-min-degree-val" style="font-size:9px;color:var(--t3);min-width:16px">0</span>
+          </div>
+        </div>
+
+        <!-- View mode -->
+        <div class="ng-section">
+          <div class="ng-sec-title">View</div>
+          <div id="ng-mode-toggle" style="display:flex;gap:5px">
+            <button id="ng-btn-2d" class="ng-view-btn on" onclick="ngSetMode('2d',this)">2D</button>
+            <button id="ng-btn-3d" class="ng-view-btn" onclick="ngSetMode('3d',this)">3D</button>
+          </div>
+          <div class="ng-ctrl-row" style="margin-top:8px">
+            <label class="ng-label">Force</label>
+            <input type="range" id="ng-force" min="0.01" max="0.5" step="0.01" value="0.12"
+              oninput="ngSetForce(parseFloat(this.value))" style="flex:1;accent-color:var(--b5)">
+          </div>
+          <div style="display:flex;gap:5px;margin-top:8px">
+            <button class="ng-ctrl-btn" onclick="ngResetLayout()">↺ Reset</button>
+            <button class="ng-ctrl-btn" onclick="ngFitToView()">⊞ Fit</button>
+            <button class="ng-ctrl-btn" onclick="ngExportJSON()">↓ JSON</button>
+          </div>
+        </div>
+
+        <!-- Communities -->
+        <div class="ng-section">
+          <div class="ng-sec-title">Communities</div>
+          <div id="ng-comm-legend">
+            <div style="font-size:10px;color:var(--t3)">Build graph to detect communities</div>
+          </div>
+          <div id="ng-comm-legend-body"></div>
+        </div>
+
+        <!-- Stats -->
+        <div class="ng-section" id="ng-stats" style="display:none">
+          <div class="ng-sec-title">Graph Stats</div>
+          <div id="ng-stats-body"></div>
+        </div>
+
+        <!-- Explore bridge -->
+        <div class="ng-section" id="ng-bridge-section" style="display:none">
+          <div class="ng-sec-title">🔗 Cross-Engine</div>
+          <div style="font-size:10px;color:var(--t3);margin-bottom:8px;line-height:1.5">
+            Click a node then explore it in Knowledge Map
+          </div>
+          <button class="ng-build-btn" id="ng-bridge-btn" onclick="ngBridgeToKex()" disabled
+            style="opacity:.5;background:linear-gradient(135deg,#8B5CF6,#3B82F6)">
+            💡 Explore Selected Node
+          </button>
+        </div>
+
+      </div><!-- /ng-panel-network -->
+
+      <!-- ── KNOWLEDGE MAP sidebar ── -->
+      <div id="ng-panel-knowledge" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+
+        <div style="padding:12px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
           <div style="font-size:9px;color:var(--t3);margin-bottom:10px;line-height:1.5">
-            Search any topic to build an interactive knowledge map with sources
+            Search any topic to build a semantic knowledge map
           </div>
           <div style="position:relative">
             <input type="text" id="kex-search-inp" class="fi"
-                   placeholder="e.g. semiconductors, trade war, Fed policy…"
-                   style="width:100%;font-size:11px;padding:8px 32px 8px 10px;box-sizing:border-box;border-radius:var(--r8)"
-                   onkeydown="if(event.key==='Enter')kexSearch()"
-            />
+              placeholder="semiconductors, Fed policy, Iran sanctions…"
+              style="width:100%;font-size:11px;padding:8px 32px 8px 10px;box-sizing:border-box;border-radius:var(--r8)"
+              onkeydown="if(event.key==='Enter')kexSearch()">
             <button onclick="kexSearch()" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--b6);border:none;border-radius:5px;padding:3px 8px;font-size:10px;color:#fff;cursor:pointer;font-weight:700">Go</button>
           </div>
-          <!-- Quick topics -->
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px" id="kex-quick-topics">
-            <span class="kex-chip" onclick="kexSearchTerm('semiconductors')">Semiconductors</span>
-            <span class="kex-chip" onclick="kexSearchTerm('US-China trade')">US-China</span>
-            <span class="kex-chip" onclick="kexSearchTerm('Federal Reserve')">Fed Policy</span>
-            <span class="kex-chip" onclick="kexSearchTerm('energy crisis')">Energy</span>
-            <span class="kex-chip" onclick="kexSearchTerm('AI regulation')">AI Policy</span>
-            <span class="kex-chip" onclick="kexSearchTerm('Ukraine conflict')">Ukraine</span>
+        </div>
+
+        <!-- Quick topics -->
+        <div style="padding:8px 12px;border-bottom:1px solid var(--bd);flex-shrink:0">
+          <div class="ng-sec-title">Quick Topics</div>
+          <div id="kex-quick-topics" style="display:flex;flex-wrap:wrap;gap:5px">
+            <button class="ng-chip" onclick="kexSearchTerm('Federal Reserve')">Federal Reserve</button>
+            <button class="ng-chip" onclick="kexSearchTerm('China economy')">China</button>
+            <button class="ng-chip" onclick="kexSearchTerm('oil price')">Oil</button>
+            <button class="ng-chip" onclick="kexSearchTerm('AI regulation')">AI</button>
+            <button class="ng-chip" onclick="kexSearchTerm('Ukraine war')">Ukraine</button>
+            <button class="ng-chip" onclick="kexSearchTerm('inflation')">Inflation</button>
           </div>
         </div>
 
-        <!-- Results / node list -->
-        <div style="flex:1;overflow-y:auto;padding:8px">
-          <div id="kex-sidebar-content">
-            <div style="text-align:center;padding:32px 12px;color:var(--t3)">
-              <div style="font-size:32px;margin-bottom:8px">🔍</div>
-              <div style="font-size:11px;line-height:1.6">Search a topic to build<br>your knowledge map</div>
-            </div>
+        <!-- Breadcrumb history -->
+        <div style="padding:8px 12px;border-bottom:1px solid var(--bd);flex-shrink:0">
+          <div class="ng-sec-title">History</div>
+          <div id="kex-breadcrumb" style="font-size:10px;color:var(--t3);line-height:1.7;min-height:16px"></div>
+        </div>
+
+        <!-- Edge type legend -->
+        <div style="padding:10px 12px;border-bottom:1px solid var(--bd);flex-shrink:0">
+          <div class="ng-sec-title">Connection Types</div>
+          <div class="ng-legend-items">
+            <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#3B82F6"></div>Live Event</div>
+            <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#10B981"></div>Concept</div>
+            <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#F59E0B"></div>Entity</div>
+            <div class="ng-leg-item"><div class="ng-leg-dot" style="background:#8B5CF6"></div>Source</div>
           </div>
         </div>
 
-        <!-- Active node detail -->
-        <div id="kex-node-detail" style="display:none;border-top:1px solid var(--bd);flex-shrink:0;max-height:50%;overflow-y:auto;padding:10px 12px">
+        <!-- Layout controls -->
+        <div style="padding:10px 12px;flex-shrink:0">
+          <div class="ng-sec-title">Layout</div>
+          <div style="display:flex;gap:5px;margin-bottom:8px">
+            <button onclick="kexLayout('radial')" id="kex-btn-radial" class="ng-view-btn on">⊙ Radial</button>
+            <button onclick="kexLayout('force')"  id="kex-btn-force"  class="ng-view-btn">⛶ Force</button>
+          </div>
+          <div style="display:flex;gap:5px">
+            <button class="ng-ctrl-btn" onclick="kexReset()">↺ Reset</button>
+            <button class="ng-ctrl-btn" onclick="kexFitView()">⊞ Fit</button>
+          </div>
         </div>
 
-      </div><!-- ng-mode-explorer -->
-      <!-- ── Timeline mode sidebar ── -->
-      <div id="ng-mode-timeline" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+        <!-- Bridge to network -->
+        <div style="padding:10px 12px;border-top:1px solid var(--bd);margin-top:auto;flex-shrink:0">
+          <div class="ng-sec-title">🔗 Cross-Engine</div>
+          <button class="ng-build-btn" onclick="kexBridgeToNetwork()"
+            style="background:linear-gradient(135deg,#3B82F6,#10B981)">
+            🕸 Build Network from Topic
+          </button>
+        </div>
 
-        <div style="padding:10px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
-          <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--t1);margin-bottom:6px">Event Timeline</div>
-          <div style="font-size:9px;color:var(--t3);line-height:1.5;margin-bottom:8px">Events plotted on a temporal axis — severity drives vertical position</div>
+      </div><!-- /ng-panel-knowledge -->
 
-          <!-- Time range -->
-          <div class="ng-ctrl-row">
-            <label class="ng-label">Window</label>
+
+      <!-- ── TIMELINE sidebar (shown when timeline tab is active) ── -->
+      <div id="ng-panel-timeline" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+        <div class="ng-engine-header">
+          <div class="ng-engine-title" style="font-size:11px">⏱ Event Timeline</div>
+          <div style="font-size:9px;color:var(--t3);line-height:1.5;padding-bottom:10px">Events plotted on a temporal axis — severity drives vertical position</div>
+        </div>
+        <div style="padding:10px 12px;flex:1;overflow-y:auto">
+          <div class="ng-ctrl-row"><label class="ng-label">Window</label>
             <select class="fi ng-select" id="tl-hours" onchange="tlBuild()">
-              <option value="12">12 hours</option>
-              <option value="24" selected>24 hours</option>
-              <option value="48">48 hours</option>
-              <option value="120">5 days</option>
-              <option value="240">10 days</option>
-            </select>
-          </div>
-          <!-- Band filter -->
-          <div class="ng-ctrl-row">
-            <label class="ng-label">Band</label>
+              <option value="12">12 hours</option><option value="24" selected>24 hours</option>
+              <option value="48">48 hours</option><option value="120">5 days</option><option value="240">10 days</option>
+            </select></div>
+          <div class="ng-ctrl-row"><label class="ng-label">Band</label>
             <select class="fi ng-select" id="tl-band" onchange="tlBuild()">
-              <option value="all">All bands</option>
-              <option value="conflict">⚔ Conflict</option>
-              <option value="geopolitical">🌐 Geopolitical</option>
-              <option value="macro">🏦 Macro</option>
-              <option value="markets">📈 Markets</option>
-              <option value="energy">⚡ Energy</option>
-              <option value="disaster">🌪 Disaster</option>
-              <option value="tech">💻 Tech</option>
+              <option value="all">All bands</option><option value="conflict">⚔ Conflict</option>
+              <option value="geopolitical">🌐 Geopolitical</option><option value="macro">🏦 Macro</option>
+              <option value="markets">📈 Markets</option><option value="energy">⚡ Energy</option>
+              <option value="disaster">🌪 Disaster</option><option value="tech">💻 Tech</option>
               <option value="humanitarian">🤝 Humanitarian</option>
-            </select>
-          </div>
-          <!-- Min severity -->
-          <div class="ng-ctrl-row">
-            <label class="ng-label">Min sev.</label>
+            </select></div>
+          <div class="ng-ctrl-row"><label class="ng-label">Min sev.</label>
             <input type="range" id="tl-minsev" min="1" max="9" step="0.5" value="3"
-                   oninput="document.getElementById('tl-minsev-val').textContent=this.value;tlBuild()"
-                   style="flex:1;accent-color:var(--b5)"/>
-            <span id="tl-minsev-val" style="font-size:10px;color:var(--b4);min-width:22px;text-align:right">3</span>
-          </div>
-          <!-- Group toggle -->
-          <div class="ng-toggle-row" style="margin-top:4px">
-            <label class="ng-toggle-label">
-              <input type="checkbox" id="tl-group" checked onchange="tlBuild()">
-              Group narratives
-            </label>
-          </div>
-          <button class="ng-build-btn" onclick="tlBuild()" style="margin-top:8px;width:100%;font-size:11px;padding:7px">
-            ⚡ Refresh Timeline
-          </button>
-        </div>
-
-        <!-- Event list below chart -->
-        <div style="flex:1;overflow-y:auto;padding:8px">
-          <div id="tl-event-list">
-            <div style="text-align:center;padding:28px 12px;color:var(--t3);font-size:11px">
-              Click a node on the timeline to see event details
-            </div>
+              oninput="document.getElementById('tl-minsev-val').textContent=this.value;tlBuild()"
+              style="flex:1;accent-color:var(--b5)">
+            <span id="tl-minsev-val" style="font-size:10px;color:var(--b4);min-width:22px;text-align:right">3</span></div>
+          <div class="ng-toggle-row" style="margin:6px 0">
+            <label class="ng-toggle-label"><input type="checkbox" id="tl-group" checked onchange="tlBuild()"> Group narratives</label></div>
+          <button class="ng-build-btn" onclick="tlBuild()" style="margin-top:4px;font-size:11px;padding:7px">⚡ Refresh Timeline</button>
+          <div style="margin-top:12px;border-top:1px solid var(--bd);padding-top:10px">
+            <div class="ng-sec-title">Selected Event</div>
+            <div id="tl-event-list" style="font-size:10px;color:var(--t3)">Click a node on the timeline</div>
           </div>
         </div>
+      </div><!-- /ng-panel-timeline -->
 
-      </div><!-- ng-mode-timeline -->
-      <!-- ── Dependency Cascade sidebar ── -->
-      <div id="ng-mode-cascade" style="display:none;flex-direction:column;height:100%;overflow:hidden">
-
-        <div style="padding:10px 12px 8px;border-bottom:1px solid var(--bd);flex-shrink:0">
-          <div style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--t1);margin-bottom:4px">Risk Cascade Simulator</div>
-          <div style="font-size:9px;color:var(--t3);line-height:1.5;margin-bottom:10px">Simulate how a shock propagates through the global dependency network</div>
-
-          <!-- Source node -->
-          <div class="ng-ctrl-row" style="margin-bottom:6px">
-            <label class="ng-label">Shock source</label>
-            <input type="text" id="cas-source" class="fi" value="US"
-                   placeholder="US, CN, NVDA, Energy…"
-                   style="flex:1;font-size:10px;padding:5px 8px"/>
-          </div>
-          <!-- Shock magnitude -->
-          <div class="ng-ctrl-row" style="margin-bottom:6px">
-            <label class="ng-label">Magnitude</label>
+      <!-- ── CASCADE sidebar (shown when cascade tab is active) ── -->
+      <div id="ng-panel-cascade" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+        <div class="ng-engine-header">
+          <div class="ng-engine-title" style="font-size:11px">🌊 Risk Cascade</div>
+          <div style="font-size:9px;color:var(--t3);line-height:1.5;padding-bottom:10px">Simulate shock propagation through the global dependency network</div>
+        </div>
+        <div style="padding:10px 12px;flex:1;overflow-y:auto">
+          <div class="ng-ctrl-row"><label class="ng-label">Shock source</label>
+            <input type="text" id="cas-source" class="fi" value="US" placeholder="US, CN, NVDA, Energy…" style="flex:1;font-size:10px;padding:5px 8px"></div>
+          <div class="ng-ctrl-row"><label class="ng-label">Magnitude</label>
             <input type="range" id="cas-shock" min="1" max="10" step="0.5" value="8"
-                   oninput="document.getElementById('cas-shock-val').textContent=this.value"
-                   style="flex:1;accent-color:var(--re)"/>
-            <span id="cas-shock-val" style="font-size:10px;color:var(--re);min-width:22px;text-align:right">8</span>
-          </div>
-          <!-- Max hops -->
-          <div class="ng-ctrl-row" style="margin-bottom:6px">
-            <label class="ng-label">Max hops</label>
+              oninput="document.getElementById('cas-shock-val').textContent=this.value" style="flex:1;accent-color:var(--re)">
+            <span id="cas-shock-val" style="font-size:10px;color:var(--re);min-width:22px;text-align:right">8</span></div>
+          <div class="ng-ctrl-row"><label class="ng-label">Max hops</label>
             <select class="fi ng-select" id="cas-hops">
-              <option value="2">2 hops</option>
-              <option value="3" selected>3 hops</option>
-              <option value="4">4 hops</option>
-              <option value="5">5 hops</option>
-            </select>
-          </div>
-          <!-- Damping -->
-          <div class="ng-ctrl-row" style="margin-bottom:8px">
-            <label class="ng-label">Damping</label>
+              <option value="2">2 hops</option><option value="3" selected>3 hops</option>
+              <option value="4">4 hops</option><option value="5">5 hops</option>
+            </select></div>
+          <div class="ng-ctrl-row"><label class="ng-label">Damping</label>
             <input type="range" id="cas-damp" min="0.3" max="0.9" step="0.05" value="0.65"
-                   oninput="document.getElementById('cas-damp-val').textContent=this.value"
-                   style="flex:1;accent-color:var(--b5)"/>
-            <span id="cas-damp-val" style="font-size:10px;color:var(--b4);min-width:28px;text-align:right">0.65</span>
-          </div>
-
-          <button class="ng-build-btn" onclick="casRun()" style="width:100%;font-size:11px;padding:7px;background:var(--re)">
-            ⚡ Run Cascade
-          </button>
-
-          <!-- Path finder -->
+              oninput="document.getElementById('cas-damp-val').textContent=this.value" style="flex:1;accent-color:var(--b5)">
+            <span id="cas-damp-val" style="font-size:10px;color:var(--b4);min-width:28px;text-align:right">0.65</span></div>
+          <button class="ng-build-btn" onclick="casRun()" style="font-size:11px;padding:7px;background:linear-gradient(135deg,var(--re),#c2410c)">⚡ Run Cascade</button>
           <div style="border-top:1px solid var(--bd);margin-top:12px;padding-top:10px">
-            <div style="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:6px">Dependency Path Finder</div>
+            <div class="ng-sec-title">Dependency Path Finder</div>
             <div style="display:flex;gap:5px;margin-bottom:5px">
-              <input type="text" id="cas-path-src" class="fi" placeholder="From…" style="flex:1;font-size:10px;padding:5px 8px"/>
-              <input type="text" id="cas-path-tgt" class="fi" placeholder="To…"   style="flex:1;font-size:10px;padding:5px 8px"/>
+              <input type="text" id="cas-path-src" class="fi" placeholder="From…" style="flex:1;font-size:10px;padding:5px 8px">
+              <input type="text" id="cas-path-tgt" class="fi" placeholder="To…"   style="flex:1;font-size:10px;padding:5px 8px">
             </div>
             <button class="btn btn-p btn-xs" onclick="casPath()" style="width:100%;font-size:10px;padding:5px">🔍 Find Path</button>
           </div>
-
-          <!-- Critical nodes button -->
           <div style="border-top:1px solid var(--bd);margin-top:10px;padding-top:8px">
             <button class="btn btn-g btn-xs" onclick="casCritical()" style="width:100%;font-size:10px;padding:5px">🎯 Most Critical Nodes</button>
           </div>
+          <div style="margin-top:12px;border-top:1px solid var(--bd);padding-top:10px">
+            <div class="ng-sec-title">Results</div>
+            <div id="cas-results" style="font-size:10px;color:var(--t3)">Run a cascade to see results</div>
+          </div>
+        </div>
+      </div><!-- /ng-panel-cascade -->
+    </div><!-- /ng-sidebar -->
+
+    <!-- ════════════════════════════════════════════════════
+         MAIN CANVAS AREA
+         ════════════════════════════════════════════════════ -->
+    <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden">
+
+      <!-- Unified top bar with mode tabs + info pills -->
+      <div class="ng-topbar" id="ng-topbar">
+        <div class="ng-tab-bar" id="ng-tab-bar">
+          <button class="ng-tab on" id="ng-tab-graph"    onclick="ngSwitchMode('graph',this)">🕸 News Network</button>
+          <button class="ng-tab"    id="ng-tab-explorer" onclick="ngSwitchMode('explorer',this)">💡 Knowledge Map</button>
+          <button class="ng-tab"    id="ng-tab-timeline" onclick="ngSwitchMode('timeline',this)">⏱ Timeline</button>
+          <button class="ng-tab"    id="ng-tab-cascade"  onclick="ngSwitchMode('cascade',this)">🌊 Cascade</button>
+        </div>
+        <!-- Info pills bar -->
+        <div id="ng-info-bar" style="display:none;align-items:center;gap:6px;padding:0 14px 0 0;flex-shrink:0">
+          <span id="ng-bar-nodes"       class="ng-stat-pill"></span>
+          <span id="ng-bar-edges"       class="ng-stat-pill"></span>
+          <span id="ng-bar-communities" class="ng-stat-pill"></span>
+          <span id="ng-bar-time"        class="ng-stat-pill" style="color:var(--t3)"></span>
+        </div>
+        <!-- Zoom controls -->
+        <div id="ng-zoom-ctrls" style="display:none;align-items:center;gap:4px;padding-right:10px;flex-shrink:0">
+          <button class="ng-zoom-btn" onclick="ngZoomIn()">+</button>
+          <button class="ng-zoom-btn" onclick="ngZoomOut()">−</button>
+          <button class="ng-zoom-btn" onclick="ngFitToView()">⊞</button>
+        </div>
+      </div>
+
+      <!-- Canvas wrap — all engines share this positioning parent -->
+      <div class="ng-canvas-wrap" id="ng-canvas-wrap">
+
+        <!-- ── Shared empty/loading overlays ── -->
+        <div id="ng-empty" class="ng-empty">
+          <div style="font-size:48px;margin-bottom:12px">⬡</div>
+          <div style="font-family:var(--fh);font-size:18px;font-weight:700;margin-bottom:8px;color:var(--t1)">Graph Engine</div>
+          <div style="font-size:12px;color:var(--t3);max-width:320px;text-align:center;line-height:1.8;margin-bottom:20px">
+            Build a <b style="color:var(--t2)">News Network</b> to explore entity relationships,<br>
+            or search a topic in the <b style="color:var(--t2)">Knowledge Map</b>.
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+            <button class="ng-build-btn" onclick="ngBuild()" style="font-size:12px;padding:9px 22px">⚡ Build Network</button>
+            <button class="ng-build-btn" onclick="ngSwitchEngine('knowledge',document.getElementById('ng-etab-knowledge'));document.getElementById('kex-search-inp')&&document.getElementById('kex-search-inp').focus()"
+              style="font-size:12px;padding:9px 22px;background:linear-gradient(135deg,#8B5CF6,#3B82F6)">💡 Knowledge Map</button>
+          </div>
         </div>
 
-        <!-- Results -->
-        <div style="flex:1;overflow-y:auto;padding:8px">
-          <div id="cas-results">
-            <div style="text-align:center;padding:28px 12px;color:var(--t3);font-size:11px">
-              <div style="font-size:32px;margin-bottom:8px">🔗</div>
-              Run a cascade simulation or find a dependency path
+        <div id="ng-loading" style="display:none" class="ng-loading">
+          <div class="ng-spinner"></div>
+          <div id="ng-loading-msg" style="font-size:12px;color:var(--t2);margin-top:14px">Building graph…</div>
+          <div id="ng-loading-sub" style="font-size:10px;color:var(--t3);margin-top:4px"></div>
+        </div>
+
+        <!-- 2D Canvas (News Network) -->
+        <canvas id="ng-canvas" style="display:none;cursor:grab;position:absolute;top:0;left:0"></canvas>
+
+        <!-- 3D Graph wrap -->
+        <div id="ng-3d-wrap" style="display:none;position:absolute;inset:0"></div>
+
+        <!-- Knowledge Explorer SVG -->
+        <div id="kex-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
+          <div id="kex-topbar" style="padding:8px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:rgba(6,11,18,.9);backdrop-filter:blur(8px)">
+            <div id="kex-query-label" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">—</div>
+            <div id="kex-breadcrumb-top" style="font-size:10px;color:var(--t3);flex:1"></div>
+          </div>
+          <div id="kex-svg-wrap" style="flex:1;position:relative;overflow:hidden">
+            <svg id="kex-svg" style="width:100%;height:100%"></svg>
+            <div style="position:absolute;bottom:14px;right:12px;display:flex;flex-direction:column;gap:3px">
+              <button class="ng-zoom-btn" onclick="kexZoom(1.3)">+</button>
+              <button class="ng-zoom-btn" onclick="kexZoom(0.77)">−</button>
+              <button class="ng-zoom-btn" onclick="kexFitView()">⊞</button>
+            </div>
+            <!-- Unified edge legend overlay -->
+            <div id="kex-edge-legend" style="position:absolute;bottom:14px;left:12px;font-size:9px;color:var(--t3);line-height:2;background:rgba(6,11,18,.8);padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.07)">
+              <div><span style="color:#3B82F6">●</span> Event &nbsp;<span style="color:#10B981">●</span> Concept</div>
+              <div><span style="color:#F59E0B">●</span> Entity &nbsp;<span style="color:#8B5CF6">●</span> Source</div>
             </div>
           </div>
         </div>
-      </div><!-- ng-mode-cascade -->
 
-    </div>
-
-
-    <!-- ── Canvas area ── -->
-    <div class="ng-canvas-wrap" id="ng-canvas-wrap" style="display:flex;flex-direction:column;position:relative">
-      <!-- Empty state -->
-      <div id="ng-empty" class="ng-empty">
-        <div style="font-size:48px;margin-bottom:12px">🕸</div>
-        <div style="font-family:var(--fh);font-size:18px;font-weight:700;margin-bottom:8px">News Knowledge Graph</div>
-        <div style="font-size:12px;color:var(--t3);max-width:300px;text-align:center;line-height:1.8;margin-bottom:20px">
-          Automatically extracts entities from live news and builds a relationship graph with communities and centrality metrics.
-        </div>
-        <button class="ng-build-btn" onclick="ngBuild()" style="font-size:13px;padding:10px 28px">
-          ⚡ Build Graph Now
-        </button>
-        <div style="font-size:10px;color:var(--t4);margin-top:12px">Takes ~2–5 seconds · Uses last 24h of news</div>
-      </div>
-
-      <!-- Loading overlay -->
-      <div id="ng-loading" style="display:none" class="ng-loading">
-        <div class="ng-spinner"></div>
-        <div id="ng-loading-msg" style="font-size:12px;color:var(--t2);margin-top:14px">Building graph…</div>
-        <div id="ng-loading-sub" style="font-size:10px;color:var(--t3);margin-top:4px"></div>
-      </div>
-
-      <!-- Main canvas -->
-      <canvas id="ng-canvas" style="display:none;cursor:grab"></canvas>
-
-      <!-- ── Knowledge Explorer canvas ── -->
-      <div id="kex-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
-        <!-- Explorer top bar -->
-        <div id="kex-topbar" style="padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg1)">
-          <div id="kex-query-label" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">—</div>
-          <div id="kex-breadcrumb" style="font-size:10px;color:var(--t3);flex:1"></div>
-          <div style="display:flex;gap:6px">
-            <button onclick="kexLayout('radial')" id="kex-btn-radial" class="kex-view-btn on" title="Radial layout">⊙</button>
-            <button onclick="kexLayout('force')"  id="kex-btn-force"  class="kex-view-btn"    title="Force layout">⛶</button>
-            <button onclick="kexReset()" class="btn btn-g btn-xs" title="Reset graph">↺ Reset</button>
-          </div>
-        </div>
-        <!-- SVG canvas for explorer graph -->
-        <div id="kex-svg-wrap" style="flex:1;position:relative;overflow:hidden">
-          <svg id="kex-svg" style="width:100%;height:100%"></svg>
-          <!-- Zoom controls -->
-          <div style="position:absolute;bottom:14px;right:12px;display:flex;flex-direction:column;gap:3px">
-            <button class="ng-zoom-btn" onclick="kexZoom(1.3)">+</button>
-            <button class="ng-zoom-btn" onclick="kexZoom(0.77)">−</button>
-            <button class="ng-zoom-btn" onclick="kexFitView()">⊞</button>
-          </div>
-          <!-- Legend -->
-          <div id="kex-legend" style="position:absolute;bottom:14px;left:12px;font-size:9px;color:var(--t3);line-height:1.8">
-            <div><span style="color:#3B82F6">●</span> Live Event</div>
-            <div><span style="color:#10B981">●</span> Concept</div>
-            <div><span style="color:#F59E0B">●</span> Entity</div>
-            <div><span style="color:#8B5CF6">●</span> Source</div>
-          </div>
-        </div>
-      </div><!-- kex-canvas-wrap -->
-
-      <!-- ── Timeline Graph canvas ── -->
-      <div id="tl-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
-        <!-- Timeline topbar -->
-        <div id="tl-topbar" style="padding:8px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg1)">
-          <div id="tl-title" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">Event Timeline</div>
-          <div id="tl-stat-pill" style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(59,130,246,.12);color:var(--b4)"></div>
-          <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-            <span style="font-size:9px;color:var(--t3)">Colour:</span>
-            <button class="tl-color-btn on" id="tl-col-band"     onclick="tlSetColorMode('band',this)"    title="By band">Band</button>
-            <button class="tl-color-btn"   id="tl-col-severity"  onclick="tlSetColorMode('severity',this)" title="By severity">Severity</button>
-            <button class="tl-color-btn"   id="tl-col-sentiment" onclick="tlSetColorMode('sentiment',this)" title="By sentiment">Sentiment</button>
-          </div>
-        </div>
-        <!-- SVG timeline canvas -->
-        <div id="tl-svg-wrap" style="flex:1;position:relative;overflow:hidden;background:var(--bg0)">
+        <!-- Timeline SVG -->
+        <div id="tl-canvas-wrap" style="display:none;position:absolute;inset:0">
           <svg id="tl-svg" style="width:100%;height:100%"></svg>
-          <!-- Time axis label -->
-          <div id="tl-axis-label" style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--t4)">← older &nbsp;&nbsp; newer →</div>
-          <!-- Zoom controls -->
-          <div style="position:absolute;top:10px;right:12px;display:flex;gap:3px">
-            <button class="ng-zoom-btn" onclick="tlZoom(1.3)" title="Zoom in">+</button>
-            <button class="ng-zoom-btn" onclick="tlZoom(0.77)" title="Zoom out">−</button>
-            <button class="ng-zoom-btn" onclick="tlFitView()" title="Fit all">⊞</button>
-          </div>
-          <!-- Band legend -->
-          <div id="tl-legend" style="position:absolute;top:10px;left:12px;font-size:9px;color:var(--t3);line-height:1.9;background:rgba(6,11,18,.7);padding:6px 9px;border-radius:8px;border:1px solid var(--bd)"></div>
         </div>
-      </div><!-- tl-canvas-wrap -->
 
-      <!-- ── Dependency Cascade canvas ── -->
-      <div id="cas-canvas-wrap" style="display:none;position:absolute;inset:0;flex-direction:column">
-        <div id="cas-topbar" style="padding:8px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg1)">
-          <div id="cas-title" style="font-family:var(--fh);font-size:13px;font-weight:700;color:var(--t1)">Dependency Cascade</div>
-          <div id="cas-stat" style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(239,68,68,.12);color:#EF4444"></div>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <button class="ng-zoom-btn" onclick="casZoom(1.3)">+</button>
-            <button class="ng-zoom-btn" onclick="casZoom(0.77)">−</button>
-            <button class="ng-zoom-btn" onclick="casFitView()">⊞</button>
-          </div>
-        </div>
-        <div id="cas-svg-wrap" style="flex:1;position:relative;overflow:hidden;background:var(--bg0)">
+        <!-- Cascade SVG -->
+        <div id="cas-canvas-wrap" style="display:none;position:absolute;inset:0">
           <svg id="cas-svg" style="width:100%;height:100%"></svg>
         </div>
-      </div><!-- cas-canvas-wrap -->
 
-      <!-- 2D / 3D mode toggle -->
-      <div class="ng-mode-toggle" id="ng-mode-toggle" style="display:none">
-        <button class="ng-mode-btn on" id="ng-btn-2d" onclick="ngSetMode('2d',this)" title="2D Force Layout">2D</button>
-        <button class="ng-mode-btn"    id="ng-btn-3d" onclick="ngSetMode('3d',this)" title="3D WebGL">3D</button>
-      </div>
+      </div><!-- /ng-canvas-wrap -->
 
-      <!-- Zoom controls overlay -->
-      <div class="ng-zoom-ctrls" id="ng-zoom-ctrls" style="display:none">
-        <button onclick="ngZoomIn()">+</button>
-        <button onclick="ngZoomOut()">−</button>
-        <button onclick="ngFitToView()">⊞</button>
-      </div>
+    </div><!-- /main canvas column -->
 
-      <!-- Three.js WebGL container (3D mode) -->
-      <div id="ng-3d-wrap" style="display:none;position:absolute;inset:0;"></div>
+    <!-- ── Sidebars for timeline/cascade (keep existing structure) ── -->
+    <div id="ng-mode-graph"    style="display:none"></div>
+    <div id="ng-mode-explorer" style="display:none"></div>
+    <div id="ng-mode-timeline" style="display:none"></div>
+    <div id="ng-mode-cascade"  style="display:none"></div>
 
-      <!-- Top-right info bar -->
-      <div class="ng-info-bar" id="ng-info-bar" style="display:none">
-        <span id="ng-bar-nodes" class="ng-stat-pill"></span>
-        <span id="ng-bar-edges" class="ng-stat-pill"></span>
-        <span id="ng-bar-communities" class="ng-stat-pill"></span>
-        <span id="ng-bar-time" class="ng-stat-pill" style="color:var(--t3)"></span>
-      </div>
-    </div>
-
-    <!-- ── Detail panel (right) ── -->
+    <!-- Detail panel (right side, shared) -->
     <div class="ng-detail" id="ng-detail" style="display:none">
       <div class="ng-detail-header">
         <div id="ng-detail-type-badge" class="ng-type-badge"></div>
-        <button onclick="ngCloseDetail()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1;padding:2px">✕</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button id="ng-detail-explore-btn" onclick="ngExploreNode()" style="display:none;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);border-radius:6px;color:#A78BFA;font-size:10px;padding:3px 8px;cursor:pointer;font-weight:600">💡 Explore</button>
+          <button onclick="ngCloseDetail()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer;line-height:1;padding:2px">✕</button>
+        </div>
       </div>
       <div id="ng-detail-body" class="ng-detail-body"></div>
     </div>
@@ -2473,6 +2412,7 @@
 <script src="/static/js/19_continent_streams.js"></script>
 <script src="/static/js/20_nav_ux.js"></script>
 <script src="/static/js/21_agents_dash.js"></script>
+<script src="/static/js/22_graph_engine.js"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
