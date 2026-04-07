@@ -4739,3 +4739,157 @@ input, select, textarea {
     border-top: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   UNIFIED GRAPH ENGINE — new elements
+   ═══════════════════════════════════════════════════════ */
+
+/* Engine header (replaces sidebar title) */
+.ng-engine-header {
+  padding: 12px 14px 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--bd);
+}
+.ng-engine-title {
+  font-family: var(--fh);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -.01em;
+  margin-bottom: 10px;
+}
+.ng-engine-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.ng-etab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03);
+  color: var(--t3);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--fh);
+  cursor: pointer;
+  transition: all .15s;
+}
+.ng-etab span:first-child { font-size: 13px; }
+.ng-etab:hover { color: var(--t2); background: rgba(255,255,255,.06); }
+.ng-etab.on {
+  background: rgba(59,130,246,.12);
+  border-color: rgba(59,130,246,.3);
+  color: var(--b4);
+}
+
+/* Top bar with tabs + pills */
+.ng-topbar {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--bd);
+  background: var(--bg1);
+  flex-shrink: 0;
+  min-height: 42px;
+  overflow: hidden;
+}
+.ng-topbar .ng-tab-bar {
+  flex: 1;
+  border-bottom: none;
+  overflow-x: auto;
+}
+
+/* Edge type toggles in sidebar */
+.ng-edge-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ng-edge-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: var(--t2);
+  cursor: pointer;
+}
+.ng-edge-toggle input[type=checkbox] {
+  accent-color: var(--b5);
+  flex-shrink: 0;
+}
+.ng-edge-line {
+  display: inline-block;
+  width: 24px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* Quick topic chips */
+.ng-chip {
+  padding: 3px 9px;
+  border-radius: 100px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.04);
+  color: var(--t2);
+  font-size: 9px;
+  font-family: var(--fh);
+  cursor: pointer;
+  transition: all .12s;
+}
+.ng-chip:hover {
+  border-color: rgba(59,130,246,.4);
+  color: var(--b4);
+  background: rgba(59,130,246,.08);
+}
+
+/* Control buttons row */
+.ng-ctrl-btn {
+  flex: 1;
+  padding: 5px 6px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 6px;
+  color: var(--t2);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all .12s;
+  font-family: var(--fh);
+}
+.ng-ctrl-btn:hover { color: var(--t1); background: rgba(255,255,255,.09); }
+
+/* View mode buttons */
+.ng-view-btn {
+  padding: 5px 10px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 6px;
+  color: var(--t3);
+  font-size: 10px;
+  cursor: pointer;
+  font-family: var(--fh);
+  font-weight: 600;
+  transition: all .12s;
+}
+.ng-view-btn.on {
+  background: rgba(59,130,246,.12);
+  border-color: rgba(59,130,246,.3);
+  color: var(--b4);
+}
+
+/* Explore button in detail panel */
+#ng-detail-explore-btn:hover {
+  background: rgba(139,92,246,.25) !important;
+}
+
+/* Mobile: collapse sidebar further on small screens */
+@media (max-width: 600px) {
+  .ng-engine-tabs { flex-direction: column; }
+  .ng-etab span:last-child { display: none; }
+  .ng-etab { padding: 8px; }
+}
