@@ -2756,6 +2756,13 @@
 
     <!-- Mobile swipe handle -->
     <div id="evpanel-handle" style="display:none;width:40px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:10px auto 0;cursor:grab"></div>
+    <!-- Mobile back bar — visible only on mobile (hidden via CSS on desktop) -->
+    <div id="ep-mobile-bar" style="display:none;align-items:center;gap:10px;padding:12px 16px 8px;border-bottom:1px solid rgba(255,255,255,.07)">
+      <button onclick="closeEP()" style="background:none;border:none;color:var(--t2);font-size:15px;font-family:var(--fh);cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 0;min-height:44px">
+        <span style="font-size:20px;line-height:1">←</span>
+        <span style="font-size:13px;font-weight:600">Back to Map</span>
+      </button>
+    </div>
     <div class="eph">
       <button class="epx" onclick="closeEP()">×</button>
       <div class="epcat" id="epcat"></div>
