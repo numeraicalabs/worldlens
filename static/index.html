@@ -299,6 +299,32 @@
         </button>
       </div>
     </div>
+    <!-- Globe Intelligence Card -->
+    <div class="db-globe-card" id="db-globe-card">
+      <div class="db-globe-header">
+        <span class="db-globe-live-dot"></span>
+        <span class="db-globe-title">Live Globe</span>
+        <span class="db-globe-region-name" id="db-globe-region-name">—</span>
+      </div>
+      <div class="db-globe-canvas-wrap" id="db-globe-canvas-wrap">
+        <canvas id="db-globe-canvas"></canvas>
+        <!-- Click-target regions overlay: invisible, just for hover/click -->
+        <div id="db-globe-click-overlay" style="position:absolute;inset:0;cursor:pointer"></div>
+      </div>
+      <!-- Region summary panel -->
+      <div class="db-globe-summary" id="db-globe-summary">
+        <div class="db-globe-trend-row">
+          <span class="db-globe-trend" id="db-globe-trend">→</span>
+          <span class="db-globe-risk" id="db-globe-risk-badge">—</span>
+          <span class="db-globe-ev-count" id="db-globe-ev-count">—</span>
+        </div>
+        <div class="db-globe-text" id="db-globe-text">Click a region to see the AI summary…</div>
+        <div class="db-globe-topics" id="db-globe-topics"></div>
+      </div>
+      <!-- Region quick-nav dots -->
+      <div class="db-globe-regions" id="db-globe-regions"></div>
+    </div>
+
     <div class="db-kpi-strip">
       <div class="db-kpi" id="dbk-risk">
         <div class="db-kpi-icon">🌡</div>
@@ -2413,6 +2439,7 @@
 <script src="/static/js/20_nav_ux.js"></script>
 <script src="/static/js/21_agents_dash.js"></script>
 <script src="/static/js/22_graph_engine.js"></script>
+<script src="/static/js/23_dash_globe.js"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
