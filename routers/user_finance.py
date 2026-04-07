@@ -139,12 +139,15 @@ async def complete_tutorial(user=Depends(require_user)):
 # ── Watchlist ─────────────────────────────────────────
 @user_router.get("/watchlist")
 async def get_watchlist(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM watchlist WHERE user_id=? ORDER BY type, label", (user["id"],)
-        ) as c:
-            return [dict(r) for r in await c.fetchall()]
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM watchlist WHERE user_id=? ORDER BY type, label", (user["id"],)
+            ) as c:
+                return [dict(r) for r in await c.fetchall()]
+    except Exception:
+        return []
 
 
 @user_router.post("/watchlist")
@@ -187,12 +190,15 @@ async def watchlist_digest(user=Depends(require_user)):
 # ── Alerts ────────────────────────────────────────────
 @user_router.get("/alerts")
 async def get_alerts(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM alerts WHERE user_id=? ORDER BY created_at DESC", (user["id"],)
-        ) as c:
-            return [dict(r) for r in await c.fetchall()]
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM alerts WHERE user_id=? ORDER BY created_at DESC", (user["id"],)
+            ) as c:
+                return [dict(r) for r in await c.fetchall()]
+    except Exception:
+        return []
 
 
 @user_router.post("/alerts")
