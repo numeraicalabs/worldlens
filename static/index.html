@@ -361,7 +361,11 @@
       </div>
       <div class="agents-section-sub">4 autonomous analysts — continuously monitoring your focus areas</div>
     </div>
-    <button class="agents-refresh-btn" onclick="refreshAgentBriefs && refreshAgentBriefs()">↻ Refresh all</button>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <button class="agents-refresh-btn" onclick="loadAllDigests && loadAllDigests()" title="Morning digest">☀ Digest</button>
+      <button class="agents-refresh-btn" onclick="loadAllPredictions && loadAllPredictions()" title="This week's predictions">📅 Predict</button>
+      <button class="agents-refresh-btn" onclick="refreshAgentBriefs && refreshAgentBriefs()">↻ Refresh</button>
+    </div>
   </div>
   <div id="agents-grid">
     <!-- Populated by 21_agents_dash.js -->
