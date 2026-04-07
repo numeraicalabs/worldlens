@@ -344,6 +344,55 @@ async def migrate_admin_columns():
             UNIQUE(user_id, bot_id)
         );
 
+        CREATE TABLE IF NOT EXISTS agent_brief_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            bot_id TEXT NOT NULL,
+            brief_json TEXT NOT NULL,
+            signal TEXT DEFAULT 'neutral',
+            event_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_abh_user_bot
+            ON agent_brief_history(user_id, bot_id, created_at DESC);
+
+        -- Streak: one row per user, updated daily
+        CREATE TABLE IF NOT EXISTS agent_streaks (
+            user_id INTEGER PRIMARY KEY,
+            current_streak INTEGER DEFAULT 0,
+            longest_streak INTEGER DEFAULT 0,
+            last_activity_date TEXT DEFAULT '',
+            total_reads INTEGER DEFAULT 0,
+            streak_frozen INTEGER DEFAULT 0,
+            freeze_used_date TEXT DEFAULT '',
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Bot predictions (Friday forecast + Monday verify)
+        CREATE TABLE IF NOT EXISTS agent_predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            bot_id TEXT NOT NULL,
+            week_key TEXT NOT NULL,          -- e.g. "2026-W14"
+            prediction_json TEXT NOT NULL,   -- {headline, direction, confidence, key_topics}
+            prediction_ts TEXT DEFAULT (datetime('now')),
+            verify_json TEXT DEFAULT NULL,   -- filled on Monday
+            verify_ts TEXT DEFAULT NULL,
+            accuracy_score REAL DEFAULT NULL,-- 0.0-1.0
+            UNIQUE(user_id, bot_id, week_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_ap_user ON agent_predictions(user_id, week_key);
+
+        -- Daily digest log (prevent duplicate sends)
+        CREATE TABLE IF NOT EXISTS agent_digest_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            bot_id TEXT NOT NULL,
+            digest_date TEXT NOT NULL,       -- YYYY-MM-DD
+            sent_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(user_id, bot_id, digest_date)
+        );
+
         CREATE TABLE IF NOT EXISTS invites (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             code        TEXT UNIQUE NOT NULL,

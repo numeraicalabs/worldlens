@@ -742,6 +742,24 @@ def start():
         id="ml_rebuild",
         misfire_grace_time=3600,
     )
+    _scheduler.add_job(
+        _run_agent_digests, "cron",
+        hour=7, minute=30,      # 07:30 UTC — after daily brief
+        id="agent_digests",
+        misfire_grace_time=3600,
+    )
+    _scheduler.add_job(
+        _run_friday_predictions, "cron",
+        day_of_week="fri", hour=18, minute=0,   # Friday 18:00 UTC
+        id="friday_predictions",
+        misfire_grace_time=3600,
+    )
+    _scheduler.add_job(
+        _run_monday_verify, "cron",
+        day_of_week="mon", hour=8, minute=0,    # Monday 08:00 UTC
+        id="monday_verify",
+        misfire_grace_time=3600,
+    )
 
     _scheduler.start()
     logger.info(
@@ -756,3 +774,165 @@ def stop():
     if _scheduler:
         _scheduler.shutdown()
         logger.info("Scheduler stopped")
+
+
+# ── Agent scheduled jobs ─────────────────────────────────────────────────────
+
+async def _run_agent_digests():
+    """07:30 UTC — generate morning digest for all active users."""
+    logger.info("Agent digests: starting")
+    try:
+        from datetime import date
+        today = date.today().isoformat()
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT id FROM users WHERE is_active=1 "
+                "AND last_login > datetime('now','-7 days')"
+            ) as cur:
+                user_ids = [r[0] for r in await cur.fetchall()]
+
+        from routers.agents import (
+            DEFAULT_BOTS, _load_user_config, _get_bot_events,
+            _generate_digest, _update_streak
+        )
+
+        count = 0
+        for uid in user_ids:
+            for bot_id in DEFAULT_BOTS:
+                try:
+                    # Skip if already generated today
+                    async with aiosqlite.connect(settings.db_path) as db:
+                        db.row_factory = aiosqlite.Row
+                        async with db.execute(
+                            "SELECT id FROM agent_digest_log "
+                            "WHERE user_id=? AND bot_id=? AND digest_date=?",
+                            (uid, bot_id, today)
+                        ) as cur:
+                            already = await cur.fetchone()
+                    if already:
+                        continue
+
+                    config = await _load_user_config(uid, bot_id)
+                    if not config.get("enabled", True):
+                        continue
+                    events = await _get_bot_events(bot_id, config, limit=5)
+                    await _generate_digest(bot_id, config, events)
+
+                    async with aiosqlite.connect(settings.db_path) as db:
+                        await db.execute(
+                            "INSERT OR IGNORE INTO agent_digest_log "
+                            "(user_id, bot_id, digest_date) VALUES (?, ?, ?)",
+                            (uid, bot_id, today)
+                        )
+                        await db.commit()
+                    count += 1
+                except Exception as e:
+                    logger.warning("digest uid=%s bot=%s: %s", uid, bot_id, e)
+
+        logger.info("Agent digests: generated %d", count)
+    except Exception as e:
+        logger.error("_run_agent_digests: %s", e)
+
+
+async def _run_friday_predictions():
+    """Friday 18:00 — generate weekly predictions for all active users."""
+    logger.info("Friday predictions: starting")
+    try:
+        from routers.agents import (
+            DEFAULT_BOTS, _load_user_config, _get_bot_events,
+            _generate_prediction, _week_key
+        )
+        week = _week_key()
+
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT id FROM users WHERE is_active=1 "
+                "AND last_login > datetime('now','-14 days')"
+            ) as cur:
+                user_ids = [r[0] for r in await cur.fetchall()]
+
+        count = 0
+        for uid in user_ids:
+            for bot_id in DEFAULT_BOTS:
+                try:
+                    # Skip if already exists
+                    async with aiosqlite.connect(settings.db_path) as db:
+                        async with db.execute(
+                            "SELECT id FROM agent_predictions "
+                            "WHERE user_id=? AND bot_id=? AND week_key=?",
+                            (uid, bot_id, week)
+                        ) as cur:
+                            exists = await cur.fetchone()
+                    if exists:
+                        continue
+
+                    config = await _load_user_config(uid, bot_id)
+                    if not config.get("enabled", True):
+                        continue
+                    events = await _get_bot_events(bot_id, config, limit=10)
+                    pred   = await _generate_prediction(bot_id, config, events)
+                    if pred:
+                        import json
+                        async with aiosqlite.connect(settings.db_path) as db:
+                            await db.execute(
+                                "INSERT OR IGNORE INTO agent_predictions "
+                                "(user_id, bot_id, week_key, prediction_json) "
+                                "VALUES (?, ?, ?, ?)",
+                                (uid, bot_id, week, json.dumps(pred))
+                            )
+                            await db.commit()
+                        count += 1
+                except Exception as e:
+                    logger.warning("prediction uid=%s bot=%s: %s", uid, bot_id, e)
+
+        logger.info("Friday predictions: generated %d", count)
+    except Exception as e:
+        logger.error("_run_friday_predictions: %s", e)
+
+
+async def _run_monday_verify():
+    """Monday 08:00 — verify last week's predictions against real events."""
+    logger.info("Monday verify: starting")
+    try:
+        from datetime import datetime, timedelta
+        import json
+        from routers.agents import (
+            DEFAULT_BOTS, _load_user_config, _get_bot_events,
+            _verify_prediction_ai, _week_key
+        )
+
+        last_week = _week_key(datetime.utcnow() - timedelta(weeks=1))
+
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT user_id, bot_id, prediction_json FROM agent_predictions "
+                "WHERE week_key=? AND verify_json IS NULL",
+                (last_week,)
+            ) as cur:
+                rows = await cur.fetchall()
+
+        count = 0
+        for row in rows:
+            uid, bot_id = row["user_id"], row["bot_id"]
+            try:
+                config    = await _load_user_config(uid, bot_id)
+                events    = await _get_bot_events(bot_id, config, limit=15)
+                prediction = json.loads(row["prediction_json"])
+                verify    = await _verify_prediction_ai(bot_id, prediction, events)
+                async with aiosqlite.connect(settings.db_path) as db:
+                    await db.execute(
+                        "UPDATE agent_predictions SET verify_json=?, verify_ts=datetime('now'), "
+                        "accuracy_score=? WHERE user_id=? AND bot_id=? AND week_key=?",
+                        (json.dumps(verify), verify.get("score", 0.5), uid, bot_id, last_week)
+                    )
+                    await db.commit()
+                count += 1
+            except Exception as e:
+                logger.warning("verify uid=%s bot=%s: %s", uid, bot_id, e)
+
+        logger.info("Monday verify: verified %d predictions", count)
+    except Exception as e:
+        logger.error("_run_monday_verify: %s", e)
