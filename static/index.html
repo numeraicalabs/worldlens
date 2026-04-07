@@ -15,6 +15,7 @@
 <!-- WorldLens Styles -->
 <link rel="stylesheet" href="/static/css/worldlens.css">
 <link rel="stylesheet" href="/static/css/worldlens_neo.css">
+  <link rel="stylesheet" href="/static/css/tradgentic.css">
 <link rel="stylesheet" href="/static/css/worldlens_mobile.css">
 <link rel="stylesheet" href="/static/css/worldlens_fire.css">
 <link rel="stylesheet" href="/static/css/globe_widget.css">
@@ -174,6 +175,11 @@
           <span class="nd-icon">🏭</span><span class="nd-label">Supply Chain</span>
           <span class="nd-desc">Trade disruptions</span>
         </button>
+        <div class="nd-section-label">Trading</div>
+        <button class="nd-item" data-v="tradgentic" onclick="sv('tradgentic',document.querySelector('[data-v=tradgentic]'));closeAllDropdowns()">
+          <span class="nd-icon">🤖</span><span class="nd-label">Tradgentic</span>
+          <span class="nd-desc">AI Paper Trading Lab</span>
+        </button>
       </div>
     </div>
 
@@ -311,18 +317,30 @@
         <!-- Click-target regions overlay: invisible, just for hover/click -->
         <div id="db-globe-click-overlay" style="position:absolute;inset:0;cursor:pointer"></div>
       </div>
+      <!-- Loading skeleton -->
+      <div class="db-globe-skeleton" id="db-globe-skeleton">
+        <div class="db-globe-skel-line" style="width:60%"></div>
+        <div class="db-globe-skel-line" style="width:90%;height:8px;margin-top:3px"></div>
+        <div class="db-globe-skel-line" style="width:75%;height:8px;margin-top:3px"></div>
+      </div>
       <!-- Region summary panel -->
-      <div class="db-globe-summary" id="db-globe-summary">
+      <div class="db-globe-summary" id="db-globe-summary" style="display:none">
         <div class="db-globe-trend-row">
           <span class="db-globe-trend" id="db-globe-trend">→</span>
           <span class="db-globe-risk" id="db-globe-risk-badge">—</span>
           <span class="db-globe-ev-count" id="db-globe-ev-count">—</span>
         </div>
-        <div class="db-globe-text" id="db-globe-text">Click a region to see the AI summary…</div>
+        <div class="db-globe-top-event" id="db-globe-top-event" style="display:none"></div>
+        <div class="db-globe-text" id="db-globe-text">Loading…</div>
         <div class="db-globe-topics" id="db-globe-topics"></div>
       </div>
       <!-- Region quick-nav dots -->
       <div class="db-globe-regions" id="db-globe-regions"></div>
+      <!-- Open full globe link -->
+      <div class="db-globe-footer">
+        <span id="db-globe-footer-label">Auto-cycling 9 regions</span>
+        <a onclick="window.open('/static/globe.html','_blank')" class="db-globe-fullscreen-link">⊞ Full Globe →</a>
+      </div>
     </div>
 
     <div class="db-kpi-strip">
@@ -2440,6 +2458,7 @@
 <script src="/static/js/21_agents_dash.js"></script>
 <script src="/static/js/22_graph_engine.js"></script>
 <script src="/static/js/23_dash_globe.js"></script>
+<script src="/static/js/24_tradgentic.js"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
@@ -2716,6 +2735,111 @@
     </div>
   </div>
 </div>
+
+
+<div class="view" id="view-tradgentic">
+  <div id="tg-root">
+
+    <!-- ══ TOP BAR ══ -->
+    <div class="tg-topbar">
+      <div class="tg-logo">
+        <span class="tg-logo-icon">🤖</span>
+        <div>
+          <div class="tg-logo-name">Tradgentic</div>
+          <div class="tg-logo-sub">Virtual Trading Lab · Paper Mode</div>
+        </div>
+      </div>
+      <div class="tg-topbar-actions">
+        <div class="tg-paper-badge">📄 PAPER TRADING</div>
+        <button class="tg-btn tg-btn-primary" onclick="tgOpenWizard()">
+          <span>+</span> New Bot
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ MAIN CONTENT ══ -->
+    <div class="tg-body" id="tg-body">
+
+      <!-- Strategy Room / Bot Grid -->
+      <div class="tg-section" id="tg-bots-section">
+        <div class="tg-section-header">
+          <div>
+            <div class="tg-section-title">⚡ Strategy Room</div>
+            <div class="tg-section-sub">Your active trading bots — each card is a live paper-trading engine</div>
+          </div>
+          <button class="tg-refresh-btn" onclick="tgLoadBots()">↻ Refresh</button>
+        </div>
+        <div class="tg-bots-grid" id="tg-bots-grid">
+          <div class="tg-empty-state" id="tg-empty">
+            <div class="tg-empty-icon">🧪</div>
+            <div class="tg-empty-title">No bots deployed yet</div>
+            <div class="tg-empty-sub">Create your first bot to start paper trading with real market data</div>
+            <button class="tg-btn tg-btn-primary" onclick="tgOpenWizard()" style="margin-top:16px">
+              🚀 Deploy First Bot
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Market Scanner -->
+      <div class="tg-section tg-scanner-section">
+        <div class="tg-section-header">
+          <div>
+            <div class="tg-section-title">📡 Market Scanner</div>
+            <div class="tg-section-sub">Live quotes for popular assets</div>
+          </div>
+        </div>
+        <div class="tg-scanner-grid" id="tg-scanner-grid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+    </div><!-- /tg-body -->
+
+    <!-- ══ BOT DETAIL PANEL (right slide-in) ══ -->
+    <div class="tg-detail-panel" id="tg-detail-panel" style="display:none">
+      <div class="tg-detail-header">
+        <div id="tg-detail-title">Bot Detail</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="tg-btn tg-btn-sm tg-btn-success" id="tg-run-btn" onclick="tgRunBot()">▶ Run</button>
+          <button onclick="tgCloseDetail()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer">✕</button>
+        </div>
+      </div>
+      <div class="tg-detail-body" id="tg-detail-body"></div>
+    </div>
+
+  </div><!-- /tg-root -->
+
+  <!-- ══ CREATE BOT WIZARD ══ -->
+  <div class="tg-wizard-overlay" id="tg-wizard" style="display:none">
+    <div class="tg-wizard-panel">
+      <div class="tg-wizard-header">
+        <div class="tg-wizard-title" id="tg-wiz-title">Deploy New Bot</div>
+        <button onclick="tgCloseWizard()" style="background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;line-height:1">✕</button>
+      </div>
+      <!-- Steps indicator -->
+      <div class="tg-steps" id="tg-steps">
+        <div class="tg-step on" data-step="1"><span class="tg-step-num">1</span><span>Strategy</span></div>
+        <div class="tg-step-line"></div>
+        <div class="tg-step" data-step="2"><span class="tg-step-num">2</span><span>Assets</span></div>
+        <div class="tg-step-line"></div>
+        <div class="tg-step" data-step="3"><span class="tg-step-num">3</span><span>Params</span></div>
+        <div class="tg-step-line"></div>
+        <div class="tg-step" data-step="4"><span class="tg-step-num">4</span><span>Deploy</span></div>
+      </div>
+      <!-- Step content -->
+      <div class="tg-wizard-content" id="tg-wiz-content">
+        <!-- Populated by JS -->
+      </div>
+      <!-- Nav buttons -->
+      <div class="tg-wizard-nav">
+        <button class="tg-btn tg-btn-ghost" id="tg-wiz-back" onclick="tgWizBack()" style="display:none">← Back</button>
+        <button class="tg-btn tg-btn-primary" id="tg-wiz-next" onclick="tgWizNext()">Next →</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /view-tradgentic -->
 
 
 <!-- ══ EVPANEL — outside #content so position:fixed works on iOS Safari ══ -->
