@@ -168,16 +168,20 @@ function initCats() {
   var mc = el('mcats'), fc = el('feedcats');
   Object.keys(CATS).forEach(function(cat) {
     var m = CATS[cat];
-    var p = document.createElement('div');
-    p.className='cpill on'; p.dataset.c=cat; p.title=cat;
-    p.style.color=m.c; p.style.borderColor=m.c+'55';
-    p.innerHTML = m.i;
-    p.onclick = function(){ p.classList.toggle('on'); updateMarkers(); };
-    mc.appendChild(p);
-    var fc2 = document.createElement('div');
-    fc2.className='fc'; fc2.dataset.cat=cat; fc2.innerHTML=m.i+' '+cat;
-    fc2.onclick = function(){ sf('cat',G.filt.cat===cat?null:cat,fc2); };
-    fc.appendChild(fc2);
+    if (mc) {
+      var p = document.createElement('div');
+      p.className='cpill on'; p.dataset.c=cat; p.title=cat;
+      p.style.color=m.c; p.style.borderColor=m.c+'55';
+      p.innerHTML = m.i;
+      p.onclick = function(){ p.classList.toggle('on'); updateMarkers(); };
+      mc.appendChild(p);
+    }
+    if (fc) {
+      var fc2 = document.createElement('div');
+      fc2.className='fc'; fc2.dataset.cat=cat; fc2.innerHTML=m.i+' '+cat;
+      fc2.onclick = function(){ sf('cat',G.filt.cat===cat?null:cat,fc2); };
+      fc.appendChild(fc2);
+    }
   });
 }
 
@@ -185,9 +189,9 @@ function initCats() {
 function updateRiskUI() {
   var r = G.stats.global_risk_index||0;
   var rc = r>60?'#EF4444':r>35?'#F59E0B':'#60A5FA';
-  setEl('m-risk', r.toFixed(0)); el('m-risk').style.color=rc;
-  el('m-riskb').style.width=Math.min(100,r)+'%'; el('m-riskb').style.background=rc;
-  setEl('m-riskl', r>60?'CRITICAL':r>35?'ELEVATED':'STABLE'); el('m-riskl').style.color=rc;
+  var mRisk = el('m-risk'); if (mRisk) { mRisk.textContent = r.toFixed(0); mRisk.style.color = rc; }
+  var mRiskb = el('m-riskb'); if (mRiskb) { mRiskb.style.width = Math.min(100,r)+'%'; mRiskb.style.background = rc; }
+  var mRiskl = el('m-riskl'); if (mRiskl) { mRiskl.textContent = r>60?'CRITICAL':r>35?'ELEVATED':'STABLE'; mRiskl.style.color = rc; }
 }
 function renderDash() {
   var st   = G.stats || {};
