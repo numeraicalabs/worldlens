@@ -430,6 +430,84 @@
 
 </div><!-- db-root -->
 </div><!-- view-dash -->
+
+<div class="view" id="view-map">
+
+  <!-- ── MAP BREAKING NEWS BANNER ── -->
+  <div id="map-breaking" style="display:none"></div>
+
+  <!-- ── MAP SEARCH BAR ── -->
+  <div id="map-search-bar">
+    <div id="map-search-wrap">
+      <input id="map-search-inp" type="text" placeholder="Search events, countries, topics…" autocomplete="off">
+      <button id="map-search-clear" onclick="document.getElementById('map-search-inp').value='';document.getElementById('map-search-results').classList.remove('open')">✕</button>
+    </div>
+    <div id="map-search-results"></div>
+  </div>
+
+  <!-- ── MAP TOOLBAR ── -->
+  <div id="map-toolbar">
+    <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;overflow-x:auto">
+      <span style="font-size:9px;color:var(--t3);font-family:var(--fm);letter-spacing:.08em;white-space:nowrap">FILTER</span>
+      <div id="mcats" style="display:flex;flex-wrap:nowrap;gap:0;overflow-x:auto"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <button class="mtool-btn" id="map-hm-btn" onclick="toggleHeatmap()">🌡 Heat</button>
+      <button class="mtool-btn" onclick="toggleLegend()">⬡ Legend</button>
+    </div>
+  </div>
+
+  <!-- ── LEAFLET MAP ── -->
+  <div id="map"></div>
+
+  <!-- ── MAP ZOOM HUD ── -->
+  <div id="map-zoom-hud"></div>
+  <div id="map-zoom-overlay"></div>
+
+  <!-- ── MAP FOCUS PANEL (country risk) ── -->
+  <div id="map-focus-panel" style="display:none">
+    <div class="fp-header">
+      <span class="fp-flag" id="fp-flag"></span>
+      <span class="fp-name" id="fp-name"></span>
+      <button class="fp-close" onclick="closeFocusPanel()">✕</button>
+    </div>
+    <div class="fp-body">
+      <div class="fp-stat" id="fp-stat"></div>
+      <div class="fp-risk" id="fp-risk-bar-wrap">
+        <div class="fp-risk-bar" id="fp-risk-bar"></div>
+      </div>
+      <div class="fp-assess" id="fp-assess"></div>
+    </div>
+  </div>
+
+  <!-- ── MAP LEFT SIDEBAR ── -->
+  <div id="mleft">
+    <div class="mcard" id="mcard-stats">
+      <div class="mcard-title">📡 Live Intelligence</div>
+      <div class="mcard-body" id="mcard-stats-body">
+        <div class="ms-row"><span class="ms-lbl">Events 24h</span><span class="ms-val" id="m-ev24">—</span></div>
+        <div class="ms-row"><span class="ms-lbl">Critical</span><span class="ms-val" id="m-critical" style="color:var(--re)">—</span></div>
+        <div class="ms-row"><span class="ms-lbl">Risk Index</span>
+          <span class="ms-val" id="m-risk">—</span>
+        </div>
+        <div class="ms-bar-wrap"><div class="ms-bar-fill" id="m-riskb" style="width:0%"></div></div>
+        <div class="ms-sub" id="m-riskl">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MAP CONTROLS (zoom) ── -->
+  <div id="mctrl">
+    <button class="mtool-btn" onclick="if(G.map)G.map.zoomIn()">+</button>
+    <button class="mtool-btn" onclick="if(G.map)G.map.zoomOut()">−</button>
+    <div class="mtool-sep"></div>
+    <button class="mtool-btn" id="mctrl-o" onclick="toggleOrbit()" title="Auto-rotate">O</button>
+    <button class="mtool-btn" id="mctrl-c" onclick="clusterToggle()" title="Cluster">C</button>
+    <button class="mtool-btn" id="mctrl-a" onclick="toggleAutoFollow()" title="Auto-follow">A</button>
+  </div>
+
+</div><!-- view-map -->
+
 <div class="view" id="view-graph">
   <div class="ng-root">
 
