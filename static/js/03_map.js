@@ -50,7 +50,15 @@ function initMap() {
   var mapEl = document.getElementById('map');
   if (!mapEl || mapEl.offsetWidth === 0) { setTimeout(initMap, 120); return; }
 
-  G.map = L.map('map', { center:[25,15], zoom:3, zoomControl:false, minZoom:2, maxZoom:14 });
+  G.map = L.map('map', {
+    center: [25,15], zoom: 3,
+    zoomControl: false,
+    minZoom: 2, maxZoom: 14,
+    tap: false,           /* disable Leaflet tap shim — use native touch events */
+    tapTolerance: 15,     /* wider tolerance for fat fingers */
+    touchZoom: true,
+    bounceAtZoomLimits: false
+  });
 
   // Dark tile providers — native dark maps, no CSS filter needed
   // CartoDB Dark Matter: purpose-built dark map, sharp and fast
@@ -407,15 +415,17 @@ function addClusterMarker(item) {
       + '</div>';
   }).join('');
 
-  mk.bindTooltip(
-    '<div style="min-width:210px">'
-    + '<div style="font-size:9px;color:'+col+';font-weight:700;text-transform:uppercase;margin-bottom:6px">'
-    + item.count + ' events &bull; '+item.category+'</div>'
-    + rows
-    + '<div style="font-size:9px;color:#4B5E7A;margin-top:5px">Click to zoom in</div>'
-    + '</div>',
-    {permanent:false, direction:'top', opacity:1}
-  );
+  if (!L.Browser.mobile && !L.Browser.touch) {
+    mk.bindTooltip(
+      '<div style="min-width:210px">'
+      + '<div style="font-size:9px;color:'+col+';font-weight:700;text-transform:uppercase;margin-bottom:6px">'
+      + item.count + ' events &bull; '+item.category+'</div>'
+      + rows
+      + '<div style="font-size:9px;color:#4B5E7A;margin-top:5px">Tap to zoom in</div>'
+      + '</div>',
+      {permanent:false, direction:'top', opacity:1}
+    );
+  }
 
   mk.on('click', function() {
     var z = G.map.getZoom();
@@ -457,32 +467,53 @@ function addMarker(ev) {
     + 'justify-content:center;font-size:'+Math.max(10,Math.round(r/1.4))+'px;position:relative;cursor:pointer">'
     + ring + badge + boostDot + m.i + '</div>';
 
-  var icon = L.divIcon({html:html, className:'', iconSize:[r*2,r*2], iconAnchor:[r,r], popupAnchor:[0,-(r+4)]});
+  var icon = L.divIcon({html:html, className:'', iconSize:[r*2,r*2], iconAnchor:[r,r]});
   var mk   = L.marker([ev.latitude, ev.longitude], {icon:icon});
 
-  var desc    = (ev.ai_summary || ev.summary || ev.title).slice(0, 130);
-  var srcInfo = isGroup ? ' &bull; '+ev._groupCount+' sources' : '';
-  var focusTip= isBoosted ? ' <span style="color:var(--b4);font-size:8px">★ focused</span>' : '';
-
-  mk.bindTooltip(
-    '<div style="min-width:190px;max-width:260px">'
-    + '<div style="font-size:9px;color:'+m.c+';font-weight:700;text-transform:uppercase;margin-bottom:4px">'
-    + ev.category + srcInfo + focusTip + '</div>'
-    + '<div style="font-size:12px;font-weight:600;line-height:1.35;margin-bottom:4px;color:#F0F6FF">'+ev.title+'</div>'
-    + '<div style="font-size:10px;color:#94A3B8;margin-bottom:5px">'+desc+(desc.length>=130?'…':'')+'</div>'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;font-size:10px">'
-    + '<span style="color:#94A3B8">'+(ev.country_name||ev.country_code||'Global')+'</span>'
-    + '<span class="tag tag'+ev.impact[0]+'">'+ev.impact+'</span>'
-    + '</div></div>',
-    {permanent:false, sticky:false, offset:[0,-(r+4)], direction:'top', opacity:1}
-  );
+  /* Desktop-only tooltip — on mobile touch it causes the dashed-line bug */
+  if (!L.Browser.mobile && !L.Browser.touch) {
+    var desc    = (ev.ai_summary || ev.summary || ev.title).slice(0, 130);
+    var srcInfo = isGroup ? ' &bull; '+ev._groupCount+' sources' : '';
+    var focusTip= isBoosted ? ' <span style="color:var(--b4);font-size:8px">★ focused</span>' : '';
+    mk.bindTooltip(
+      '<div style="min-width:190px;max-width:260px">'
+      + '<div style="font-size:9px;color:'+m.c+';font-weight:700;text-transform:uppercase;margin-bottom:4px">'
+      + ev.category + srcInfo + focusTip + '</div>'
+      + '<div style="font-size:12px;font-weight:600;line-height:1.35;margin-bottom:4px;color:#F0F6FF">'+ev.title+'</div>'
+      + '<div style="font-size:10px;color:#94A3B8;margin-bottom:5px">'+desc+(desc.length>=130?'…':'')+'</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;font-size:10px">'
+      + '<span style="color:#94A3B8">'+(ev.country_name||ev.country_code||'Global')+'</span>'
+      + '<span class="tag tag'+ev.impact[0]+'">'+ev.impact+'</span>'
+      + '</div></div>',
+      {permanent:false, sticky:false, offset:[0,-(r+4)], direction:'top', opacity:1}
+    );
+  }
 
   var eid = ev.id;
 
-  /* Single clean click handler — no popup, no stopPropagation interference */
-  mk.on('click', function() {
-    openEP(eid);
-  });
+  if (L.Browser.touch || L.Browser.mobile) {
+    /* On mobile: use Leaflet click (which fires on touchend via tap:false native events)
+       plus a direct touchend fallback on the DOM element after it's added to the map */
+    mk.on('click', function(e) {
+      L.DomEvent.stopPropagation(e);
+      openEP(eid);
+    });
+    mk.on('add', function() {
+      var domEl = mk.getElement();
+      if (!domEl) return;
+      var _moved = false;
+      domEl.addEventListener('touchstart', function() { _moved = false; }, {passive:true});
+      domEl.addEventListener('touchmove',  function() { _moved = true;  }, {passive:true});
+      domEl.addEventListener('touchend', function(e) {
+        if (_moved) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openEP(eid);
+      }, {passive:false});
+    });
+  } else {
+    mk.on('click', function() { openEP(eid); });
+  }
 
   mk.addTo(G.map);
   G.markers[ev.id] = mk;
