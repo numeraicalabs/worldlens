@@ -270,3 +270,160 @@ async def reset_portfolio(bot_id: str, user=Depends(require_user)):
         return {"status": "reset", "cash": INITIAL_CAPITAL}
     except Exception as e:
         return {"error": str(e)}
+
+
+# ════════════════════════════════════════════════════════════
+# AGGREGATION ENGINE
+# ════════════════════════════════════════════════════════════
+
+from routers.tradgentic.aggregator import aggregate_signals, signal_stream_item
+
+@router.get("/aggregate")
+async def get_aggregated_signals(user=Depends(require_user)):
+    """
+    Run all active bots' strategies → aggregate signals with performance weighting.
+    Returns meta-signals per symbol + contributor breakdown.
+    """
+    try:
+        bots = await list_bots(user["id"])
+        active_bots = [b for b in bots if b.get("active", 1)]
+        if not active_bots:
+            return {"signals": {}, "message": "No active bots"}
+
+        signals_per_bot: dict = {}
+        stats_per_bot:   dict = {}
+
+        for bot in active_bots:
+            strategy = get_strategy(bot["strategy"])
+            if not strategy:
+                continue
+            assets  = bot.get("assets", [])
+            params  = bot.get("params", {})
+            bot_signals: dict = {}
+
+            for sym in assets:
+                hist = await fetch_history(sym, "6mo")
+                if not hist:
+                    continue
+                prices = [h["close"] for h in hist]
+                sig    = strategy.generate_signal(prices, params)
+                bot_signals[sym] = {
+                    "action":   sig.action,
+                    "strength": sig.strength,
+                    "reason":   sig.reason,
+                    "price":    sig.price,
+                }
+
+            if bot_signals:
+                signals_per_bot[bot["id"]] = bot_signals
+                # Load stats
+                all_assets = bot.get("assets", [])
+                curr_prices = {}
+                if all_assets:
+                    qdata = await fetch_multi(all_assets)
+                    curr_prices = {s: d["price"] for s, d in qdata.items()}
+                stats = await get_portfolio_stats(bot["id"], curr_prices)
+                stats_per_bot[bot["id"]] = {
+                    "win_rate":     stats.get("win_rate", 50),
+                    "total_trades": stats.get("total_trades", 0),
+                    "total_return": stats.get("total_return", 0),
+                }
+
+        agg = aggregate_signals(signals_per_bot, stats_per_bot)
+
+        # Enrich with live prices
+        all_syms = list(agg.keys())
+        prices   = {}
+        if all_syms:
+            pdata  = await fetch_multi(all_syms)
+            prices = {s: d["price"] for s, d in pdata.items()}
+
+        return {
+            "signals": {
+                sym: {
+                    "action":       a.action,
+                    "confidence":   a.confidence,
+                    "vote_buy":     a.vote_buy,
+                    "vote_sell":    a.vote_sell,
+                    "contributors": a.contributors,
+                    "reasons":      a.reasons,
+                    "price":        prices.get(sym, 0),
+                    "stream_item":  signal_stream_item(sym, a, prices.get(sym, 0)),
+                }
+                for sym, a in agg.items()
+            },
+            "bot_count": len(active_bots),
+            "symbol_count": len(agg),
+        }
+    except Exception as e:
+        logger.error("aggregate error: %s", e)
+        return {"error": str(e), "signals": {}}
+
+
+# ════════════════════════════════════════════════════════════
+# POLYMARKET
+# ════════════════════════════════════════════════════════════
+
+from routers.tradgentic.polymarket import fetch_trending, poly_to_feature
+
+@router.get("/polymarket/trending")
+async def get_poly_trending(limit: int = Query(12, le=30)):
+    """Trending Polymarket prediction markets."""
+    try:
+        markets = await fetch_trending(limit)
+        features = poly_to_feature(markets)
+        return {"markets": markets, "features": features, "count": len(markets)}
+    except Exception as e:
+        logger.error("polymarket error: %s", e)
+        return {"markets": [], "features": {}, "error": str(e)}
+
+
+@router.get("/polymarket/features")
+async def get_poly_features():
+    """Scalar feature vector from Polymarket for ML model input."""
+    try:
+        markets  = await fetch_trending(20)
+        features = poly_to_feature(markets)
+        return features
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ════════════════════════════════════════════════════════════
+# LIVE PNL — broadcasted via main WebSocket
+# ════════════════════════════════════════════════════════════
+
+@router.get("/pnl/snapshot")
+async def get_pnl_snapshot(user=Depends(require_user)):
+    """
+    One-shot PnL snapshot for all user bots.
+    Call this on initial load; live updates come via WebSocket type=tg_pnl.
+    """
+    try:
+        bots = await list_bots(user["id"])
+        result = []
+        for b in bots:
+            assets = b.get("assets", [])
+            prices = {}
+            if assets:
+                qd = await fetch_multi(assets)
+                prices = {s: d["price"] for s, d in qd.items()}
+            stats = await get_portfolio_stats(b["id"], prices)
+            result.append({
+                "bot_id":       b["id"],
+                "name":         b["name"],
+                "strategy":     b["strategy"],
+                "active":       b.get("active", 1),
+                "equity":       stats.get("equity", 0),
+                "cash":         stats.get("cash", 0),
+                "pos_value":    stats.get("pos_value", 0),
+                "total_return": stats.get("total_return", 0),
+                "realized_pnl": stats.get("realized_pnl", 0),
+                "total_trades": stats.get("total_trades", 0),
+                "win_rate":     stats.get("win_rate", 0),
+                "positions":    stats.get("positions", []),
+            })
+        return {"bots": result, "count": len(result)}
+    except Exception as e:
+        logger.error("pnl_snapshot error: %s", e)
+        return {"bots": [], "error": str(e)}
