@@ -2760,38 +2760,90 @@
     <!-- ══ MAIN CONTENT ══ -->
     <div class="tg-body" id="tg-body">
 
-      <!-- Strategy Room / Bot Grid -->
+      <!-- ── Neural Network Flow ── -->
+      <div class="tg-nn-flow" id="tg-nn-flow">
+        <div class="tg-nn-node tg-nn-data">
+          <div class="tg-nn-icon">📡</div>
+          <div class="tg-nn-label">Market<br>Data</div>
+        </div>
+        <div class="tg-nn-edge"><div class="tg-nn-pulse"></div></div>
+        <div class="tg-nn-node tg-nn-poly">
+          <div class="tg-nn-icon">🎯</div>
+          <div class="tg-nn-label">Polymarket<br>Features</div>
+        </div>
+        <div class="tg-nn-edge"><div class="tg-nn-pulse"></div></div>
+        <div class="tg-nn-node tg-nn-bots">
+          <div class="tg-nn-icon">🤖</div>
+          <div class="tg-nn-label">Bot<br>Signals</div>
+          <div class="tg-nn-count" id="tg-nn-bot-count">—</div>
+        </div>
+        <div class="tg-nn-edge"><div class="tg-nn-pulse"></div></div>
+        <div class="tg-nn-node tg-nn-agg">
+          <div class="tg-nn-icon">⚖️</div>
+          <div class="tg-nn-label">Aggregator</div>
+          <div class="tg-nn-count" id="tg-nn-sig-count">—</div>
+        </div>
+        <div class="tg-nn-edge"><div class="tg-nn-pulse"></div></div>
+        <div class="tg-nn-node tg-nn-trade">
+          <div class="tg-nn-icon">💹</div>
+          <div class="tg-nn-label">Paper<br>Trade</div>
+        </div>
+      </div>
+
+      <!-- ── Live Signal Stream ── -->
+      <div class="tg-signal-stream-wrap">
+        <div class="tg-stream-label">LIVE SIGNAL STREAM</div>
+        <div class="tg-signal-stream" id="tg-signal-stream">
+          <div class="tg-stream-empty">Waiting for signals… deploy a bot and run aggregation</div>
+        </div>
+        <button class="tg-stream-run-btn" onclick="tgRunAggregation()">▶ Run Aggregation</button>
+      </div>
+
+      <!-- ── Strategy Room / Bot Grid ── -->
       <div class="tg-section" id="tg-bots-section">
         <div class="tg-section-header">
           <div>
             <div class="tg-section-title">⚡ Strategy Room</div>
-            <div class="tg-section-sub">Your active trading bots — each card is a live paper-trading engine</div>
+            <div class="tg-section-sub">Your deployed bots — live paper-trading with real market data</div>
           </div>
-          <button class="tg-refresh-btn" onclick="tgLoadBots()">↻ Refresh</button>
+          <div style="display:flex;gap:8px">
+            <button class="tg-refresh-btn" onclick="tgLoadBots()">↻ Refresh</button>
+            <button class="tg-btn tg-btn-primary tg-btn-sm" onclick="tgOpenWizard()">+ Bot</button>
+          </div>
         </div>
         <div class="tg-bots-grid" id="tg-bots-grid">
           <div class="tg-empty-state" id="tg-empty">
             <div class="tg-empty-icon">🧪</div>
             <div class="tg-empty-title">No bots deployed yet</div>
             <div class="tg-empty-sub">Create your first bot to start paper trading with real market data</div>
-            <button class="tg-btn tg-btn-primary" onclick="tgOpenWizard()" style="margin-top:16px">
-              🚀 Deploy First Bot
-            </button>
+            <button class="tg-btn tg-btn-primary" onclick="tgOpenWizard()" style="margin-top:16px">🚀 Deploy First Bot</button>
           </div>
         </div>
       </div>
 
-      <!-- Market Scanner -->
-      <div class="tg-section tg-scanner-section">
+      <!-- ── Polymarket Trend Cards ── -->
+      <div class="tg-section">
+        <div class="tg-section-header">
+          <div>
+            <div class="tg-section-title">🎯 Polymarket Intelligence</div>
+            <div class="tg-section-sub">Prediction market probabilities — used as exogenous features in signal models</div>
+          </div>
+          <button class="tg-refresh-btn" onclick="tgLoadPolymarket()">↻ Refresh</button>
+        </div>
+        <div class="tg-poly-grid" id="tg-poly-grid">
+          <div class="tg-poly-loading">Loading prediction markets…</div>
+        </div>
+      </div>
+
+      <!-- ── Market Scanner ── -->
+      <div class="tg-section">
         <div class="tg-section-header">
           <div>
             <div class="tg-section-title">📡 Market Scanner</div>
-            <div class="tg-section-sub">Live quotes for popular assets</div>
+            <div class="tg-section-sub">Live quotes — click to add to bot watchlist</div>
           </div>
         </div>
-        <div class="tg-scanner-grid" id="tg-scanner-grid">
-          <!-- Populated by JS -->
-        </div>
+        <div class="tg-scanner-grid" id="tg-scanner-grid"></div>
       </div>
 
     </div><!-- /tg-body -->

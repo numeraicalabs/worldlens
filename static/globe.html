@@ -162,7 +162,7 @@ function init(){
   /* Globe */
   var geo=new THREE.SphereGeometry(R,64,64);
   var mat=new THREE.MeshPhongMaterial({color:0x0a1628,emissive:0x010408,emissiveIntensity:.2,shininess:30,specular:0x1a3a6a});
-  new THREE.TextureLoader().load('https://github.com/hakubox/ThreeJSEditor/blob/master/examples/textures/planets/earth_atmos_2048.jpg',function(t){mat.map=t;mat.needsUpdate=true;},null,null);
+  new THREE.TextureLoader().load('https://unpkg.com/three@0.128.0/examples/textures/planets/earth_atmos_2048.jpg',function(t){mat.map=t;mat.needsUpdate=true;},null,null);
   globeMesh=new THREE.Mesh(geo,mat);
   scene.add(globeMesh);
   globeMesh.rotation.z=.41;
