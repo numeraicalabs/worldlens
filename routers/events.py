@@ -258,22 +258,6 @@ async def get_macro_briefing():
         return {"briefing": "Macro briefing unavailable — database initialising."}
 
 
-@router.get("/{event_id}")
-async def get_event(event_id: str):
-    try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
-                row = await c.fetchone()
-        if not row:
-            raise HTTPException(404, "Not found")
-        return _parse_ev(row)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.warning("get_event DB error %s: %s", event_id, e)
-        raise HTTPException(503, "Database unavailable")
-
 
 # ── Sentiment Analysis endpoint ──────────────────────
 @router.post("/sentiment/{event_id}")
@@ -899,3 +883,20 @@ async def export_events_csv(
     except Exception as e:
         logger.warning("export_events_csv error: %s", e)
         raise HTTPException(503, "Export unavailable — database initialising.")
+
+# ── Catch-all: single event by ID (MUST be last to avoid shadowing fixed routes) ──
+@router.get("/{event_id}")
+async def get_event(event_id: str):
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
+                row = await c.fetchone()
+        if not row:
+            raise HTTPException(404, "Not found")
+        return _parse_ev(row)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("get_event DB error %s: %s", event_id, e)
+        raise HTTPException(503, "Database unavailable")
