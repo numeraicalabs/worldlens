@@ -161,6 +161,9 @@ function sv(name, btn) {
   if (name==='markets') track('markets_opened', 'markets', '');
   if (name==='insiders') track('insiders_opened', 'insiders', '');
   if (name==='ai') track('ai_opened', 'ai', '');
+  if (name==='tradgentic') {
+    if (typeof initTradgentic === 'function') initTradgentic();
+  }
 }
 
 // ── CAT FILTERS INIT ──────────────────────────────────

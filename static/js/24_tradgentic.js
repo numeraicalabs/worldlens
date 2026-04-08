@@ -44,8 +44,16 @@ var ASSET_CATEGORIES = {
 };
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+var _tgInited = false;
 window.initTradgentic = function() {
   if (!G.token) return;
+  if (_tgInited) {
+    // Already initialized — just refresh bots and scanner
+    tgLoadBots();
+    tgLoadScanner();
+    return;
+  }
+  _tgInited = true;
   tgLoadStrategies();
   tgLoadBots();
   tgLoadScanner();
