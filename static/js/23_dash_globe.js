@@ -39,7 +39,11 @@ function initDashGlobe() {
   var canvas = document.getElementById('db-globe-canvas');
   var wrap   = document.getElementById('db-globe-canvas-wrap');
   if (!canvas || !wrap) return;
-  if (wrap.offsetWidth === 0) { setTimeout(initDashGlobe, 200); return; }
+  // Guard: abort after 10 retries (card may be hidden by media query)
+  DG._retries = (DG._retries || 0) + 1;
+  if (DG._retries > 10) return;
+  if (wrap.offsetWidth === 0) { setTimeout(initDashGlobe, 300); return; }
+  DG._retries = 0;  // reset once we get a real size
 
   DG.initialized = true;
   var W = wrap.offsetWidth, H = wrap.offsetHeight || 150;
@@ -74,10 +78,24 @@ function initDashGlobe() {
   var mat = new THREE.MeshPhongMaterial({
     color: 0x0a1628, emissive: 0x010408, shininess: 25, specular: 0x1a3a6a
   });
-  new THREE.TextureLoader().load(
-    'https://unpkg.com/three@0.128.0/examples/textures/planets/earth_atmos_2048.jpg',
-    function(t) { mat.map = t; mat.needsUpdate = true; }
-  );
+  // Try loading earth texture from CDN — fail silently if CORS blocks it
+  var _texUrls = [
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/textures/planets/earth_atmos_2048.jpg',
+    'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+  ];
+  (function _tryTex(urls) {
+    if (!urls.length) return;  // give up, use base color
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() {
+      var tex = new THREE.Texture(img);
+      tex.needsUpdate = true;
+      mat.map = tex;
+      mat.needsUpdate = true;
+    };
+    img.onerror = function() { _tryTex(urls.slice(1)); };
+    img.src = urls[0];
+  })(_texUrls);
   DG.globe = new THREE.Mesh(geo, mat);
   DG.globe.rotation.z = 0.41;
   DG.scene.add(DG.globe);
@@ -183,7 +201,13 @@ function _loadRegions() {
     DG.regions = data;
     _buildBeacons(data);
     _buildRegionDots(data);
-    _showRegion(DG.activeIdx);
+    // Start on highest-risk region
+    var topIdx = 0, topRisk = -1;
+    data.forEach(function(r, i) {
+      if ((r.risk || 0) > topRisk) { topRisk = r.risk; topIdx = i; }
+    });
+    DG.activeIdx = topIdx;
+    _showRegion(topIdx);
     _startCycle();
   });
 
@@ -246,7 +270,12 @@ function _buildRegionDots(regions) {
     var dot = document.createElement('div');
     dot.className = 'db-globe-region-dot' + (i === DG.activeIdx ? ' active' : '');
     dot.style.background = reg.color || '#3B82F6';
-    dot.title = reg.name;
+    // High-risk glow
+    if (reg.risk >= 7) {
+      dot.style.boxShadow = '0 0 6px 2px ' + (reg.color || '#EF4444') + '80';
+    }
+    dot.title = reg.name + ' — Risk ' + (reg.risk || 0).toFixed(1) +
+                ' · ' + (reg.event_count || 0) + ' events';
     dot.onclick = (function(idx) {
       return function() { _showRegion(idx); _resetCycle(); };
     })(i);
@@ -262,9 +291,21 @@ function _showRegion(idx) {
   DG.activeIdx = idx;
   var reg = DG.regions[idx];
 
+  // Hide skeleton, show summary
+  var skel    = document.getElementById('db-globe-skeleton');
+  var summary = document.getElementById('db-globe-summary');
+  if (skel)    skel.style.display    = 'none';
+  if (summary) {
+    summary.style.display = 'flex';
+    // Re-trigger animation
+    summary.classList.remove('db-globe-summary');
+    void summary.offsetWidth;
+    summary.classList.add('db-globe-summary');
+  }
+
   // Update active dot
-  var dots = document.querySelectorAll('.db-globe-region-dot');
-  dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+  document.querySelectorAll('.db-globe-region-dot')
+    .forEach(function(d, i) { d.classList.toggle('active', i === idx); });
 
   // Region name in header
   var rn = document.getElementById('db-globe-region-name');
@@ -279,11 +320,23 @@ function _showRegion(idx) {
     var risk = reg.risk || 0;
     var riskColor = risk >= 7 ? '#EF4444' : risk >= 5 ? '#F59E0B' : '#10B981';
     riskEl.textContent = 'Risk ' + risk.toFixed(1);
-    riskEl.style.background = riskColor + '18';
-    riskEl.style.color       = riskColor;
-    riskEl.style.borderColor = riskColor + '40';
+    riskEl.style.background  = riskColor + '18';
+    riskEl.style.color        = riskColor;
+    riskEl.style.borderColor  = riskColor + '40';
   }
   if (evEl) evEl.textContent = (reg.event_count || 0) + ' events';
+
+  // Top critical event (if any)
+  var topEvEl = document.getElementById('db-globe-top-event');
+  if (topEvEl) {
+    var topEvs = (reg.top_events || []).filter(function(e){ return e.severity >= 7; });
+    if (topEvs.length) {
+      topEvEl.style.display = 'block';
+      topEvEl.textContent   = '⚠ ' + topEvs[0].title.slice(0, 65);
+    } else {
+      topEvEl.style.display = 'none';
+    }
+  }
 
   // Summary text
   var textEl = document.getElementById('db-globe-text');
@@ -296,6 +349,12 @@ function _showRegion(idx) {
     topicsEl.innerHTML = topics.slice(0, 3).map(function(t) {
       return '<span class="db-globe-topic-chip">' + t + '</span>';
     }).join('');
+  }
+
+  // Footer label
+  var footerLbl = document.getElementById('db-globe-footer-label');
+  if (footerLbl) {
+    footerLbl.textContent = (idx + 1) + '/' + DG.regions.length + ' regions · auto-cycling';
   }
 
   // Rotate globe to face this region
@@ -357,26 +416,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ── Boot: init when dash view becomes active ──────────────────────────────────
 
-// Called by enterApp() in 02_core.js after data load — hook into sv()
-var _svOrigGlobe = window.sv;
-window.sv = function(view, btn) {
-  if (_svOrigGlobe) _svOrigGlobe(view, btn);
-  if (view === 'dash') {
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() { initDashGlobe(); });
-    });
-  }
-};
-
-// Also init immediately if dash is already active on load
-document.addEventListener('DOMContentLoaded', function() {
-  setTimeout(function() {
-    var dash = document.getElementById('view-dash');
-    if (dash && dash.classList.contains('on')) initDashGlobe();
-  }, 800);
-});
-
-// Expose for external call from enterApp
 window.initDashGlobe = initDashGlobe;
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Watch view-dash for .on class addition (robust across any sv() patcher)
+  var dash = document.getElementById('view-dash');
+  if (!dash) return;
+
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      if (m.attributeName === 'class' && dash.classList.contains('on')) {
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() { initDashGlobe(); });
+        });
+      }
+    });
+  });
+  observer.observe(dash, { attributes: true, attributeFilter: ['class'] });
+
+  // Init immediately if already active on first load
+  setTimeout(function() {
+    if (dash.classList.contains('on')) initDashGlobe();
+  }, 600);
+});
 
 })();

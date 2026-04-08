@@ -67,10 +67,34 @@ function tgLoadStrategies() {
 }
 
 window.tgLoadBots = function() {
+  var grid  = document.getElementById('tg-bots-grid');
+  var empty = document.getElementById('tg-empty');
+  // Show skeleton while loading
+  if (grid) grid.innerHTML = [1,2].map(function() {
+    return '<div class="tg-bot-card" style="opacity:.35;pointer-events:none">'
+      + '<div style="height:14px;background:rgba(255,255,255,.08);border-radius:4px;width:60%;margin-bottom:10px"></div>'
+      + '<div style="height:10px;background:rgba(255,255,255,.05);border-radius:4px;width:80%;margin-bottom:6px"></div>'
+      + '<div style="height:10px;background:rgba(255,255,255,.05);border-radius:4px;width:50%"></div>'
+      + '</div>';
+  }).join('');
+
   rq('/api/tradgentic/bots').then(function(d) {
-    if (!Array.isArray(d)) return;
+    if (!Array.isArray(d)) {
+      // Server error or auth issue — show empty state with message
+      if (grid) grid.innerHTML = '';
+      if (empty) {
+        empty.style.display = 'flex';
+        var msg = empty.querySelector('.tg-empty-sub');
+        if (msg) msg.textContent = 'Could not load bots. Check server logs.';
+        if (grid) grid.appendChild(empty);
+      }
+      return;
+    }
     TG.bots = d;
     _renderBotsGrid(d);
+    // Update NN flow bot count
+    var nn = document.getElementById('tg-nn-bot-count');
+    if (nn) nn.textContent = d.filter(function(b){ return b.active !== 0; }).length + ' active';
   });
 };
 
