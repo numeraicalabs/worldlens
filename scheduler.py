@@ -761,6 +761,12 @@ def start():
         misfire_grace_time=3600,
     )
 
+    _scheduler.add_job(
+        _broadcast_tg_pnl, "interval",
+        seconds=30,
+        id="tg_pnl",
+        next_run_time=__import__('datetime').datetime.now(),
+    )
     _scheduler.start()
     logger.info(
         "Scheduler started — events every %ds, finance every %ds, sentiment every 180s",
@@ -936,3 +942,49 @@ async def _run_monday_verify():
         logger.info("Monday verify: verified %d predictions", count)
     except Exception as e:
         logger.error("_run_monday_verify: %s", e)
+
+
+# ── Tradgentic live PnL broadcast (every 30s when users online) ──────────────
+async def _broadcast_tg_pnl():
+    """Push live PnL updates for all active bots via WebSocket."""
+    try:
+        from routers.tradgentic.portfolio import list_bots as tg_list_bots, get_portfolio_stats
+        from routers.tradgentic.market_data import fetch_multi
+
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT DISTINCT user_id FROM tg_bots WHERE active=1"
+            ) as cur:
+                user_rows = await cur.fetchall()
+
+        for row in user_rows:
+            uid   = row[0]
+            bots  = await tg_list_bots(uid)
+            pnls  = []
+            for b in bots:
+                if not b.get("active", 1):
+                    continue
+                assets = b.get("assets", [])
+                prices = {}
+                if assets:
+                    qd     = await fetch_multi(assets)
+                    prices = {s: d["price"] for s, d in qd.items()}
+                stats = await get_portfolio_stats(b["id"], prices)
+                pnls.append({
+                    "bot_id":       b["id"],
+                    "name":         b["name"],
+                    "equity":       stats.get("equity", 0),
+                    "total_return": stats.get("total_return", 0),
+                    "positions":    stats.get("positions", []),
+                })
+
+            if pnls:
+                for cb in _ws_callbacks:
+                    try:
+                        await cb({"type": "tg_pnl", "user_id": uid, "data": pnls})
+                    except Exception:
+                        pass
+
+    except Exception as e:
+        logger.debug("_broadcast_tg_pnl error: %s", e)
