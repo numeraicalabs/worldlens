@@ -45,9 +45,15 @@ var ASSET_CATEGORIES = {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
-// ── Activation routine — called by sv() + MutationObserver ───────────────────
+// ── ALL module state declared here so every function can access them ──────────
 var _tgBootDone  = false;
 var _tgActivated = false;
+var _tgInited    = false;
+var _polyLoaded  = false;
+var _aggRunning  = false;
+var _streamItems = [];
+var _pnlCache    = {};
+var _drawdownMap = {};
 
 function _tgOnActivate() {
   if (!_polyLoaded) tgLoadPolymarket();
@@ -60,7 +66,6 @@ function _tgOnActivate() {
   }
 }
 
-var _tgInited = false;
 window.initTradgentic = function() {
   if (!G.token) return;
   if (_tgInited) {
@@ -713,20 +718,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 window.initTradgentic = initTradgentic;
 
-})();
-
-// ══════════════════════════════════════════════════════════════════════════════
-// BLOCK B+C — Aggregation Engine · Polymarket · NN Flow · Signal Stream · WS PnL
-// ══════════════════════════════════════════════════════════════════════════════
-(function() {
-'use strict';
-
-// ── State ────────────────────────────────────────────────────────────────────
-var _streamItems  = [];   // [{symbol, action, confidence, price, ...}]
-var _aggRunning   = false;
-var _polyLoaded   = false;
-var _pnlCache     = {};   // bot_id → pnl snapshot
-var _drawdownMap  = {};   // bot_id → peak equity (for drawdown calc)
+// ── BLOCK B+C — Aggregation Engine · Polymarket · NN Flow · Signal Stream ────
 
 // ── WebSocket PnL live updates ───────────────────────────────────────────────
 window.tgOnWsPnl = function(data) {

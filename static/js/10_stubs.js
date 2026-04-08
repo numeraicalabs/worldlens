@@ -135,7 +135,7 @@ function saveProfile() {
   if (u   && u.value)   body.username = u.value.trim();
   if (bio && bio.value) body.bio      = bio.value.trim();
   if (!Object.keys(body).length) return;
-  rq('/api/user/profile', { method:'POST', body:body }).then(function(r) {
+  rq('/api/user/profile', { method:'PUT', body:body }).then(function(r) {
     if (r && !r.detail) {
       if (body.username) G.user.username = body.username;
       renderProfile();
@@ -285,7 +285,7 @@ function obNext() { if (OB.step < OB_STEPS.length-1) { OB.step++; _obRender(); }
 function obBack() { if (OB.step>0) { OB.step--; _obRender(); } }
 function skipOnboarding() {
   var ov=document.getElementById('ob-overlay'); if (ov) ov.style.display='none';
-  rq('/api/user/profile',{method:'POST',body:{onboarding_done:1}});
+  rq('/api/user/profile',{method:'PUT',body:{onboarding_done:1}});
 }
 function _obFinish() {
   var ov=document.getElementById('ob-overlay'); if (ov) ov.style.display='none';
@@ -316,7 +316,7 @@ function _tutRender() {
 }
 function tutNext() {
   if (TUT.step<TUT_STEPS.length-1) { TUT.step++; _tutRender(); }
-  else { skipTutorial(); rq('/api/user/profile',{method:'POST',body:{tutorial_done:1}}); }
+  else { skipTutorial(); rq('/api/user/profile',{method:'PUT',body:{tutorial_done:1}}); }
 }
 function tutBack() { if (TUT.step>0) { TUT.step--; _tutRender(); } }
 function skipTutorial() { var ov=document.getElementById('tut-overlay'); if (ov) ov.style.display='none'; }
