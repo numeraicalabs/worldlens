@@ -8,7 +8,7 @@ No API key required for public markets.
 from __future__ import annotations
 import time, logging, random
 from typing import List, Dict, Optional
-import aiohttp
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -39,20 +39,18 @@ async def fetch_trending(limit: int = 20) -> List[Dict]:
         return _POLY_CACHE[:limit]
 
     try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=8)
-        ) as session:
-            params = {
-                "active": "true",
-                "closed": "false",
-                "limit":  str(min(limit * 3, 100)),
-                "order":  "volume24hr",
-                "ascending": "false",
-            }
-            async with session.get(POLYMARKET_ENDPOINT, params=params) as resp:
-                if resp.status != 200:
-                    raise ValueError(f"HTTP {resp.status}")
-                data = await resp.json()
+        params = {
+            "active":    "true",
+            "closed":    "false",
+            "limit":     str(min(limit * 3, 100)),
+            "order":     "volume24hr",
+            "ascending": "false",
+        }
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(POLYMARKET_ENDPOINT, params=params)
+            if resp.status_code != 200:
+                raise ValueError(f"HTTP {resp.status_code}")
+            data = resp.json()
 
         markets  = data if isinstance(data, list) else data.get("markets", [])
         result   = []
