@@ -44,19 +44,37 @@ var ASSET_CATEGORIES = {
 };
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+
+// ── Activation routine — called by sv() + MutationObserver ───────────────────
+var _tgBootDone  = false;
+var _tgActivated = false;
+
+function _tgOnActivate() {
+  if (!_polyLoaded) tgLoadPolymarket();
+  setTimeout(tgLoadPnlSnapshot, 600);
+  if (!_tgBootDone) {
+    _tgBootDone = true;
+    setTimeout(function() {
+      if (TG.bots && TG.bots.length) tgRunAggregation();
+    }, 1500);
+  }
+}
+
 var _tgInited = false;
 window.initTradgentic = function() {
   if (!G.token) return;
   if (_tgInited) {
-    // Already initialized — just refresh bots and scanner
     tgLoadBots();
     tgLoadScanner();
+    _tgOnActivate();
     return;
   }
   _tgInited = true;
   tgLoadStrategies();
   tgLoadBots();
   tgLoadScanner();
+  // Also trigger the activation routine (Polymarket + PnL + aggregation)
+  setTimeout(_tgOnActivate, 300);
 };
 
 // ── Data loading ──────────────────────────────────────────────────────────────
@@ -80,14 +98,15 @@ window.tgLoadBots = function() {
 
   rq('/api/tradgentic/bots').then(function(d) {
     if (!Array.isArray(d)) {
-      // Server error or auth issue — show empty state with message
-      if (grid) grid.innerHTML = '';
-      if (empty) {
-        empty.style.display = 'flex';
-        var msg = empty.querySelector('.tg-empty-sub');
-        if (msg) msg.textContent = 'Could not load bots. Check server logs.';
-        if (grid) grid.appendChild(empty);
-      }
+      // Server error — show inline error message (no DOM moves)
+      if (grid) grid.innerHTML =
+        '<div style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;'
+        + 'justify-content:center;padding:48px 24px;gap:10px;color:var(--t3)">'
+        + '<div style="font-size:32px">⚠️</div>'
+        + '<div style="font-size:13px;color:var(--t2);font-weight:600">Could not load bots</div>'
+        + '<div style="font-size:11px">Check server logs · <a onclick="tgLoadBots()" '
+        + 'style="color:var(--b4);cursor:pointer">Retry</a></div></div>';
+      if (empty) empty.style.display = 'none';
       return;
     }
     TG.bots = d;
@@ -119,13 +138,21 @@ function _renderBotsGrid(bots) {
   var grid  = document.getElementById('tg-bots-grid');
   var empty = document.getElementById('tg-empty');
   if (!grid) return;
+
   if (!bots.length) {
-    grid.innerHTML = '';
-    if (empty) { empty.style.display = 'flex'; grid.appendChild(empty); }
+    // Use innerHTML so we don't move the DOM node (appendChild breaks layout)
+    grid.innerHTML =
+      '<div class="tg-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;gap:12px;color:var(--t3)">'
+    + '<div style="font-size:40px">🧪</div>'
+    + '<div style="font-family:var(--fh);font-size:16px;font-weight:700;color:var(--t2)">No bots deployed yet</div>'
+    + '<div style="font-size:12px;text-align:center;max-width:280px;line-height:1.6">Create your first bot to start paper trading with real market data</div>'
+    + '<button class="tg-btn tg-btn-primary" onclick="tgOpenWizard()" style="margin-top:8px">🚀 Deploy First Bot</button>'
+    + '</div>';
+    if (empty) empty.style.display = 'none';  // hide original so no duplicate
     return;
   }
-  if (empty) empty.style.display = 'none';
 
+  if (empty) empty.style.display = 'none';
   grid.innerHTML = '';
   bots.forEach(function(bot, i) {
     var card = _buildBotCard(bot, i);
@@ -978,28 +1005,26 @@ setInterval(function() {
   }
 }, 60000);
 
-// ── Boot additions ─────────────────────────────────────────────────────────────
-var _tgBootDone = false;
+// ── Boot: MutationObserver for class changes ─────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   var view = document.getElementById('view-tradgentic');
   if (!view) return;
+
+  // Watch for class changes (handles sv() transitions)
   new MutationObserver(function(muts) {
     muts.forEach(function(m) {
       if (m.attributeName === 'class' && view.classList.contains('on')) {
-        // Load Polymarket on first activation
-        if (!_polyLoaded) tgLoadPolymarket();
-        // Load PnL snapshot
-        setTimeout(tgLoadPnlSnapshot, 800);
-        // Run aggregation after bots load
-        if (!_tgBootDone) {
-          _tgBootDone = true;
-          setTimeout(function() {
-            if (typeof TG !== 'undefined' && TG.bots.length) tgRunAggregation();
-          }, 2000);
-        }
+        _tgActivated = true;
+        _tgOnActivate();
       }
     });
   }).observe(view, { attributes: true, attributeFilter: ['class'] });
+
+  // If already active at DOMContentLoaded (edge case)
+  if (view.classList.contains('on')) {
+    _tgActivated = true;
+    _tgOnActivate();
+  }
 });
 
 // ── Helper ────────────────────────────────────────────────────────────────────
