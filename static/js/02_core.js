@@ -328,6 +328,7 @@ function connectWS() {
       var m = JSON.parse(e.data);
       if (m.type==='events_updated') { loadEvs().then(function(){ renderFeed(); renderDash(); if(G.mapReady) updateMarkers(); }); }
       if (m.type==='finance_updated') { G.finance=m.data; renderMkts(); updateDashFin(); }
+      if (m.type==='tg_pnl' && typeof tgOnWsPnl === 'function') { tgOnWsPnl(m.data); }
     } catch(ex) {}
   };
   setInterval(function(){ if(G.ws&&G.ws.readyState===1) G.ws.send('ping'); }, 25000);

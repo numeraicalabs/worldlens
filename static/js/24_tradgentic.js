@@ -117,6 +117,7 @@ function _buildBotCard(bot, idx) {
   div.className = 'tg-bot-card ' + (active ? 'active' : 'paused');
   div.style.setProperty('--tg-color', color);
   div.style.animationDelay = (idx * 0.07) + 's';
+  div.setAttribute('data-bot-id', bot.id);
 
   var retClass = ret > 0 ? 'positive' : ret < 0 ? 'negative' : 'neutral';
   var retPrefix = ret >= 0 ? '+' : '';
@@ -138,9 +139,9 @@ function _buildBotCard(bot, idx) {
     '  </div>',
     '</div>',
     '<div class="tg-card-pnl">',
-    '  <div class="tg-pnl-item"><div class="tg-pnl-label">Equity</div><div class="tg-pnl-val">$' + _fmt(equity) + '</div></div>',
-    '  <div class="tg-pnl-item"><div class="tg-pnl-label">Return</div><div class="tg-pnl-val ' + retClass + '">' + retPrefix + ret.toFixed(2) + '%</div></div>',
-    '  <div class="tg-pnl-item"><div class="tg-pnl-label">Win Rate</div><div class="tg-pnl-val">' + winRate.toFixed(0) + '%</div></div>',
+    '  <div class="tg-pnl-item"><div class="tg-pnl-label">Equity</div><div class="tg-pnl-val tg-live-equity">$' + _fmt(equity) + '</div></div>',
+    '  <div class="tg-pnl-item"><div class="tg-pnl-label">Return</div><div class="tg-pnl-val ' + retClass + ' tg-live-return">' + retPrefix + ret.toFixed(2) + '%</div></div>',
+    '  <div class="tg-pnl-item"><div class="tg-pnl-label">Drawdown</div><div class="tg-pnl-val tg-live-dd">0.0%</div></div>',
     '</div>',
     '<div class="tg-card-assets">' + (assetHtml || '<span style="font-size:10px;color:var(--t3)">No assets configured</span>') + '</div>',
     '<div class="tg-card-foot">',
@@ -652,5 +653,329 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 window.initTradgentic = initTradgentic;
+
+})();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BLOCK B+C — Aggregation Engine · Polymarket · NN Flow · Signal Stream · WS PnL
+// ══════════════════════════════════════════════════════════════════════════════
+(function() {
+'use strict';
+
+// ── State ────────────────────────────────────────────────────────────────────
+var _streamItems  = [];   // [{symbol, action, confidence, price, ...}]
+var _aggRunning   = false;
+var _polyLoaded   = false;
+var _pnlCache     = {};   // bot_id → pnl snapshot
+var _drawdownMap  = {};   // bot_id → peak equity (for drawdown calc)
+
+// ── WebSocket PnL live updates ───────────────────────────────────────────────
+window.tgOnWsPnl = function(data) {
+  if (!Array.isArray(data)) return;
+  data.forEach(function(snap) {
+    _pnlCache[snap.bot_id] = snap;
+    _updateCardPnl(snap);
+    _trackDrawdown(snap);
+  });
+};
+
+function _updateCardPnl(snap) {
+  // Live-patch PnL values on the bot card without full re-render
+  var card = document.querySelector('[data-bot-id="' + snap.bot_id + '"]');
+  if (!card) return;
+
+  var retEl = card.querySelector('.tg-live-return');
+  var eqEl  = card.querySelector('.tg-live-equity');
+  var ddEl  = card.querySelector('.tg-live-dd');
+
+  var ret = snap.total_return || 0;
+  var dd  = _drawdownMap[snap.bot_id] || 0;
+
+  if (retEl) {
+    retEl.textContent = (ret >= 0 ? '+' : '') + ret.toFixed(2) + '%';
+    retEl.className   = 'tg-pnl-val tg-live-return ' + (ret >= 0 ? 'positive' : 'negative');
+  }
+  if (eqEl)  eqEl.textContent  = '$' + _fmt(snap.equity);
+  if (ddEl)  ddEl.textContent  = dd.toFixed(1) + '%';
+}
+
+function _trackDrawdown(snap) {
+  var id   = snap.bot_id;
+  var eq   = snap.equity || 0;
+  var peak = _drawdownMap[id + '_peak'] || eq;
+  if (eq > peak) peak = eq;
+  _drawdownMap[id + '_peak'] = peak;
+  _drawdownMap[id] = peak > 0 ? ((peak - eq) / peak * 100) : 0;
+}
+
+// ── NN Flow updater ───────────────────────────────────────────────────────────
+function _updateNNFlow(botCount, sigCount, polyLoaded) {
+  var bc = document.getElementById('tg-nn-bot-count');
+  var sc = document.getElementById('tg-nn-sig-count');
+  if (bc) bc.textContent = botCount || '—';
+  if (sc) sc.textContent = sigCount || '—';
+
+  // Animate the active nodes
+  var nodes = document.querySelectorAll('.tg-nn-node');
+  nodes.forEach(function(n, i) {
+    n.style.opacity = '1';
+    n.style.animation = 'none';
+    setTimeout(function() {
+      n.style.animation = 'tgNodePing .5s ease-out';
+    }, i * 120);
+  });
+
+  // Color the Poly node if loaded
+  var polyNode = document.querySelector('.tg-nn-poly');
+  if (polyNode) {
+    polyNode.style.borderColor = polyLoaded
+      ? 'rgba(245,158,11,.5)'
+      : 'rgba(245,158,11,.2)';
+  }
+}
+
+// ── Signal Aggregation ────────────────────────────────────────────────────────
+window.tgRunAggregation = function() {
+  if (_aggRunning) return;
+  _aggRunning = true;
+
+  var btn = document.querySelector('.tg-stream-run-btn');
+  if (btn) { btn.classList.add('loading'); btn.textContent = '⏳ Aggregating…'; }
+
+  var stream = document.getElementById('tg-signal-stream');
+  if (stream) stream.innerHTML = '<div class="tg-stream-empty" style="color:var(--b4)">Running aggregation across all active bots…</div>';
+
+  rq('/api/tradgentic/aggregate').then(function(d) {
+    _aggRunning = false;
+    if (btn) { btn.classList.remove('loading'); btn.textContent = '▶ Run Aggregation'; }
+
+    if (!d || d.error) {
+      if (stream) stream.innerHTML = '<div class="tg-stream-empty" style="color:var(--re)">'
+        + (d && d.error || 'Aggregation failed — deploy at least one active bot') + '</div>';
+      return;
+    }
+
+    var signals = d.signals || {};
+    var syms    = Object.keys(signals);
+    if (!syms.length) {
+      if (stream) stream.innerHTML = '<div class="tg-stream-empty">No signals — all bots may be holding</div>';
+      return;
+    }
+
+    _streamItems = syms.map(function(sym) { return signals[sym].stream_item || signals[sym]; });
+    _renderSignalStream(_streamItems);
+    _updateNNFlow(d.bot_count, syms.length, _polyLoaded);
+    toast('⚡ ' + syms.length + ' signals aggregated from ' + d.bot_count + ' bots', 's', 3000);
+  });
+};
+
+function _renderSignalStream(items) {
+  var stream = document.getElementById('tg-signal-stream');
+  if (!stream) return;
+
+  if (!items.length) {
+    stream.innerHTML = '<div class="tg-stream-empty">No active signals</div>';
+    return;
+  }
+
+  // Render as scrolling ticker
+  var ticker = document.createElement('div');
+  ticker.className = 'tg-stream-ticker';
+
+  // Sort: BUY and SELL first, HOLD last; then by confidence desc
+  var sorted = items.slice().sort(function(a, b) {
+    var aPriority = a.action === 'HOLD' ? 0 : 1;
+    var bPriority = b.action === 'HOLD' ? 0 : 1;
+    if (aPriority !== bPriority) return bPriority - aPriority;
+    return (b.confidence || 0) - (a.confidence || 0);
+  });
+
+  sorted.forEach(function(item, i) {
+    var el = document.createElement('div');
+    el.className = 'tg-stream-item ' + item.action;
+    el.style.animationDelay = (i * 0.06) + 's';
+
+    var conf    = Math.round((item.confidence || 0) * 100);
+    var buyPct  = Math.round((item.vote_buy   || 0) * 100);
+    var sellPct = Math.round((item.vote_sell  || 0) * 100);
+    var price   = item.price ? '$' + parseFloat(item.price).toFixed(2) : '';
+
+    el.innerHTML = '<span class="tg-stream-sym">' + (item.icon || '') + ' ' + item.symbol + '</span>'
+      + '<span class="tg-stream-action">' + item.action + '</span>'
+      + '<span class="tg-stream-conf">' + conf + '%</span>'
+      + '<span class="tg-stream-bars">'
+      +   '<span class="tg-bar-buy"  style="width:' + buyPct + 'px" title="Buy votes"></span>'
+      +   '<span class="tg-bar-sell" style="width:' + sellPct + 'px" title="Sell votes"></span>'
+      + '</span>'
+      + '<span class="tg-stream-price">' + price + '</span>'
+      + (item.contributors ? '<span class="tg-stream-bots">' + item.contributors + ' bots</span>' : '');
+
+    ticker.appendChild(el);
+  });
+
+  stream.innerHTML = '';
+  stream.appendChild(ticker);
+}
+
+// ── Polymarket cards ──────────────────────────────────────────────────────────
+window.tgLoadPolymarket = function() {
+  var grid = document.getElementById('tg-poly-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="tg-poly-loading">Loading prediction markets…</div>';
+
+  rq('/api/tradgentic/polymarket/trending').then(function(d) {
+    if (!d || !d.markets || !d.markets.length) {
+      grid.innerHTML = '<div class="tg-poly-loading">No prediction markets available</div>';
+      return;
+    }
+    _polyLoaded = true;
+    _renderPolyCards(d.markets, grid);
+    _updateNNFlow(null, null, true);
+  });
+};
+
+var CAT_COLORS = {
+  Crypto:  '#F59E0B',
+  Macro:   '#3B82F6',
+  Politics:'#8B5CF6',
+  Tech:    '#06B6D4',
+  Energy:  '#F97316',
+  Markets: '#10B981',
+};
+
+function _renderPolyCards(markets, grid) {
+  grid.innerHTML = '';
+  markets.slice(0, 12).forEach(function(m, i) {
+    var card = _buildPolyCard(m, i);
+    grid.appendChild(card);
+  });
+}
+
+function _buildPolyCard(m, i) {
+  var prob     = m.probability || 0;
+  var pct      = Math.round(prob * 100);
+  var noP      = 100 - pct;
+  var trend    = m.trend || 'uncertain';
+  var catColor = CAT_COLORS[m.category] || '#94A3B8';
+  var isStrong = trend === 'strong_yes' || trend === 'strong_no';
+
+  var trendIcon = {
+    strong_yes:  '🟢 Strong YES',
+    leaning_yes: '↗ Leaning YES',
+    uncertain:   '↔ Uncertain',
+    leaning_no:  '↘ Leaning NO',
+    strong_no:   '🔴 Strong NO',
+  }[trend] || '↔ Uncertain';
+
+  var trendColor = trend.includes('yes') ? 'var(--gr)'
+                 : trend.includes('no')  ? 'var(--re)'
+                 : 'var(--am)';
+
+  var vol = m.volume_24h >= 1e6
+    ? '$' + (m.volume_24h / 1e6).toFixed(1) + 'M'
+    : m.volume_24h >= 1e3
+    ? '$' + (m.volume_24h / 1e3).toFixed(0) + 'K'
+    : '$' + m.volume_24h;
+
+  var div = document.createElement('div');
+  div.className = 'tg-poly-card' + (isStrong ? ' trending-strong' : '');
+  div.style.setProperty('--tg-poly-color', catColor);
+  div.style.animationDelay = (i * 0.07) + 's';
+
+  div.innerHTML = [
+    '<div class="tg-poly-header">',
+    '  <span class="tg-poly-question">' + _esc(m.question) + '</span>',
+    '  <span class="tg-poly-cat" style="background:' + catColor + '18;color:' + catColor + ';border:1px solid ' + catColor + '30">' + m.category + '</span>',
+    '</div>',
+    '<div class="tg-poly-prob-wrap">',
+    '  <div class="tg-poly-prob-row">',
+    '    <span class="tg-poly-yes-label">YES</span>',
+    '    <div class="tg-poly-bar-track">',
+    '      <div class="tg-poly-bar-fill" style="width:' + pct + '%;background:' + (pct > 50 ? 'var(--gr)' : 'var(--re)') + '"></div>',
+    '    </div>',
+    '    <span class="tg-poly-no-label">NO</span>',
+    '  </div>',
+    '  <div class="tg-poly-prob-pct">',
+    '    <span style="color:var(--gr);font-family:var(--fm);font-weight:800">' + pct + '%</span>',
+    '    <span class="tg-poly-trend" style="color:' + trendColor + '">' + trendIcon + '</span>',
+    '    <span style="color:var(--re);font-family:var(--fm);font-weight:800">' + noP + '%</span>',
+    '  </div>',
+    '</div>',
+    '<div class="tg-poly-footer">',
+    '  <span class="tg-poly-vol">Vol ' + vol + '</span>',
+    (m.end_date ? '<span class="tg-poly-date">⏱ ' + m.end_date + '</span>' : ''),
+    '</div>',
+  ].join('');
+
+  div.onclick = function() {
+    if (m.slug) window.open('https://polymarket.com/event/' + m.slug, '_blank');
+  };
+
+  return div;
+}
+
+// ── PnL Snapshot + drawdown monitor ─────────────────────────────────────────
+window.tgLoadPnlSnapshot = function() {
+  rq('/api/tradgentic/pnl/snapshot').then(function(d) {
+    if (!d || !d.bots) return;
+    d.bots.forEach(function(snap) {
+      _pnlCache[snap.bot_id] = snap;
+      _trackDrawdown(snap);
+      _updateCardPnl(snap);
+    });
+    _updateNNFlow(d.count, Object.keys(_pnlCache).length, _polyLoaded);
+  });
+};
+
+// ── Extend _buildBotCard to add live-patch data attributes ──────────────────
+// Monkey-patch: add data-bot-id and live-update classes to cards
+var _origBuildBotCard = window._tgBuildBotCard_internal;
+
+// Hook into tgLoadBots to attach live-patchable attributes
+var _origLoadBots = window.tgLoadBots;
+window.tgLoadBots = function() {
+  if (_origLoadBots) _origLoadBots();
+  // After bots load, refresh PnL
+  setTimeout(tgLoadPnlSnapshot, 600);
+};
+
+// ── Auto-cycle: run aggregation every 60s when view is active ────────────────
+setInterval(function() {
+  if (typeof G !== 'undefined' && G.currentView === 'tradgentic') {
+    if (!_aggRunning) tgRunAggregation();
+  }
+}, 60000);
+
+// ── Boot additions ─────────────────────────────────────────────────────────────
+var _tgBootDone = false;
+document.addEventListener('DOMContentLoaded', function() {
+  var view = document.getElementById('view-tradgentic');
+  if (!view) return;
+  new MutationObserver(function(muts) {
+    muts.forEach(function(m) {
+      if (m.attributeName === 'class' && view.classList.contains('on')) {
+        // Load Polymarket on first activation
+        if (!_polyLoaded) tgLoadPolymarket();
+        // Load PnL snapshot
+        setTimeout(tgLoadPnlSnapshot, 800);
+        // Run aggregation after bots load
+        if (!_tgBootDone) {
+          _tgBootDone = true;
+          setTimeout(function() {
+            if (typeof TG !== 'undefined' && TG.bots.length) tgRunAggregation();
+          }, 2000);
+        }
+      }
+    });
+  }).observe(view, { attributes: true, attributeFilter: ['class'] });
+});
+
+// ── Helper ────────────────────────────────────────────────────────────────────
+function _fmt(n) {
+  return parseFloat(n || 0).toLocaleString('en', { maximumFractionDigits: 0 });
+}
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
 })();
