@@ -1046,4 +1046,50 @@ function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+/* ── Main tab switching ── */
+window.tgMainTab = function(tab, btn) {
+  document.querySelectorAll('.tg-main-tab').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('.tg-main-panel').forEach(function(p){ p.classList.remove('on'); });
+  if (btn) btn.classList.add('on');
+  var panel = document.getElementById('tg-panel-' + tab);
+  if (panel) panel.classList.add('on');
+
+  if (tab === 'backtest') {
+    if (typeof initBacktestLab === 'function') {
+      if (!document.querySelector('#bt-lab-root .btl-header')) {
+        initBacktestLab();
+      }
+    }
+  }
+  if (tab === 'features') {
+    if (typeof initFeatureLab === 'function') {
+      if (!document.querySelector('#fe-lab-root .fel-header')) {
+        initFeatureLab();
+      }
+    }
+  }
+  if (tab === 'polymarket') {
+    var grid = document.getElementById('tg-poly-grid-tab');
+    if (grid) {
+      // Clone polymarket data to new grid
+      var src = document.getElementById('tg-poly-grid');
+      if (src && src.innerHTML && !src.innerHTML.includes('Loading')) {
+        grid.innerHTML = src.innerHTML;
+      } else {
+        tgLoadPolymarket();
+      }
+    }
+  }
+  if (tab === 'scanner') {
+    var sgrid = document.getElementById('tg-scanner-grid-tab');
+    var src2  = document.getElementById('tg-scanner-grid');
+    if (sgrid && src2 && src2.children.length > 0) {
+      sgrid.innerHTML = src2.innerHTML;
+    } else if (sgrid) {
+      tgLoadScanner();
+    }
+  }
+};
+
+
 })();
