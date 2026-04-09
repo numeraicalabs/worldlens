@@ -13,12 +13,13 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/css/worldlens.css?v=20260411">
-<link rel="stylesheet" href="/static/css/worldlens_neo.css?v=20260411">
-  <link rel="stylesheet" href="/static/css/tradgentic.css?v=20260411">
-<link rel="stylesheet" href="/static/css/worldlens_mobile.css?v=20260411">
-<link rel="stylesheet" href="/static/css/worldlens_fire.css?v=20260411">
-<link rel="stylesheet" href="/static/css/globe_widget.css?v=20260411">
+<link rel="stylesheet" href="/static/css/worldlens.css?v=20260413">
+<link rel="stylesheet" href="/static/css/worldlens_neo.css?v=20260413">
+  <link rel="stylesheet" href="/static/css/tradgentic.css?v=20260413">
+  <link rel="stylesheet" href="/static/css/backtest.css?v=20260413">
+<link rel="stylesheet" href="/static/css/worldlens_mobile.css?v=20260413">
+<link rel="stylesheet" href="/static/css/worldlens_fire.css?v=20260413">
+<link rel="stylesheet" href="/static/css/globe_widget.css?v=20260413">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -2028,9 +2029,18 @@
         </button>
       </div>
     </div>
+    <!-- ══ TRADGENTIC TOP TABS ══ -->
+    <div class="tg-main-tabs">
+      <button class="tg-main-tab on" onclick="tgMainTab('room',this)">⚡ Strategy Room</button>
+      <button class="tg-main-tab"   onclick="tgMainTab('backtest',this)">⚗️ Backtest Lab</button>
+      <button class="tg-main-tab"   onclick="tgMainTab('features',this)">🔬 Features</button>
+      <button class="tg-main-tab"   onclick="tgMainTab('polymarket',this)">🎯 Polymarket</button>
+      <button class="tg-main-tab"   onclick="tgMainTab('scanner',this)">📡 Scanner</button>
+    </div>
 
     <!-- ══ MAIN CONTENT ══ -->
-    <div class="tg-body" id="tg-body">
+    <!-- Tab: Strategy Room -->
+    <div class="tg-body tg-main-panel on" id="tg-panel-room">
 
       <!-- ── Neural Network Flow ── -->
       <div class="tg-nn-flow" id="tg-nn-flow">
@@ -2118,7 +2128,42 @@
         <div class="tg-scanner-grid" id="tg-scanner-grid"></div>
       </div>
 
-    </div><!-- /tg-body -->
+    </div><!-- /tg-panel-room -->
+
+    <!-- Tab: Backtest Lab -->
+    <div class="tg-body tg-main-panel" id="tg-panel-backtest" style="position:relative;min-height:400px">
+      <div id="bt-lab-root"></div>
+    </div>
+
+    <!-- Tab: Feature Engineering Lab -->
+    <div class="tg-body tg-main-panel" id="tg-panel-features" style="position:relative;min-height:400px">
+      <div id="fe-lab-root"></div>
+    </div>
+
+    <!-- Tab: Polymarket (moved from bottom section) -->
+    <div class="tg-body tg-main-panel" id="tg-panel-polymarket">
+      <div class="tg-section-header">
+        <div>
+          <div class="tg-section-title">🎯 Polymarket Intelligence</div>
+          <div class="tg-section-sub">Prediction market probabilities — exogenous features for signal models</div>
+        </div>
+        <button class="tg-refresh-btn" onclick="tgLoadPolymarket()">↻ Refresh</button>
+      </div>
+      <div class="tg-poly-grid" id="tg-poly-grid-tab">
+        <div class="tg-poly-loading">Click Polymarket tab to load prediction markets…</div>
+      </div>
+    </div>
+
+    <!-- Tab: Scanner -->
+    <div class="tg-body tg-main-panel" id="tg-panel-scanner">
+      <div class="tg-section-header">
+        <div>
+          <div class="tg-section-title">📡 Market Scanner</div>
+          <div class="tg-section-sub">Live quotes — click to backtest any asset</div>
+        </div>
+      </div>
+      <div class="tg-scanner-grid" id="tg-scanner-grid-tab"></div>
+    </div>
 
     <!-- ══ BOT DETAIL PANEL (right slide-in) ══ -->
     <div class="tg-detail-panel" id="tg-detail-panel" style="display:none">
@@ -2591,31 +2636,33 @@
 </div>
 
 <!-- WorldLens Application Scripts (load order matters) -->
-<script src="/static/js/01_globals.js?v=20260411"></script>
-<script src="/static/js/02_core.js?v=20260411"></script>
-<script src="/static/js/03_map.js?v=20260411"></script>
-<script src="/static/js/04_events.js?v=20260411"></script>
-<script src="/static/js/05_markets.js?v=20260411"></script>
-<script src="/static/js/06_supply_admin.js?v=20260411"></script>
-<script src="/static/js/07_map_advanced.js?v=20260411"></script>
-<script src="/static/js/08_knowledge_graph.js?v=20260411"></script>
-<script src="/static/js/09_historical_events.js?v=20260411"></script>
-<script src="/static/js/10_stubs.js?v=20260411"></script>
-<script src="/static/js/11_insiders.js?v=20260411"></script>
-<script src="/static/js/12_graph.js?v=20260411"></script>
-<script src="/static/js/13_portfolio.js?v=20260411"></script>
+<script src="/static/js/01_globals.js?v=20260413"></script>
+<script src="/static/js/02_core.js?v=20260413"></script>
+<script src="/static/js/03_map.js?v=20260413"></script>
+<script src="/static/js/04_events.js?v=20260413"></script>
+<script src="/static/js/05_markets.js?v=20260413"></script>
+<script src="/static/js/06_supply_admin.js?v=20260413"></script>
+<script src="/static/js/07_map_advanced.js?v=20260413"></script>
+<script src="/static/js/08_knowledge_graph.js?v=20260413"></script>
+<script src="/static/js/09_historical_events.js?v=20260413"></script>
+<script src="/static/js/10_stubs.js?v=20260413"></script>
+<script src="/static/js/11_insiders.js?v=20260413"></script>
+<script src="/static/js/12_graph.js?v=20260413"></script>
+<script src="/static/js/13_portfolio.js?v=20260413"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/js/14_graph3d.js?v=20260411"></script>
-<script src="/static/js/15_knowledge_explorer.js?v=20260411"></script>
-<script src="/static/js/16_timeline_graph.js?v=20260411"></script>
-<script src="/static/js/17_cascade.js?v=20260411"></script>
-<script src="/static/js/18_network_hub.js?v=20260411"></script>
-<script src="/static/js/19_continent_streams.js?v=20260411"></script>
-<script src="/static/js/20_nav_ux.js?v=20260411"></script>
-<script src="/static/js/21_agents_dash.js?v=20260411"></script>
-<script src="/static/js/22_graph_engine.js?v=20260411"></script>
-<script src="/static/js/23_dash_globe.js?v=20260411"></script>
-<script src="/static/js/24_tradgentic.js?v=20260411"></script>
+<script src="/static/js/14_graph3d.js?v=20260413"></script>
+<script src="/static/js/15_knowledge_explorer.js?v=20260413"></script>
+<script src="/static/js/16_timeline_graph.js?v=20260413"></script>
+<script src="/static/js/17_cascade.js?v=20260413"></script>
+<script src="/static/js/18_network_hub.js?v=20260413"></script>
+<script src="/static/js/19_continent_streams.js?v=20260413"></script>
+<script src="/static/js/20_nav_ux.js?v=20260413"></script>
+<script src="/static/js/21_agents_dash.js?v=20260413"></script>
+<script src="/static/js/22_graph_engine.js?v=20260413"></script>
+<script src="/static/js/23_dash_globe.js?v=20260413"></script>
+<script src="/static/js/24_tradgentic.js?v=20260413"></script>
+<script src="/static/js/25_backtest.js?v=20260413"></script>
+<script src="/static/js/26_features.js?v=20260413"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
