@@ -3,7 +3,7 @@ tradgentic/router.py
 FastAPI router — all /api/tradgentic/* endpoints.
 """
 from __future__ import annotations
-import logging
+import logging, time
 from typing import Optional
 from fastapi import APIRouter, Depends, Body, Query
 
@@ -427,3 +427,329 @@ async def get_pnl_snapshot(user=Depends(require_user)):
     except Exception as e:
         logger.error("pnl_snapshot error: %s", e)
         return {"bots": [], "error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BACKTESTING ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+from routers.tradgentic.backtest import (
+    fetch_ohlcv, run_single_backtest, run_walk_forward,
+    buy_hold_nav, grade_from_score, PERIOD_INTERVAL, TIMEFRAME_LABELS
+)
+
+_BT_CACHE: dict = {}
+_BT_CACHE_TTL = 300  # 5 min
+
+def _bt_cache_key(payload: dict) -> str:
+    import json
+    return json.dumps({k: payload.get(k) for k in
+                       sorted(["symbol","strategy","period","params"])}, sort_keys=True)
+
+
+@router.post("/backtest/run")
+async def backtest_run(payload: dict = Body(...)):
+    """
+    Full single-pass backtest.
+    Body: { symbol, strategy, period, params, commission_pct, slippage_pct }
+    """
+    try:
+        symbol         = (payload.get("symbol") or "SPY").upper()
+        strategy       = payload.get("strategy", "ma_crossover")
+        period         = payload.get("period", "2y")
+        params         = payload.get("params") or {}
+        commission_pct = float(payload.get("commission_pct", 0.10))
+        slippage_pct   = float(payload.get("slippage_pct",   0.05))
+
+        cache_key = _bt_cache_key({
+            "symbol": symbol, "strategy": strategy,
+            "period": period, "params": params
+        })
+        cached = _BT_CACHE.get(cache_key)
+        if cached and (time.time() - cached["ts"]) < _BT_CACHE_TTL:
+            return cached["data"]
+
+        bars = await fetch_ohlcv(symbol, period)
+        if not bars:
+            return {"error": "No data for symbol"}
+
+        result = run_single_backtest(bars, strategy, params, commission_pct, slippage_pct)
+        if "error" in result:
+            return result
+
+        bh  = buy_hold_nav(bars)
+        m   = result["metrics"]
+        grade, grade_label = grade_from_score(m.get("score", 0))
+
+        data = {
+            "symbol":       symbol,
+            "strategy":     strategy,
+            "period":       period,
+            "n_bars":       result["n_bars"],
+            "bars":         [{"date": b["date"], "close": b["close"]} for b in bars],
+            "nav":          result["nav"],
+            "buyhold_nav":  bh,
+            "trades":       result["trades"][-50:],   # last 50 trades
+            "n_trades":     len(result["trades"]),
+            "metrics":      m,
+            "grade":        grade,
+            "grade_label":  grade_label,
+            "commission_pct": commission_pct,
+            "slippage_pct":   slippage_pct,
+        }
+        _BT_CACHE[cache_key] = {"ts": time.time(), "data": data}
+        return data
+
+    except Exception as e:
+        logger.error("backtest_run error: %s", e)
+        return {"error": str(e)}
+
+
+@router.post("/backtest/walk-forward")
+async def backtest_walk_forward(payload: dict = Body(...)):
+    """
+    Walk-forward validation — anti-overfitting.
+    Body: { symbol, strategy, period, params, n_windows }
+    """
+    try:
+        symbol     = (payload.get("symbol") or "SPY").upper()
+        strategy   = payload.get("strategy", "ma_crossover")
+        period     = payload.get("period", "5y")
+        params     = payload.get("params") or {}
+        n_windows  = int(payload.get("n_windows", 5))
+        commission = float(payload.get("commission_pct", 0.10))
+        slippage   = float(payload.get("slippage_pct",   0.05))
+
+        bars = await fetch_ohlcv(symbol, period)
+        if not bars:
+            return {"error": "No data"}
+
+        result = run_walk_forward(bars, strategy, params, n_windows, 0.70, commission, slippage)
+        return {**result, "symbol": symbol, "strategy": strategy, "period": period}
+
+    except Exception as e:
+        logger.error("walk_forward error: %s", e)
+        return {"error": str(e)}
+
+
+@router.get("/backtest/periods")
+async def backtest_periods():
+    """Available period/timeframe combinations."""
+    return {
+        "periods": [
+            {"key": "6mo",    "label": "6 Months",  "tf": "Daily",   "bars": 126},
+            {"key": "1y",     "label": "1 Year",    "tf": "Daily",   "bars": 252},
+            {"key": "2y",     "label": "2 Years",   "tf": "Daily",   "bars": 504},
+            {"key": "5y",     "label": "5 Years",   "tf": "Weekly",  "bars": 260},
+            {"key": "10y",    "label": "10 Years",  "tf": "Weekly",  "bars": 520},
+            {"key": "2y_wk",  "label": "2Y Weekly", "tf": "Weekly",  "bars": 104},
+            {"key": "5y_mo",  "label": "5Y Monthly","tf": "Monthly", "bars": 60},
+            {"key": "10y_mo", "label": "10Y Monthly","tf": "Monthly","bars": 120},
+        ],
+        "strategies": [
+            {"id": "ma_crossover",    "name": "MA Crossover",    "icon": "📈"},
+            {"id": "rsi_reversion",   "name": "RSI Reversion",   "icon": "🔄"},
+            {"id": "bollinger_bands", "name": "Bollinger Bands", "icon": "📊"},
+            {"id": "macd_momentum",   "name": "MACD Momentum",   "icon": "⚡"},
+            {"id": "buy_hold",        "name": "Buy & Hold",      "icon": "🔒"},
+        ],
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FEATURE ENGINEERING ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+from routers.tradgentic.features import (
+    compute_feature_set, fetch_cross_asset,
+    action_from_composite, FEATURE_WEIGHTS,
+    atr_series, obv_series, stochastic_series, adx_series,
+    ichimoku_cloud, realised_vol, mtf_momentum,
+)
+
+_FEAT_CACHE: dict = {}
+_FEAT_TTL = 120  # 2 minutes
+
+
+@router.post("/features/analyse")
+async def analyse_features(payload: dict = Body(...)):
+    """
+    Full feature engineering analysis for one symbol.
+    Body: { symbol, period? }
+    Returns: FeatureSet with composite signal, regime, all indicators.
+    """
+    try:
+        symbol = (payload.get("symbol") or "SPY").upper()
+        period = payload.get("period", "6mo")
+
+        cache_key = f"feat:{symbol}:{period}"
+        cached = _FEAT_CACHE.get(cache_key)
+        if cached and (time.time() - cached["ts"]) < _FEAT_TTL:
+            return cached["data"]
+
+        # Fetch OHLCV
+        from routers.tradgentic.backtest import fetch_ohlcv
+        bars = await fetch_ohlcv(symbol, period)
+        if not bars:
+            return {"error": "No data for " + symbol}
+
+        # Fetch cross-asset and polymarket in parallel
+        cross, poly_data = await asyncio.gather(
+            fetch_cross_asset(),
+            fetch_trending(12),
+            return_exceptions=True,
+        )
+        if isinstance(cross, Exception):    cross    = {}
+        if isinstance(poly_data, Exception): poly_data = []
+
+        from routers.tradgentic.polymarket import poly_to_feature
+        poly_feats = poly_to_feature(poly_data) if poly_data else {}
+
+        fs = await compute_feature_set(symbol, bars, poly_feats, cross)
+
+        data = {
+            "symbol":     fs.symbol,
+            "timestamp":  fs.timestamp,
+            "price":      fs.price,
+            "composite":  fs.composite,
+            "confidence": fs.confidence,
+            "action":     action_from_composite(fs.composite),
+            "regime":     fs.regime,
+            "features":   fs.features,
+            "components": fs.components,
+            "n_bars":     len(bars),
+            "weights":    FEATURE_WEIGHTS,
+        }
+        _FEAT_CACHE[cache_key] = {"ts": time.time(), "data": data}
+        return data
+
+    except Exception as e:
+        logger.error("analyse_features error: %s", e)
+        import traceback; logger.debug(traceback.format_exc())
+        return {"error": str(e)}
+
+
+@router.post("/features/multi")
+async def analyse_multi(payload: dict = Body(...)):
+    """
+    Feature analysis for multiple symbols simultaneously.
+    Body: { symbols: [...], period? }
+    """
+    try:
+        symbols = [s.upper() for s in (payload.get("symbols") or ["SPY","BTC-USD","GC=F"])[:8]]
+        period  = payload.get("period", "3mo")
+
+        from routers.tradgentic.backtest import fetch_ohlcv
+
+        # Fetch cross-asset once, reuse for all symbols
+        cross, poly_data = await asyncio.gather(
+            fetch_cross_asset(),
+            fetch_trending(12),
+            return_exceptions=True,
+        )
+        if isinstance(cross,    Exception): cross    = {}
+        if isinstance(poly_data,Exception): poly_data = []
+
+        from routers.tradgentic.polymarket import poly_to_feature
+        poly_feats = poly_to_feature(poly_data) if poly_data else {}
+
+        results = []
+        for sym in symbols:
+            try:
+                bars = await fetch_ohlcv(sym, period)
+                if not bars:
+                    continue
+                fs = await compute_feature_set(sym, bars, poly_feats, cross)
+                results.append({
+                    "symbol":     fs.symbol,
+                    "price":      fs.price,
+                    "composite":  fs.composite,
+                    "confidence": fs.confidence,
+                    "action":     action_from_composite(fs.composite),
+                    "regime":     fs.regime,
+                    "components": fs.components,
+                })
+            except Exception as e:
+                logger.debug("multi analyse %s: %s", sym, e)
+
+        results.sort(key=lambda r: abs(r["composite"]), reverse=True)
+        return {
+            "results":     results,
+            "cross_asset": cross,
+            "timestamp":   __import__("datetime").datetime.utcnow().isoformat(),
+        }
+    except Exception as e:
+        logger.error("analyse_multi: %s", e)
+        return {"error": str(e)}
+
+
+@router.get("/features/indicators/{symbol}")
+async def get_raw_indicators(symbol: str, period: str = Query("6mo")):
+    """
+    Raw indicator series for charting in the frontend.
+    Returns time series for: RSI, ATR, OBV, Stochastic, ADX, Ichimoku, VWAP.
+    """
+    try:
+        from routers.tradgentic.backtest import fetch_ohlcv
+        from routers.tradgentic.features import (
+            _rsi_series_local, obv_series, atr_series, stochastic_series,
+            adx_series, ichimoku_cloud, realised_vol,
+        )
+
+        bars = await fetch_ohlcv(symbol.upper(), period)
+        if not bars:
+            return {"error": "No data"}
+
+        closes  = [b["close"]  for b in bars]
+        highs   = [b["high"]   for b in bars]
+        lows    = [b["low"]    for b in bars]
+        volumes = [b.get("volume",0) for b in bars]
+        dates   = [b["date"]   for b in bars]
+        returns = [(closes[i]/closes[i-1]-1) for i in range(1,len(closes))]
+
+        rsi_s          = _rsi_series_local(closes, 14)
+        atr_s          = atr_series(highs, lows, closes, 14)
+        stk_k, stk_d   = stochastic_series(highs, lows, closes)
+        adx_s, di_p, di_m = adx_series(highs, lows, closes)
+        obv_s          = obv_series(closes, volumes)
+        rv_s           = realised_vol(returns, 20)
+        ichi           = ichimoku_cloud(highs, lows, closes)
+
+        # Thin out data for large datasets (return max 300 points)
+        step = max(1, len(dates) // 300)
+
+        def thin(series):
+            return [series[i] for i in range(0, len(series), step)]
+
+        return {
+            "dates":       thin(dates),
+            "closes":      thin(closes),
+            "rsi":         thin(rsi_s),
+            "atr":         thin(atr_s),
+            "stoch_k":     thin(stk_k),
+            "stoch_d":     thin(stk_d),
+            "adx":         thin(adx_s),
+            "di_plus":     thin(di_p),
+            "di_minus":    thin(di_m),
+            "obv":         thin(obv_s),
+            "realised_vol": thin(rv_s),
+            "ichimoku": {
+                k: thin(v) for k, v in ichi.items()
+            },
+            "n_bars": len(dates),
+            "step":   step,
+        }
+    except Exception as e:
+        logger.error("get_raw_indicators %s: %s", symbol, e)
+        return {"error": str(e)}
+
+
+@router.get("/features/cross-asset")
+async def get_cross_asset():
+    """Current cross-asset features: VIX, DXY, yields, gold."""
+    try:
+        import asyncio
+        features = await fetch_cross_asset()
+        return {"features": features, "timestamp": __import__("datetime").datetime.utcnow().isoformat()}
+    except Exception as e:
+        return {"error": str(e)}
