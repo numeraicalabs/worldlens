@@ -44,67 +44,42 @@ var ASSET_CATEGORIES = {
 };
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-var _tgInited    = false;
-var _tgRetries   = 0;
-var _TG_MAX_RETRY = 5;   // 5 × 100 ms = 500 ms max wait for token
 
-/* Render ghost cards so the page is never blank while the token resolves. */
-function _tgShowSkeletons() {
-  var grid  = document.getElementById('tg-bots-grid');
-  var empty = document.getElementById('tg-empty');
-  if (!grid || grid.querySelector('.tg-skel')) return;   // already shown
-  if (empty) empty.style.display = 'none';               // hide "no bots" state
-  var html = '';
-  for (var i = 0; i < 3; i++) {
-    html +=
-      '<div class="tg-bot-card active tg-skel" style="opacity:.45;pointer-events:none;animation:none">' +
-        '<div class="tg-card-head">' +
-          '<div>' +
-            '<div class="tg-card-name"  style="background:var(--b3,#1e293b);color:transparent;border-radius:4px;width:120px">&nbsp;</div>' +
-            '<div class="tg-card-strategy" style="background:var(--b3,#1e293b);color:transparent;border-radius:4px;width:80px;margin-top:5px">&nbsp;</div>' +
-          '</div>' +
-          '<div class="tg-card-status paused"><div class="tg-status-dot"></div>…</div>' +
-        '</div>' +
-        '<div class="tg-card-pnl">' +
-          '<div class="tg-pnl-item"><div class="tg-pnl-label">Equity</div>' +
-            '<div class="tg-pnl-val" style="background:var(--b3,#1e293b);color:transparent;border-radius:3px;width:70px">&nbsp;</div></div>' +
-          '<div class="tg-pnl-item"><div class="tg-pnl-label">Return</div>' +
-            '<div class="tg-pnl-val" style="background:var(--b3,#1e293b);color:transparent;border-radius:3px;width:50px">&nbsp;</div></div>' +
-          '<div class="tg-pnl-item"><div class="tg-pnl-label">Drawdown</div>' +
-            '<div class="tg-pnl-val" style="background:var(--b3,#1e293b);color:transparent;border-radius:3px;width:50px">&nbsp;</div></div>' +
-        '</div>' +
-        '<div class="tg-card-assets"><span style="font-size:10px;color:var(--t3)">Loading…</span></div>' +
-        '<div class="tg-card-foot"><div class="tg-card-meta" style="background:var(--b3,#1e293b);color:transparent;border-radius:3px;height:14px;width:160px">&nbsp;</div></div>' +
-      '</div>';
+// ── ALL module state declared here so every function can access them ──────────
+var _tgBootDone  = false;
+var _tgActivated = false;
+var _tgInited    = false;
+var _polyLoaded  = false;
+var _aggRunning  = false;
+var _streamItems = [];
+var _pnlCache    = {};
+var _drawdownMap = {};
+
+function _tgOnActivate() {
+  if (!_polyLoaded) tgLoadPolymarket();
+  setTimeout(tgLoadPnlSnapshot, 600);
+  if (!_tgBootDone) {
+    _tgBootDone = true;
+    setTimeout(function() {
+      if (TG.bots && TG.bots.length) tgRunAggregation();
+    }, 1500);
   }
-  grid.innerHTML = html;
 }
 
 window.initTradgentic = function() {
-  // Always paint skeletons immediately — page is never blank
-  _tgShowSkeletons();
-
-  // Token not ready yet (auth still in-flight) — retry up to 500 ms
-  if (!G.token) {
-    if (_tgRetries < _TG_MAX_RETRY) {
-      _tgRetries++;
-      setTimeout(window.initTradgentic, 100);
-    }
-    // After max retries the skeletons remain; user is not logged in
-    return;
-  }
-  _tgRetries = 0;   // reset for next navigation
-
+  if (!G.token) return;
   if (_tgInited) {
-    // Already initialized — just refresh bots and scanner
     tgLoadBots();
     tgLoadScanner();
+    _tgOnActivate();
     return;
   }
   _tgInited = true;
   tgLoadStrategies();
   tgLoadBots();
   tgLoadScanner();
+  // Also trigger the activation routine (Polymarket + PnL + aggregation)
+  setTimeout(_tgOnActivate, 300);
 };
 
 // ── Data loading ──────────────────────────────────────────────────────────────
@@ -115,10 +90,35 @@ function tgLoadStrategies() {
 }
 
 window.tgLoadBots = function() {
+  var grid  = document.getElementById('tg-bots-grid');
+  var empty = document.getElementById('tg-empty');
+  // Show skeleton while loading
+  if (grid) grid.innerHTML = [1,2].map(function() {
+    return '<div class="tg-bot-card" style="opacity:.35;pointer-events:none">'
+      + '<div style="height:14px;background:rgba(255,255,255,.08);border-radius:4px;width:60%;margin-bottom:10px"></div>'
+      + '<div style="height:10px;background:rgba(255,255,255,.05);border-radius:4px;width:80%;margin-bottom:6px"></div>'
+      + '<div style="height:10px;background:rgba(255,255,255,.05);border-radius:4px;width:50%"></div>'
+      + '</div>';
+  }).join('');
+
   rq('/api/tradgentic/bots').then(function(d) {
-    if (!Array.isArray(d)) return;
+    if (!Array.isArray(d)) {
+      // Server error — show inline error message (no DOM moves)
+      if (grid) grid.innerHTML =
+        '<div style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;'
+        + 'justify-content:center;padding:48px 24px;gap:10px;color:var(--t3)">'
+        + '<div style="font-size:32px">⚠️</div>'
+        + '<div style="font-size:13px;color:var(--t2);font-weight:600">Could not load bots</div>'
+        + '<div style="font-size:11px">Check server logs · <a onclick="tgLoadBots()" '
+        + 'style="color:var(--b4);cursor:pointer">Retry</a></div></div>';
+      if (empty) empty.style.display = 'none';
+      return;
+    }
     TG.bots = d;
     _renderBotsGrid(d);
+    // Update NN flow bot count
+    var nn = document.getElementById('tg-nn-bot-count');
+    if (nn) nn.textContent = d.filter(function(b){ return b.active !== 0; }).length + ' active';
   });
 };
 
@@ -143,13 +143,21 @@ function _renderBotsGrid(bots) {
   var grid  = document.getElementById('tg-bots-grid');
   var empty = document.getElementById('tg-empty');
   if (!grid) return;
+
   if (!bots.length) {
-    grid.innerHTML = '';
-    if (empty) { empty.style.display = 'flex'; grid.appendChild(empty); }
+    // Use innerHTML so we don't move the DOM node (appendChild breaks layout)
+    grid.innerHTML =
+      '<div class="tg-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;gap:12px;color:var(--t3)">'
+    + '<div style="font-size:40px">🧪</div>'
+    + '<div style="font-family:var(--fh);font-size:16px;font-weight:700;color:var(--t2)">No bots deployed yet</div>'
+    + '<div style="font-size:12px;text-align:center;max-width:280px;line-height:1.6">Create your first bot to start paper trading with real market data</div>'
+    + '<button class="tg-btn tg-btn-primary" onclick="tgOpenWizard()" style="margin-top:8px">🚀 Deploy First Bot</button>'
+    + '</div>';
+    if (empty) empty.style.display = 'none';  // hide original so no duplicate
     return;
   }
-  if (empty) empty.style.display = 'none';
 
+  if (empty) empty.style.display = 'none';
   grid.innerHTML = '';
   bots.forEach(function(bot, i) {
     var card = _buildBotCard(bot, i);
@@ -710,20 +718,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 window.initTradgentic = initTradgentic;
 
-})();
-
-// ══════════════════════════════════════════════════════════════════════════════
-// BLOCK B+C — Aggregation Engine · Polymarket · NN Flow · Signal Stream · WS PnL
-// ══════════════════════════════════════════════════════════════════════════════
-(function() {
-'use strict';
-
-// ── State ────────────────────────────────────────────────────────────────────
-var _streamItems  = [];   // [{symbol, action, confidence, price, ...}]
-var _aggRunning   = false;
-var _polyLoaded   = false;
-var _pnlCache     = {};   // bot_id → pnl snapshot
-var _drawdownMap  = {};   // bot_id → peak equity (for drawdown calc)
+// ── BLOCK B+C — Aggregation Engine · Polymarket · NN Flow · Signal Stream ────
 
 // ── WebSocket PnL live updates ───────────────────────────────────────────────
 window.tgOnWsPnl = function(data) {
@@ -1002,28 +997,26 @@ setInterval(function() {
   }
 }, 60000);
 
-// ── Boot additions ─────────────────────────────────────────────────────────────
-var _tgBootDone = false;
+// ── Boot: MutationObserver for class changes ─────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   var view = document.getElementById('view-tradgentic');
   if (!view) return;
+
+  // Watch for class changes (handles sv() transitions)
   new MutationObserver(function(muts) {
     muts.forEach(function(m) {
       if (m.attributeName === 'class' && view.classList.contains('on')) {
-        // Load Polymarket on first activation
-        if (!_polyLoaded) tgLoadPolymarket();
-        // Load PnL snapshot
-        setTimeout(tgLoadPnlSnapshot, 800);
-        // Run aggregation after bots load
-        if (!_tgBootDone) {
-          _tgBootDone = true;
-          setTimeout(function() {
-            if (typeof TG !== 'undefined' && TG.bots.length) tgRunAggregation();
-          }, 2000);
-        }
+        _tgActivated = true;
+        _tgOnActivate();
       }
     });
   }).observe(view, { attributes: true, attributeFilter: ['class'] });
+
+  // If already active at DOMContentLoaded (edge case)
+  if (view.classList.contains('on')) {
+    _tgActivated = true;
+    _tgOnActivate();
+  }
 });
 
 // ── Helper ────────────────────────────────────────────────────────────────────
