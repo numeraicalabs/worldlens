@@ -4,12 +4,18 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Root layout ── */
-#view-tradgentic { overflow-y: auto; position: relative; overflow-x: hidden; }
+#view-tradgentic {
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  background: var(--bg0);
+}
 
 #tg-root {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  width: 100%;
   background: var(--bg0);
   padding-bottom: 40px;
 }
@@ -399,11 +405,11 @@
    WIZARD
    ══════════════════════════════════════════════════════════ */
 .tg-wizard-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: rgba(0,0,0,.75);
   backdrop-filter: blur(8px);
-  z-index: 500;
+  z-index: 1100;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -736,14 +742,14 @@
    DETAIL PANEL
    ══════════════════════════════════════════════════════════ */
 .tg-detail-panel {
-  position: absolute;
+  position: fixed;
   top: 0; right: 0; bottom: 0;
   width: min(420px, 100vw);
   background: var(--bg1);
   border-left: 1px solid var(--bd);
   display: flex;
   flex-direction: column;
-  z-index: 200;
+  z-index: 900;
   animation: tgSlideRight .25s cubic-bezier(.16,1,.3,1) both;
   overflow: hidden;
 }
