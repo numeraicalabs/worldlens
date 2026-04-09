@@ -4,12 +4,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Root layout ── */
+/* #view-tradgentic base layout is in worldlens.css (same as other views) */
 #view-tradgentic {
-  flex-direction: column;
-  overflow-y: auto;
   overflow-x: hidden;
-  position: relative;
-  background: var(--bg0);
 }
 
 #tg-root {
