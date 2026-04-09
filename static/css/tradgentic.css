@@ -1418,3 +1418,31 @@
   color: var(--re);
   opacity: .7;
 }
+
+/* ── Main tab navigation ── */
+.tg-main-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(0,0,0,.3);
+  border-bottom: 1px solid var(--bd);
+  padding: 0 20px;
+  overflow-x: auto;
+}
+.tg-main-tab {
+  padding: 12px 18px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--t3);
+  font-size: 12px;
+  font-family: var(--fh);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+  margin-bottom: -1px;
+}
+.tg-main-tab:hover { color: var(--t1); }
+.tg-main-tab.on    { color: var(--t1); border-bottom-color: #60a5fa; }
+.tg-main-panel     { display: none; }
+.tg-main-panel.on  { display: block; }
