@@ -67,7 +67,13 @@ function _tgOnActivate() {
 }
 
 window.initTradgentic = function() {
-  if (!G.token) return;
+  // If token not ready yet, retry once after short delay
+  if (!G.token) {
+    setTimeout(function() {
+      if (typeof initTradgentic === 'function') initTradgentic();
+    }, 400);
+    return;
+  }
   if (_tgInited) {
     tgLoadBots();
     tgLoadScanner();
@@ -75,12 +81,25 @@ window.initTradgentic = function() {
     return;
   }
   _tgInited = true;
+  // Show scanner skeletons immediately so page feels alive
+  _tgShowScannerSkeleton();
   tgLoadStrategies();
   tgLoadBots();
   tgLoadScanner();
-  // Also trigger the activation routine (Polymarket + PnL + aggregation)
+  // Activation routine (Polymarket + PnL + aggregation)
   setTimeout(_tgOnActivate, 300);
 };
+
+function _tgShowScannerSkeleton() {
+  var grid = document.getElementById('tg-scanner-grid');
+  if (!grid || grid.children.length > 0) return;
+  grid.innerHTML = ['AAPL','MSFT','NVDA','SPY','BTC-USD','ETH-USD','^VIX','GC=F','CL=F','QQQ'].map(function(s) {
+    return '<div class="tg-quote-card" style="opacity:.35">'
+      + '<div class="tg-quote-sym">' + s + '</div>'
+      + '<div class="tg-quote-price" style="color:var(--t3)">—</div>'
+      + '</div>';
+  }).join('');
+}
 
 // ── Data loading ──────────────────────────────────────────────────────────────
 function tgLoadStrategies() {
