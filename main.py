@@ -121,6 +121,10 @@ async def lifespan(app: FastAPI):
     try:
         from routers.tradgentic.portfolio import ensure_tables as tg_init
         await tg_init()
+        from routers.tradgentic.signal_history import ensure_signal_log
+        await ensure_signal_log()
+        from routers.tradgentic.leaderboard import ensure_leaderboard_tables
+        await ensure_leaderboard_tables()
         logger.info("Tradgentic tables ready")
     except Exception as e:
         logger.warning("Tradgentic init skipped: %s", e)
