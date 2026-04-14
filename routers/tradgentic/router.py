@@ -753,3 +753,688 @@ async def get_cross_asset():
         return {"features": features, "timestamp": __import__("datetime").datetime.utcnow().isoformat()}
     except Exception as e:
         return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINT A — ONBOARDING, TEMPLATES, GLOSSARY
+# ══════════════════════════════════════════════════════════════════════════════
+
+from routers.tradgentic.templates import (
+    BOT_TEMPLATES, GLOSSARY, get_template, recommend_template
+)
+
+
+@router.get("/templates")
+async def get_bot_templates():
+    """All pre-built bot templates with baked-in backtest metrics."""
+    return {"templates": BOT_TEMPLATES}
+
+
+@router.get("/templates/{template_id}")
+async def get_template_detail(template_id: str):
+    t = get_template(template_id)
+    if not t:
+        raise HTTPException(404, "Template not found")
+    return t
+
+
+@router.post("/templates/{template_id}/deploy")
+async def deploy_from_template(
+    template_id: str,
+    payload: dict = Body({}),
+    user=Depends(require_user),
+):
+    """
+    One-click deploy from a template.
+    Optionally override name via body { "name": "..." }.
+    """
+    try:
+        t = get_template(template_id)
+        if not t:
+            return {"error": "Template not found"}
+
+        await ensure_tables()
+        name = payload.get("name") or t["name"]
+        bot  = await create_bot(user["id"], {
+            "name":      name,
+            "strategy":  t["strategy"],
+            "assets":    t["assets"],
+            "timeframe": t.get("timeframe", "1d"),
+            "params":    t["params"],
+        })
+        # Award XP for first deploy
+        try:
+            from routers.engage import award_xp
+            await award_xp(user["id"], "tg_bot_deploy", 150)
+        except Exception:
+            pass
+        return {"status": "deployed", "bot": bot, "template": template_id}
+    except Exception as e:
+        logger.error("deploy_from_template %s: %s", template_id, e)
+        return {"error": str(e)}
+
+
+@router.post("/profile-quiz")
+async def profile_quiz(payload: dict = Body(...)):
+    """
+    Quiz of 2 questions → recommended template.
+    Body: { goal: str, risk: str }
+    """
+    goal = payload.get("goal", "learn")
+    risk = payload.get("risk", "moderate")
+    template_id = recommend_template(goal, risk)
+    template    = get_template(template_id)
+    return {
+        "recommended_template": template_id,
+        "template":             template,
+        "all_templates":        BOT_TEMPLATES,
+    }
+
+
+@router.get("/glossary")
+async def get_glossary():
+    """Plain-language explanations of all trading metrics."""
+    return {"glossary": GLOSSARY}
+
+
+@router.get("/glossary/{term}")
+async def get_term(term: str):
+    entry = GLOSSARY.get(term)
+    if not entry:
+        raise HTTPException(404, "Term not found")
+    return entry
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINT B — ML BOTS + SIGNAL HISTORY
+# ══════════════════════════════════════════════════════════════════════════════
+
+from fastapi import BackgroundTasks
+from routers.tradgentic.ml_bot import (
+    train_gb_model, gb_signal, ensemble_signal, sentiment_signal,
+    ML_STRATEGY_META, ML_STRATEGY_IDS,
+)
+from routers.tradgentic.signal_history import (
+    ensure_signal_log, log_signal, get_signal_history,
+    get_signal_stats, get_training_data, resolve_outcomes,
+)
+from routers.tradgentic.backtest import fetch_ohlcv
+
+# In-memory training status tracker
+_TRAINING_STATUS: dict = {}
+
+
+@router.on_event("startup")
+async def _init_signal_log():
+    await ensure_signal_log()
+
+
+@router.get("/ml/strategies")
+async def get_ml_strategies():
+    """List available ML strategy types with metadata."""
+    return {"strategies": list(ML_STRATEGY_META.values())}
+
+
+@router.post("/ml/train/{bot_id}")
+async def train_ml_bot(
+    bot_id: str,
+    background_tasks: BackgroundTasks,
+    user=Depends(require_user),
+):
+    """
+    Kick off async ML model training for a bot.
+    Returns immediately with status 'training_started'.
+    Poll GET /ml/train/{bot_id}/status for progress.
+    """
+    try:
+        bot = await get_bot(bot_id)
+        if not bot or bot["user_id"] != user["id"]:
+            return {"error": "not_found"}
+        if bot["strategy"] not in ML_STRATEGY_IDS:
+            return {"error": f"Strategy '{bot['strategy']}' is not an ML strategy"}
+
+        _TRAINING_STATUS[bot_id] = {
+            "status": "training", "started_at": datetime.utcnow().isoformat(),
+            "pct": 0, "message": "Fetching historical data…"
+        }
+
+        background_tasks.add_task(_train_bg, bot_id, bot)
+        return {"status": "training_started", "bot_id": bot_id, "eta_seconds": 90}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def _train_bg(bot_id: str, bot: dict):
+    """Background training task."""
+    try:
+        assets  = bot.get("assets", []) or ["SPY"]
+        symbol  = assets[0]
+        strategy = bot.get("strategy", "ml_xgb")
+
+        _TRAINING_STATUS[bot_id]["message"] = f"Downloading 2Y of {symbol} data…"
+        _TRAINING_STATUS[bot_id]["pct"]     = 15
+
+        bars = await fetch_ohlcv(symbol, "2y")
+        if not bars or len(bars) < 100:
+            _TRAINING_STATUS[bot_id] = {"status": "failed", "message": "Insufficient data"}
+            return
+
+        _TRAINING_STATUS[bot_id]["message"] = "Building feature matrix…"
+        _TRAINING_STATUS[bot_id]["pct"]     = 40
+
+        model_info = train_gb_model(bars)
+
+        if not model_info:
+            _TRAINING_STATUS[bot_id] = {
+                "status": "failed",
+                "message": "Not enough training rows or sklearn unavailable"
+            }
+            return
+
+        _TRAINING_STATUS[bot_id]["message"] = "Saving model to database…"
+        _TRAINING_STATUS[bot_id]["pct"]     = 85
+
+        # Save model_b64 into bot params
+        params = dict(bot.get("params") or {})
+        params["model_b64"]      = model_info["model_b64"]
+        params["model_metrics"]  = {k: v for k, v in model_info.items() if k != "model_b64"}
+        params["trained_symbol"] = symbol
+
+        await update_bot(bot_id, {"params": params})
+
+        _TRAINING_STATUS[bot_id] = {
+            "status":       "complete",
+            "pct":          100,
+            "message":      "Training complete",
+            "val_accuracy": model_info["val_accuracy"],
+            "edge":         model_info["edge"],
+            "n_train":      model_info["n_train"],
+            "feature_importances": model_info.get("feature_importances", {}),
+            "trained_at":   model_info["trained_at"],
+        }
+        logger.info("ML training complete for bot %s: acc=%.3f edge=%.3f",
+                    bot_id, model_info["val_accuracy"], model_info["edge"])
+    except Exception as e:
+        logger.error("_train_bg error: %s", e)
+        _TRAINING_STATUS[bot_id] = {"status": "failed", "message": str(e)}
+
+
+@router.get("/ml/train/{bot_id}/status")
+async def get_training_status(bot_id: str, user=Depends(require_user)):
+    """Poll training progress."""
+    status = _TRAINING_STATUS.get(bot_id)
+    if not status:
+        bot = await get_bot(bot_id)
+        if bot and bot.get("params", {}).get("model_b64"):
+            m = bot["params"].get("model_metrics", {})
+            return {"status": "complete", "pct": 100, **m}
+        return {"status": "not_started"}
+    return status
+
+
+@router.post("/ml/signal/{bot_id}")
+async def run_ml_signal(bot_id: str, user=Depends(require_user)):
+    """
+    Generate ML-based signals for a bot.
+    Logs every signal to tg_signal_log for future model training.
+    """
+    try:
+        bot = await get_bot(bot_id)
+        if not bot or bot["user_id"] != user["id"]:
+            return {"error": "not_found"}
+
+        strategy = bot.get("strategy", "ml_xgb")
+        assets   = bot.get("assets", [])
+        params   = bot.get("params") or {}
+        model_b64 = params.get("model_b64")
+        signals   = {}
+
+        for sym in assets:
+            try:
+                bars = await fetch_ohlcv(sym, "6mo")
+                if not bars:
+                    continue
+
+                if strategy == "ml_xgb":
+                    sig = gb_signal(model_b64, bars)
+                    if not sig:
+                        sig = {"action":"HOLD","strength":0.2,"price":bars[-1]["close"],
+                               "reason":"Model not trained yet","source":"ml_xgb"}
+                elif strategy == "ml_ensemble":
+                    sig = ensemble_signal(model_b64, bars, params)
+                elif strategy == "ml_sentiment":
+                    sig = await sentiment_signal(sym, bars, params)
+                else:
+                    sig = {"action":"HOLD","strength":0.2,"price":bars[-1]["close"],
+                           "reason":"Unknown ML strategy","source":strategy}
+
+                signals[sym] = sig
+
+                # ── Persist signal to history
+                await log_signal(
+                    bot_id      = bot_id,
+                    symbol      = sym,
+                    action      = sig["action"],
+                    price       = sig["price"],
+                    strategy_id = strategy,
+                    strength    = sig.get("strength", 0.5),
+                    reason      = sig.get("reason", ""),
+                    features    = {"prob_up": sig.get("prob_up"), "raw_score": sig.get("raw_score"),
+                                   "vix": sig.get("vix"), "votes": sig.get("votes")},
+                    params      = {k: v for k, v in params.items() if k != "model_b64"},
+                )
+
+                # Resolve past outcomes for this symbol
+                await resolve_outcomes(sym, sig["price"])
+
+            except Exception as e:
+                logger.debug("ml_signal %s %s: %s", bot_id, sym, e)
+
+        return {
+            "bot_id":   bot_id,
+            "strategy": strategy,
+            "signals":  signals,
+            "has_model": bool(model_b64),
+        }
+    except Exception as e:
+        logger.error("run_ml_signal: %s", e)
+        return {"error": str(e)}
+
+
+# ── Signal history endpoints ─────────────────────────────────
+
+@router.get("/signals/history")
+async def signal_history(
+    bot_id: str = None,
+    symbol: str = None,
+    limit:  int = Query(100, le=500),
+    user=Depends(require_user),
+):
+    """Signal history log — all signals ever generated, with outcomes."""
+    rows = await get_signal_history(bot_id=bot_id, symbol=symbol, limit=limit)
+    stats = await get_signal_stats(bot_id=bot_id)
+    return {"signals": rows, "stats": stats, "count": len(rows)}
+
+
+@router.get("/signals/stats")
+async def signal_stats_endpoint(
+    bot_id: str = None,
+    user=Depends(require_user),
+):
+    """Aggregated signal statistics for gamification / model quality."""
+    return await get_signal_stats(bot_id=bot_id)
+
+
+@router.get("/signals/training-data")
+async def export_training_data(
+    symbol:      str = None,
+    strategy_id: str = None,
+    min_rows:    int = Query(50, ge=10),
+    user=Depends(require_user),
+):
+    """
+    Export resolved signal history as ML training dataset.
+    X = feature snapshots, y = outcome labels.
+    """
+    rows = await get_training_data(symbol=symbol, strategy_id=strategy_id, min_rows=min_rows)
+    return {
+        "rows":       rows,
+        "count":      len(rows),
+        "ready":      len(rows) >= min_rows,
+        "message":    f"{len(rows)} labeled examples available" if rows
+                      else "Not enough resolved signals yet. Run bots for a few days first.",
+    }
+
+
+# ── Patch existing run_signal to also log to history ────────
+
+_orig_run_signal = None  # will be patched below
+
+@router.post("/bots/{bot_id}/signal/v2")
+async def run_signal_v2(bot_id: str, user=Depends(require_user)):
+    """
+    run_signal with signal logging.
+    Calls the original strategy, then persists every signal.
+    """
+    try:
+        bot = await get_bot(bot_id)
+        if not bot or bot["user_id"] != user["id"]:
+            return {"error": "not_found"}
+
+        # Route ML strategies to ml endpoint
+        if bot.get("strategy") in ML_STRATEGY_IDS:
+            return await run_ml_signal.__wrapped__(bot_id, user) \
+                if hasattr(run_ml_signal, "__wrapped__") else {"error": "use /ml/signal endpoint"}
+
+        strategy_obj = get_strategy(bot["strategy"])
+        if not strategy_obj:
+            return {"error": "unknown_strategy"}
+
+        assets  = bot.get("assets", [])
+        params  = bot.get("params", {})
+        signals = {}
+
+        for sym in assets:
+            try:
+                hist = await fetch_history(sym, "6mo")
+                if not hist:
+                    continue
+                prices = [h["close"] for h in hist]
+                sig    = strategy_obj.generate_signal(prices, params)
+                signals[sym] = {
+                    "action":      sig.action,
+                    "strength":    round(sig.strength, 3),
+                    "reason":      sig.reason,
+                    "price":       sig.price,
+                    "stop_loss":   sig.stop_loss,
+                    "take_profit": sig.take_profit,
+                }
+                # Log signal
+                await log_signal(
+                    bot_id      = bot_id,
+                    symbol      = sym,
+                    action      = sig.action,
+                    price       = sig.price,
+                    strategy_id = bot["strategy"],
+                    strength    = sig.strength,
+                    reason      = sig.reason,
+                    stop_loss   = sig.stop_loss,
+                    take_profit = sig.take_profit,
+                    params      = params,
+                )
+                # Resolve past outcomes
+                await resolve_outcomes(sym, sig.price)
+            except Exception as e:
+                logger.debug("signal_v2 %s %s: %s", bot_id, sym, e)
+
+        return {"bot_id": bot_id, "signals": signals, "strategy": bot["strategy"]}
+    except Exception as e:
+        logger.error("run_signal_v2: %s", e)
+        return {"error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINT C — EXPLAINER, AUTOPSY, ACHIEVEMENTS, LEADERBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+
+from routers.tradgentic.autopsy import explain_signal, autopsy_trade
+from routers.tradgentic.leaderboard import (
+    ensure_leaderboard_tables, award_achievement,
+    check_and_award_trade_achievements,
+    get_achievements, get_leaderboard, upsert_leaderboard,
+    ACHIEVEMENT_DEFS,
+)
+
+
+@router.on_event("startup")
+async def _init_leaderboard():
+    await ensure_leaderboard_tables()
+
+
+# ── C1: Trade Explainer ──────────────────────────────────────────────────────
+
+@router.get("/explain/signal/{signal_id}")
+async def explain_signal_endpoint(signal_id: str, user=Depends(require_user)):
+    """
+    Explain why a specific signal in tg_signal_log fired.
+    Fetches feature snapshot from DB and generates plain-language breakdown.
+    """
+    try:
+        async with aiosqlite.connect(__import__('config').settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM tg_signal_log WHERE id=?", (signal_id,)
+            ) as c:
+                row = await c.fetchone()
+        if not row:
+            return {"error": "Signal not found"}
+
+        features = {}
+        try:
+            features = __import__('json').loads(row["features_json"] or "{}")
+        except Exception:
+            pass
+        params = {}
+        try:
+            params = __import__('json').loads(row["params_json"] or "{}")
+        except Exception:
+            pass
+
+        expl = explain_signal(
+            symbol      = row["symbol"],
+            action      = row["action"],
+            price       = row["price"],
+            strategy_id = row["strategy_id"],
+            features    = features,
+            params      = params,
+            stop_loss   = row["stop_loss"],
+            take_profit = row["take_profit"],
+            strength    = row["strength"] or 0.5,
+        )
+        return expl
+    except Exception as e:
+        logger.error("explain_signal endpoint: %s", e)
+        return {"error": str(e)}
+
+
+@router.post("/explain/preview")
+async def explain_preview(payload: dict = Body(...), user=Depends(require_user)):
+    """
+    Generate a signal explanation from a direct payload (no DB needed).
+    Used by the frontend to explain the latest signal inline.
+    Body: { symbol, action, price, strategy_id, features, params, stop_loss, take_profit, strength }
+    """
+    try:
+        expl = explain_signal(
+            symbol      = payload.get("symbol", "?"),
+            action      = payload.get("action", "HOLD"),
+            price       = float(payload.get("price", 0)),
+            strategy_id = payload.get("strategy_id", "unknown"),
+            features    = payload.get("features") or {},
+            params      = payload.get("params")   or {},
+            stop_loss   = payload.get("stop_loss"),
+            take_profit = payload.get("take_profit"),
+            strength    = float(payload.get("strength", 0.5)),
+        )
+        return expl
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ── C2: Post-Trade Autopsy ───────────────────────────────────────────────────
+
+@router.get("/autopsy/trade/{trade_id}")
+async def autopsy_trade_endpoint(trade_id: str, user=Depends(require_user)):
+    """
+    Post-trade autopsy for a closed trade.
+    Joins tg_trades with tg_signal_log to get entry features.
+    """
+    try:
+        import aiosqlite, json
+        from config import settings as cfg
+
+        async with aiosqlite.connect(cfg.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            # Get trade
+            async with db.execute(
+                "SELECT * FROM tg_trades WHERE id=?", (trade_id,)
+            ) as c:
+                trade = await c.fetchone()
+            if not trade:
+                return {"error": "Trade not found"}
+            if trade["side"] != "SELL":
+                return {"error": "Autopsy only available for closed (SELL) trades"}
+
+            # Find matching BUY signal from signal log (closest in time before trade)
+            async with db.execute(
+                """SELECT features_json, params_json, stop_loss, take_profit, signal_ts, strength, price as entry_price
+                   FROM tg_signal_log
+                   WHERE bot_id=? AND symbol=? AND action='BUY'
+                   ORDER BY signal_ts DESC LIMIT 1""",
+                (trade["bot_id"], trade["symbol"])
+            ) as c:
+                sig = await c.fetchone()
+
+        entry_feat = {}
+        if sig:
+            try: entry_feat = json.loads(sig["features_json"] or "{}")
+            except Exception: pass
+
+        entry_price = float(sig["entry_price"]) if sig else float(trade["price"])
+        exit_price  = float(trade["price"])
+        pnl         = float(trade["pnl"])
+        pnl_pct     = (exit_price / entry_price - 1) * 100 if entry_price else 0.0
+
+        # Bot strategy
+        bot = await get_bot(trade["bot_id"])
+        strategy_id = bot.get("strategy", "unknown") if bot else "unknown"
+
+        result = autopsy_trade(
+            symbol         = trade["symbol"],
+            side           = "BUY",
+            entry_price    = entry_price,
+            exit_price     = exit_price,
+            pnl            = pnl,
+            pnl_pct        = pnl_pct,
+            entry_features = entry_feat,
+            exit_features  = {},   # no separate exit snapshot; use entry features
+            strategy_id    = strategy_id,
+            hold_bars      = 0,
+        )
+        result["trade_id"] = trade_id
+        return result
+    except Exception as e:
+        logger.error("autopsy_trade: %s", e)
+        return {"error": str(e)}
+
+
+@router.get("/autopsy/bot/{bot_id}")
+async def bot_autopsy_summary(bot_id: str, user=Depends(require_user)):
+    """
+    Aggregate autopsy across all closed trades for a bot.
+    Returns patterns: what setups consistently work/fail.
+    """
+    try:
+        import aiosqlite
+        from config import settings as cfg
+
+        bot = await get_bot(bot_id)
+        if not bot or bot["user_id"] != user["id"]:
+            return {"error": "not_found"}
+
+        async with aiosqlite.connect(cfg.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """SELECT side, symbol, price, pnl, signal_reason, executed_at
+                   FROM tg_trades WHERE bot_id=? AND side='SELL'
+                   ORDER BY executed_at DESC LIMIT 50""",
+                (bot_id,)
+            ) as c:
+                trades = await c.fetchall()
+
+        if not trades:
+            return {"bot_id": bot_id, "message": "No closed trades yet", "patterns": []}
+
+        wins   = [t for t in trades if float(t["pnl"]) > 0]
+        losses = [t for t in trades if float(t["pnl"]) <= 0]
+        total  = len(trades)
+        win_r  = len(wins) / total * 100
+
+        avg_win  = sum(float(t["pnl"]) for t in wins)  / max(len(wins), 1)
+        avg_loss = sum(float(t["pnl"]) for t in losses) / max(len(losses), 1)
+
+        patterns = []
+        if win_r > 55:
+            patterns.append({"type": "positive", "text": f"Win rate {win_r:.0f}% — strategy has consistent edge"})
+        elif win_r < 40:
+            patterns.append({"type": "warning", "text": f"Win rate {win_r:.0f}% — strategy needs review or market regime changed"})
+
+        if avg_win > abs(avg_loss) * 1.5:
+            patterns.append({"type": "positive", "text": f"Average win (${avg_win:.0f}) is {avg_win/max(abs(avg_loss),1):.1f}x average loss — good risk/reward"})
+        elif abs(avg_loss) > avg_win * 1.5:
+            patterns.append({"type": "warning", "text": f"Average loss (${abs(avg_loss):.0f}) exceeds average win (${avg_win:.0f}) — review stop loss placement"})
+
+        return {
+            "bot_id":    bot_id,
+            "n_trades":  total,
+            "win_rate":  round(win_r, 1),
+            "avg_win":   round(avg_win, 2),
+            "avg_loss":  round(avg_loss, 2),
+            "patterns":  patterns,
+        }
+    except Exception as e:
+        logger.error("bot_autopsy_summary: %s", e)
+        return {"error": str(e)}
+
+
+# ── C3: Achievements ─────────────────────────────────────────────────────────
+
+@router.get("/achievements")
+async def list_achievements(user=Depends(require_user)):
+    """User's achievements — earned and locked."""
+    items = await get_achievements(user["id"])
+    earned = [a for a in items if not a.get("locked")]
+    total_xp = sum(a.get("xp", 0) for a in earned)
+    return {"achievements": items, "earned_count": len(earned), "total_xp": total_xp}
+
+
+@router.post("/achievements/award")
+async def award_manual(payload: dict = Body(...), user=Depends(require_user)):
+    """Award an achievement by key (called from frontend gamification events)."""
+    key    = payload.get("key", "")
+    bot_id = payload.get("bot_id")
+    result = await award_achievement(user["id"], key, bot_id)
+    return {"awarded": result is not None, "achievement": result}
+
+
+# ── C4: Leaderboard ──────────────────────────────────────────────────────────
+
+@router.get("/leaderboard")
+async def leaderboard_endpoint(period: str = "all", limit: int = Query(20, le=50)):
+    """Anonymous paper-trading leaderboard."""
+    rows = await get_leaderboard(period, limit)
+    return {"period": period, "entries": rows, "count": len(rows)}
+
+
+@router.post("/leaderboard/submit")
+async def submit_leaderboard(user=Depends(require_user)):
+    """
+    Update the leaderboard with the user's best bot performance.
+    Called after each trade cycle.
+    """
+    try:
+        bots = await list_bots(user["id"])
+        if not bots:
+            return {"status": "no_bots"}
+
+        best = None
+        for b in bots:
+            stats = b.get("stats") or {}
+            ret   = stats.get("total_return", 0.0)
+            if best is None or ret > best.get("return", -999):
+                best = {
+                    "return":   ret,
+                    "strategy": b.get("strategy", "unknown"),
+                    "trades":   stats.get("total_trades", 0),
+                    "win_rate": stats.get("win_rate", 0),
+                }
+                # Simple Sharpe approximation: return / (win_rate variance proxy)
+                wr = max(stats.get("win_rate", 50) / 100, 0.01)
+                best["sharpe"] = round(ret / (100 * (1 - wr) + 0.1), 3)
+
+        if not best:
+            return {"status": "no_data"}
+
+        await upsert_leaderboard(
+            user_id       = user["id"],
+            period        = "all",
+            total_return  = best["return"],
+            sharpe        = best["sharpe"],
+            win_rate      = best["win_rate"],
+            n_trades      = best["trades"],
+            best_strategy = best["strategy"],
+        )
+        return {"status": "submitted", "handle": f"Trader_{user['id']}"}
+    except Exception as e:
+        logger.error("submit_leaderboard: %s", e)
+        return {"error": str(e)}
