@@ -409,11 +409,20 @@ function _renderScoreBadge(r) {
   ].join('');
 }
 
+var _METRIC_GLOSSARY = {
+  'Sharpe Ratio': 'sharpe', 'Sortino Ratio': 'sharpe',
+  'Max Drawdown': 'max_drawdown', 'Win Rate': 'win_rate',
+  'Profit Factor': 'profit_factor', 'Calmar Ratio': 'calmar',
+};
+
 function _metricCard(label, value, sub, color, icon) {
+  var termKey = _METRIC_GLOSSARY[label];
+  var help = termKey && typeof obHelpIcon === 'function'
+    ? obHelpIcon(termKey) : '';
   return '<div class="btl-metric-card">'
     + '<div class="btl-metric-icon">' + icon + '</div>'
     + '<div class="btl-metric-body">'
-    + '  <div class="btl-metric-label">' + label + '</div>'
+    + '  <div class="btl-metric-label">' + label + help + '</div>'
     + '  <div class="btl-metric-value" style="color:' + (color || 'var(--t1)') + '">' + value + '</div>'
     + (sub ? '<div class="btl-metric-sub">' + sub + '</div>' : '')
     + '</div></div>';
