@@ -248,6 +248,9 @@ function _readParams() {
     rsi_reversion:   { rsi_period:'p-rsi-period', oversold:'p-oversold', overbought:'p-overbought', stop_pct:'p-stop-pct' },
     bollinger_bands: { bb_period:'p-bb-period', bb_std:'p-bb-std', mode:'p-mode', stop_pct:'p-stop-pct' },
     macd_momentum:   { stop_pct:'p-stop-pct', min_hist:'p-min-hist' },
+    ml_xgb:          { stop_pct:'p-stop-pct' },
+    ml_ensemble:     { min_hist:'p-min-hist', oversold:'p-oversold', overbought:'p-overbought', stop_pct:'p-stop-pct' },
+    ml_sentiment:    { threshold:'p-threshold', stop_pct:'p-stop-pct' },
   };
   var fields = map[BT.strategy] || {};
   Object.keys(fields).forEach(function(param) {

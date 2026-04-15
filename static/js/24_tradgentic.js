@@ -889,7 +889,8 @@ function _renderSignalStream(items) {
 
 // ── Polymarket cards ──────────────────────────────────────────────────────────
 window.tgLoadPolymarket = function() {
-  var grid = document.getElementById('tg-poly-grid');
+  // Write to whichever grid is currently visible
+  var grid = document.getElementById('tg-poly-grid-tab') || document.getElementById('tg-poly-grid');
   if (!grid) return;
   grid.innerHTML = '<div class="tg-poly-loading">Loading prediction markets…</div>';
 
@@ -899,7 +900,13 @@ window.tgLoadPolymarket = function() {
       return;
     }
     _polyLoaded = true;
+    // Render into active grid
     _renderPolyCards(d.markets, grid);
+    // Also populate hidden room grid if it exists separately
+    var roomGrid = document.getElementById('tg-poly-grid');
+    if (roomGrid && roomGrid !== grid) {
+      _renderPolyCards(d.markets, roomGrid);
+    }
     _updateNNFlow(null, null, true);
   });
 };
@@ -1069,16 +1076,9 @@ window.tgMainTab = function(tab, btn) {
     }
   }
   if (tab === 'polymarket') {
-    var grid = document.getElementById('tg-poly-grid-tab');
-    if (grid) {
-      // Clone polymarket data to new grid
-      var src = document.getElementById('tg-poly-grid');
-      if (src && src.innerHTML && !src.innerHTML.includes('Loading')) {
-        grid.innerHTML = src.innerHTML;
-      } else {
-        tgLoadPolymarket();
-      }
-    }
+    // Render directly into the tab grid
+    _polyLoaded = false;
+    tgLoadPolymarket();
   }
   if (tab === 'scanner') {
     var sgrid = document.getElementById('tg-scanner-grid-tab');
