@@ -95,12 +95,15 @@
 .btl-sym-pill:hover { background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.3); color: #60a5fa; }
 
 /* Strategy cards */
-.btl-strategy-cards { display: flex; gap: 8px; flex-wrap: wrap; }
+.btl-strategy-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 7px;
+}
 .btl-strat-card {
-  flex: 1;
-  min-width: 80px;
-  max-width: 110px;
-  padding: 10px 8px;
+  min-width: 0;
+  max-width: none;
+  padding: 10px 6px;
   background: var(--bg2);
   border: 1px solid var(--bd);
   border-radius: 12px;
@@ -118,7 +121,11 @@
 .btl-strat-short { font-size: 8px; color: var(--t4); }
 
 /* Period grid */
-.btl-period-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+.btl-period-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 6px;
+}
 .btl-period-btn {
   padding: 7px 12px;
   background: var(--bg2);
@@ -379,17 +386,28 @@
 
 /* ── Mobile ── */
 @media (max-width: 600px) {
-  #bt-lab-root { padding: 14px; gap: 14px; }
-  .btl-strategy-cards { gap: 5px; }
-  .btl-strat-card { min-width: 62px; padding: 7px 4px; }
-  .btl-strat-icon { font-size: 16px; }
-  .btl-strat-name { font-size: 9px; }
-  .btl-metrics-grid { grid-template-columns: 1fr 1fr; }
+  #bt-lab-root     { padding: 12px; gap: 12px; }
+  .btl-controls    { padding: 14px; gap: 12px; }
+  .btl-strat-card  { padding: 8px 4px; }
+  .btl-strat-icon  { font-size: 16px; }
+  .btl-strat-name  { font-size: 9px; }
+  .btl-strat-short { display: none; }
+  .btl-metrics-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .btl-metric-card  { padding: 8px 10px; gap: 7px; }
+  .btl-metric-icon  { font-size: 16px; }
+  .btl-metric-value { font-size: 14px; }
+  .btl-score-badge  { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
+  .btl-grade        { font-size: 32px; }
+  .btl-score-bar-wrap { width: 100%; margin-top: 4px; }
   .btl-trade-header,
-  .btl-trade-row { grid-template-columns: 50px 90px 70px 50px; }
+  .btl-trade-row { grid-template-columns: 52px 88px 70px 52px; }
   .btl-trade-pnl, .btl-trade-pct { display: none; }
   .btl-wf-win-body { grid-template-columns: 1fr; }
   .btl-wf-divider  { display: none; }
+  .btl-run-row     { flex-direction: column; }
+  .btl-tabs        { overflow-x: auto; gap: 2px; }
+  .btl-tab         { padding: 7px 10px; font-size: 10px; white-space: nowrap; }
+  .btl-wf-meta-grid { grid-template-columns: 1fr 1fr; }
 }
 
 

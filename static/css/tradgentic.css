@@ -1445,7 +1445,7 @@
 .tg-main-tab:hover { color: var(--t1); }
 .tg-main-tab.on    { color: var(--t1); border-bottom-color: #60a5fa; }
 .tg-main-panel     { display: none; }
-.tg-main-panel.on  { display: block; }
+.tg-main-panel.on  { display: block; overflow-y: auto; }
 
 
 /* ════════════════════════════════════════════════════════════════
