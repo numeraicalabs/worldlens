@@ -572,47 +572,338 @@ function renderMkts() {
   else if (typeof renderMktSidebar==='function') renderMktSidebar();
 }
 
-function loadEarlyWarning() {
-  rq('/api/intelligence/early-warning').then(function(r) {
-    if (!r) return;
-    var s = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
-    var score = r.global_ew_score || r.score || 5;
-    s('ew-score', score.toFixed(1));
-    s('ew-label', score>=7?'HIGH RISK':score>=5?'ELEVATED':'STABLE');
-    s('ew-assess', r.ai_assessment || r.assessment || '');
-    s('ew-evcount', r.event_count || '');
-    var scoreEl = document.getElementById('ew-score');
-    if (scoreEl) scoreEl.style.color = score>=7?'var(--re)':score>=5?'var(--am)':'var(--gr)';
-    // Gauges
-    var gauges = { macro: r.macro_stress, market: r.market_stress, sent: r.sentiment_trend, vel: r.event_velocity };
-    Object.keys(gauges).forEach(function(k) {
-      var val = gauges[k] || 0;
-      var pct = Math.min(100, Math.max(0, (val/10)*100));
-      var bar = document.getElementById('ewgb-'+k); if (bar) bar.style.width = pct+'%';
-      var lbl = document.getElementById('ewg-'+k);  if (lbl) lbl.textContent = val.toFixed(1);
-    });
-    loadEWSignals();
-  });
-  track('early_warning_viewed', 'earlywarning', '');
+/* ── EW safe-escape (used if global _esc not available) ── */
+function _ew_esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function loadEWSignals() {
-  rq('/api/intelligence/signals/active').then(function(r) {
+/* ═══════════════════════════════════════════════════════
+   CRISIS EARLY WARNING SYSTEM — Full Implementation
+   Fixes: G_EW, URL mismatch, field names, opacity, patterns, chart
+   ═══════════════════════════════════════════════════════ */
+
+var _ewData     = null;   // cached last response
+var _ewChart    = null;   // Chart.js instance
+
+/* Score → colour */
+function _ewColor(score) {
+  return score >= 8 ? '#ef4444'
+       : score >= 6 ? '#f97316'
+       : score >= 4 ? '#f59e0b'
+       :              '#10b981';
+}
+
+/* Score → label */
+function _ewLabel(score) {
+  return score >= 8 ? 'CRITICAL' : score >= 6 ? 'HIGH RISK' : score >= 4 ? 'ELEVATED' : 'STABLE';
+}
+
+/* ── Main loader ──────────────────────────────────────── */
+window.loadEarlyWarning = function(force) {
+  // Show skeleton while loading
+  var hero = document.getElementById('ew-hero');
+  if (hero) { hero.style.opacity = '0.5'; }
+
+  rq('/api/intelligence/early-warning').then(function(r) {
+    if (!r) { _ewShowError('Could not reach Early Warning API'); return; }
+    _ewData = r;
+
+    var score = parseFloat(r.global_ew_score || r.score || 5);
+    var col   = _ewColor(score);
+    var label = _ewLabel(score);
+
+    // ── Hero
+    if (hero) hero.style.opacity = '1';
+    _ewSet('ew-score', score.toFixed(1));
+    _ewSet('ew-label', label);
+    _ewSet('ew-evcount', r.event_count_48h || r.event_count || '—');
+    var scoreEl = document.getElementById('ew-score');
+    var labelEl = document.getElementById('ew-label');
+    if (scoreEl) scoreEl.style.color = col;
+    if (labelEl) labelEl.style.color = col;
+
+    // ── AI Assessment
+    _ewRenderAssessment(r.ai_assessment || r.assessment || '', score, r);
+
+    // ── Gauges (with colour-coded fills)
+    var gauges = {
+      macro:  { val: r.macro_stress     || 0, col: _ewColor(r.macro_stress  || 0) },
+      market: { val: r.market_stress    || 0, col: _ewColor(r.market_stress || 0) },
+      sent:   { val: Math.abs(r.sentiment_trend || 0) * 10,
+                col: (r.sentiment_trend||0) < -0.3 ? '#ef4444' : (r.sentiment_trend||0) > 0.1 ? '#10b981' : '#f59e0b' },
+      vel:    { val: Math.min(10, (r.event_velocity || 1) * 4),
+                col: (r.event_velocity||1) > 1.5 ? '#ef4444' : (r.event_velocity||1) > 1.1 ? '#f59e0b' : '#10b981' },
+    };
+    Object.keys(gauges).forEach(function(k) {
+      var g   = gauges[k];
+      var pct = Math.min(100, Math.max(0, (g.val / 10) * 100));
+      var bar = document.getElementById('ewgb-'+k);
+      var lbl = document.getElementById('ewg-'+k);
+      if (bar) { bar.style.width = pct+'%'; bar.style.background = g.col; }
+      if (lbl) { lbl.textContent = g.val.toFixed(1); lbl.style.color = g.col; }
+    });
+
+    // ── Pattern matrix
+    _ewRenderPatterns(r.top_risks || []);
+
+    // ── Signals
+    _ewLoadSignals();
+
+    // ── Timeline chart
+    _ewLoadTimeline();
+
+  }).catch(function(e) {
+    _ewShowError('Failed: ' + (e && e.message || 'network error'));
+  });
+
+  track('early_warning_viewed', 'earlywarning', '');
+};
+
+/* ── Set text helper ─────────────────────────────────── */
+function _ewSet(id, v) {
+  var e = document.getElementById(id); if (e) e.textContent = v;
+}
+
+/* ── Error state ─────────────────────────────────────── */
+function _ewShowError(msg) {
+  var hero = document.getElementById('ew-hero');
+  if (hero) { hero.style.opacity = '1'; }
+  _ewSet('ew-score', '—');
+  _ewSet('ew-label', 'UNAVAILABLE');
+  _ewSet('ew-assess', msg);
+}
+
+/* ── AI Assessment renderer ──────────────────────────── */
+function _ewRenderAssessment(text, score, r) {
+  var el = document.getElementById('ew-assess');
+  if (!el) return;
+
+  if (!text || text.length < 20) {
+    // Fallback: synthesise a basic assessment from the data
+    var vel  = r.event_velocity || 1.0;
+    var velTxt = vel > 1.5 ? 'accelerating (+' + Math.round((vel-1)*100) + '%)' : vel < 0.8 ? 'decelerating' : 'stable';
+    var negTrend = (r.sentiment_trend || 0) < -0.3;
+    text = 'EW Score ' + score.toFixed(1) + '/10 — '
+      + (r.event_count_48h || r.event_count || 0) + ' events in the 48h window. '
+      + 'Event velocity ' + velTxt + '. '
+      + 'Macro stress ' + (r.macro_stress || 5).toFixed(1) + '/10. '
+      + (negTrend ? 'News sentiment is deteriorating. ' : 'Sentiment stable. ')
+      + 'Enable an AI provider in Admin → Settings for deep crisis assessment.';
+  }
+
+  // Render as structured paragraphs if multi-sentence
+  var sentences = text.split(/(?<=[.!?])\s+/);
+  if (sentences.length >= 3) {
+    el.innerHTML = sentences.map(function(s, i) {
+      return '<p style="margin:0 0 6px;' + (i===0 ? 'font-weight:600;color:var(--t1)' : 'color:var(--t2)') + '">' + (window._esc||_ew_esc)(s) + '</p>';
+    }).join('');
+  } else {
+    el.innerHTML = '<p style="margin:0;color:var(--t2);line-height:1.7">' + (window._esc||_ew_esc)(text) + '</p>';
+  }
+}
+
+/* ── Pattern matrix ──────────────────────────────────── */
+function _ewRenderPatterns(patterns) {
+  var el = document.getElementById('ew-patterns');
+  if (!el) return;
+  if (!patterns || !patterns.length) {
+    el.innerHTML = '<div style="color:var(--t3);font-size:11px;padding:12px 0;grid-column:1/-1">No significant crisis patterns detected in the 48h window.</div>';
+    return;
+  }
+  el.innerHTML = patterns.map(function(p) {
+    var sc  = parseFloat(p.score || 0);
+    var col = _ewColor(sc);
+    var pct = Math.min(100, sc * 10);
+    var regHtml = (p.regions || []).length
+      ? '<div style="font-size:9px;color:var(--t4);margin-top:4px">📍 ' + p.regions.slice(0,3).join(', ') + '</div>'
+      : '';
+    return '<div class="pattern-card" style="border-color:' + col + '22">'
+      + '<div class="pattern-icon">' + (p.icon || '⚠️') + '</div>'
+      + '<div class="pattern-label" style="color:' + col + '">' + (p.label || p.type || '') + '</div>'
+      + '<div class="pattern-score" style="color:' + col + '">' + sc.toFixed(1) + '<span style="font-size:10px;opacity:.6">/10</span></div>'
+      + '<div class="pattern-bar"><div class="pattern-fill" style="width:' + pct + '%;background:' + col + '"></div></div>'
+      + regHtml
+      + '</div>';
+  }).join('');
+}
+
+/* ── Active signals ──────────────────────────────────── */
+window.loadEWSignals = function() {
+  rq('/api/intelligence/early-warning/signals').then(function(r) {   // FIXED URL
     var el2 = document.getElementById('ew-signals');
     var cnt = document.getElementById('ew-signal-count');
-    if (!el2 || !r || !r.signals) return;
+    if (!el2 || !r) return;
     var signals = r.signals || [];
-    if (cnt) cnt.textContent = signals.length;
-    el2.innerHTML = signals.length ? signals.map(function(sig) {
-      var col = sig.severity>=7?'var(--re)':sig.severity>=5?'var(--am)':'var(--gr)';
-      return '<div style="padding:10px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;margin-bottom:6px">'
-        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
-        + '<span style="font-size:10px;font-weight:700;color:'+col+'">'+sig.signal_type+'</span>'
-        + '<span style="font-size:9px;color:var(--t3)">'+sig.region+'</span>'
-        + '<span style="margin-left:auto;font-size:10px;font-weight:700;color:'+col+'">'+sig.severity.toFixed(1)+'</span>'
+    if (cnt) cnt.textContent = '(' + signals.length + ')';
+
+    if (!signals.length) {
+      el2.innerHTML = '<div style="font-size:11px;color:var(--t3);text-align:center;padding:24px;grid-column:1/-1">No active signals in the 48h window</div>';
+      return;
+    }
+
+    el2.innerHTML = signals.map(function(sig) {
+      var sev  = parseFloat(sig.severity || 5);
+      var col  = _ewColor(sev);
+      var conf = parseFloat(sig.confidence || 0.5);
+      var confPct = Math.round(conf * 100);
+      // FIXED: use sig.type not sig.signal_type; sig.summary not sig.description
+      var typeLabel = sig.label || (sig.type || sig.signal_type || '').replace(/_/g,' ');
+      var bodyText  = (sig.summary || sig.description || sig.title || '').slice(0, 160);
+      var ts = sig.timestamp ? sig.timestamp.slice(0,10) : '';
+
+      return '<div class="ew-signal" onclick="_ewOpenSignal(this)" data-id="' + (sig.id||'') + '">'
+        + '<div class="ew-signal-icon">' + (sig.icon || '⚠️') + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        + '  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">'
+        + '    <span class="ew-signal-type" style="color:' + col + '">' + typeLabel + '</span>'
+        + '    <span style="font-size:9px;color:var(--t3)">' + (sig.region || '') + '</span>'
+        + '    <span style="margin-left:auto;font-family:var(--fm);font-size:13px;font-weight:800;color:' + col + '">' + sev.toFixed(1) + '</span>'
+        + '  </div>'
+        + '  <div class="ew-signal-title">' + (window._esc||_ew_esc)(sig.title || typeLabel) + '</div>'
+        + (bodyText ? '  <div style="font-size:10px;color:var(--t3);line-height:1.5;margin-top:3px">' + (window._esc||_ew_esc)(bodyText) + '</div>' : '')
+        + '  <div class="ew-confidence">'
+        + '    <div class="ew-conf-bar"><div class="ew-conf-fill" style="width:' + confPct + '%;background:' + col + '"></div></div>'
+        + '    <span style="font-size:9px;color:var(--t3)">' + confPct + '% confidence</span>'
+        + (ts ? '    <span style="font-size:9px;color:var(--t4);margin-left:auto">' + ts + '</span>' : '')
+        + '  </div>'
         + '</div>'
-        + '<div style="font-size:10px;color:var(--t2);line-height:1.5">'+(sig.description||'').slice(0,120)+'</div>'
         + '</div>';
-    }).join('') : '<div style="font-size:11px;color:var(--t3);text-align:center;padding:24px">No active signals</div>';
+    }).join('');
+  });
+};
+
+window._ewOpenSignal = function(el) {
+  /* Future: open a detail drawer */
+};
+
+/* ── Timeline chart (vanilla canvas — no Chart.js dependency) ── */
+function _ewLoadTimeline() {
+  rq('/api/intelligence/early-warning/timeline').then(function(rows) {
+    var canvas = document.getElementById('ew-chart');
+    if (!canvas) return;
+
+    // Render even with no history — show placeholder
+    if (!rows || !rows.length) {
+      canvas.height = 80;
+      var ctx0 = canvas.getContext('2d');
+      ctx0.fillStyle = 'rgba(148,163,184,.3)';
+      ctx0.font = '11px monospace';
+      ctx0.textAlign = 'center';
+      ctx0.fillText('No history yet — score updates every 30 minutes', canvas.width/2, 40);
+      return;
+    }
+
+    var sorted  = rows.slice().reverse();  // oldest → newest
+    var scores  = sorted.map(function(r){ return parseFloat(r.global_ew_score  || 5); });
+    var macros  = sorted.map(function(r){ return parseFloat(r.macro_stress     || 0); });
+    var markets = sorted.map(function(r){ return parseFloat(r.market_stress    || 0); });
+    var labels  = sorted.map(function(r){ return (r.snapshot_date||'').slice(5); }); // MM-DD
+
+    canvas.width  = canvas.offsetWidth || 600;
+    canvas.height = 100;
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    var W   = canvas.width;
+    var H   = canvas.height;
+    var pad = { top: 12, right: 14, bottom: 24, left: 36 };
+    var cW  = W - pad.left - pad.right;
+    var cH  = H - pad.top  - pad.bottom;
+    var n   = scores.length;
+    if (n < 2) return;
+
+    var minY = 0, maxY = 10, rangeY = 10;
+
+    function xOf(i)  { return pad.left + i * cW / (n - 1); }
+    function yOf(v)  { return pad.top  + (1 - (v - minY) / rangeY) * cH; }
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,.04)';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(148,163,184,.45)';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'right';
+    [0, 2.5, 5, 7.5, 10].forEach(function(v) {
+      var y = yOf(v);
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+      ctx.fillText(v.toFixed(0), pad.left - 3, y + 3);
+    });
+
+    // Threshold line at 6 (HIGH RISK)
+    ctx.strokeStyle = 'rgba(239,68,68,.2)';
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, yOf(6)); ctx.lineTo(W - pad.right, yOf(6)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw filled area under EW Score
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(scores[0]));
+    for (var i = 1; i < n; i++) {
+      var xc  = (xOf(i-1) + xOf(i)) / 2;
+      var yc  = (yOf(scores[i-1]) + yOf(scores[i])) / 2;
+      ctx.quadraticCurveTo(xOf(i-1), yOf(scores[i-1]), xc, yc);
+    }
+    ctx.lineTo(xOf(n-1), yOf(scores[n-1]));
+    ctx.lineTo(xOf(n-1), H - pad.bottom);
+    ctx.lineTo(pad.left, H - pad.bottom);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(245,158,11,.07)';
+    ctx.fill();
+
+    // Draw series lines
+    function drawLine(data, color, dash, width) {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth   = width || 1.5;
+      ctx.lineJoin    = 'round';
+      if (dash) ctx.setLineDash(dash); else ctx.setLineDash([]);
+      ctx.moveTo(xOf(0), yOf(data[0]));
+      for (var i = 1; i < n; i++) {
+        var xc = (xOf(i-1) + xOf(i)) / 2;
+        var yc = (yOf(data[i-1]) + yOf(data[i])) / 2;
+        ctx.quadraticCurveTo(xOf(i-1), yOf(data[i-1]), xc, yc);
+      }
+      ctx.lineTo(xOf(n-1), yOf(data[n-1]));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    drawLine(macros,  'rgba(239,68,68,.5)',  [3,3], 1.2);
+    drawLine(markets, 'rgba(59,130,246,.5)', [2,4], 1.2);
+    drawLine(scores,  '#f59e0b', null, 2.2);
+
+    // Coloured dots on EW Score line
+    scores.forEach(function(v, i) {
+      ctx.beginPath();
+      ctx.arc(xOf(i), yOf(v), 3.5, 0, Math.PI*2);
+      ctx.fillStyle = _ewColor(v);
+      ctx.fill();
+    });
+
+    // X axis labels
+    ctx.fillStyle = 'rgba(148,163,184,.45)';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'center';
+    var step = Math.max(1, Math.floor(n / 7));
+    for (var i = 0; i < n; i += step) {
+      ctx.fillText(labels[i], xOf(i), H - 6);
+    }
+
+    // Legend
+    var legendItems = [
+      { color:'#f59e0b',              label:'EW Score' },
+      { color:'rgba(239,68,68,.6)',   label:'Macro' },
+      { color:'rgba(59,130,246,.6)',  label:'Market' },
+    ];
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'left';
+    var lx = pad.left;
+    legendItems.forEach(function(it) {
+      ctx.fillStyle  = it.color;
+      ctx.fillRect(lx, 2, 18, 3);
+      ctx.fillStyle  = 'rgba(148,163,184,.6)';
+      ctx.fillText(it.label, lx + 21, 7);
+      lx += ctx.measureText(it.label).width + 34;
+    });
   });
 }

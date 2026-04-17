@@ -15,6 +15,7 @@
 // ════════════════════════════════════════════════════════
 
 var G_SC = { loaded: false, map: null, markers: [], ready: false };
+var G_EW = { loaded: false };
 
 async function loadSupplyChain() {
   var r = await rq('/api/intelligence/supply-chain');
@@ -160,6 +161,7 @@ var _sv_intel = sv;
 sv = function(name, btn) {
   _sv_intel(name, btn);
   if (name === 'earlywarning' && !G_EW.loaded) {
+    G_EW.loaded = true;
     setTimeout(loadEarlyWarning, 100);
   }
   if (name === 'markets') { initMarkets(); }
