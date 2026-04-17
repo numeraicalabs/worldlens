@@ -195,7 +195,7 @@ function buildMarkers(data){
   while(mGroup.children.length) mGroup.remove(mGroup.children[0]);
   var points = Array.isArray(data) ? data : (data.points || []);
   points.slice(0,120).forEach(function(p){
-    var pos = latLonToVec3(p.lat||0, p.lon||0, 1.01);
+    var pos = latLonToVec3(p.latitude||p.lat||0, p.longitude||p.lon||0, 1.01);
     var sev = p.severity||5;
     var col = new THREE.Color(CAT_COLORS[p.category] || CAT_COLORS.default);
     var size = 0.008 + sev * 0.003;
@@ -219,9 +219,9 @@ function buildRegionBeacons(data){
   while(rGroup.children.length) rGroup.remove(rGroup.children[0]);
   var regions = Array.isArray(data) ? data : (data.regions || []);
   regions.forEach(function(reg, i){
-    var coords = REGION_COORDS[reg.region] || [0, i*40];
+    var coords = REGION_COORDS[reg.name || reg.region] || reg.center || [0, i*40];
     var pos    = latLonToVec3(coords[0], coords[1], 1.01);
-    var risk   = reg.risk_score || 5;
+    var risk   = reg.risk || reg.risk_score || 5;
     var col    = new THREE.Color(risk > 7 ? '#ef4444' : risk > 5 ? '#f59e0b' : '#10b981');
     var s      = 0.015 + risk * 0.004;
     var geo    = new THREE.SphereGeometry(s, 8, 8);
@@ -247,9 +247,9 @@ function buildRegionBeacons(data){
 /* ── Render stats ── */
 function renderStats(d){
   var el = function(id){ return document.getElementById(id); };
-  if(el('s-ev')) el('s-ev').textContent = d.last_24h || 0;
-  if(el('s-cr')) el('s-cr').textContent = d.high_impact_24h || 0;
-  if(el('s-ri')) el('s-ri').textContent = (d.global_risk_index || 0).toFixed(0);
+  if(el('s-ev')) el('s-ev').textContent = d.events_24h || d.last_24h || 0;
+  if(el('s-cr')) el('s-cr').textContent = d.high_impact || d.high_impact_24h || 0;
+  if(el('s-ri')) el('s-ri').textContent = (d.avg_severity || d.global_risk_index || 0).toFixed(0);
 }
 
 /* ── Boot sequence ── */
