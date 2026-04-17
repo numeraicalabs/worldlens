@@ -28,7 +28,7 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-_NO_AI_MSG = "Configure your Google Gemini API key in Admin → Settings to enable AI analysis."
+_NO_AI_MSG = "AI analysis powered by puter.js (free, no key needed) — running in browser."
 
 # ── Provider resolution ───────────────────────────────
 
