@@ -139,7 +139,7 @@ function initDashGlobe() {
 
   // Load data
   _loadRegions();
-  setInterval(_loadRegions, 60000);
+  setInterval(_loadRegions, 60000);  // _loadRegions uses _globeFetch (auth-free)
 }
 
 // ── Animation loop ─────────────────────────────────────────────────────────────
@@ -194,10 +194,29 @@ function _setupDragRotation(canvas) {
 
 // ── Data loading ───────────────────────────────────────────────────────────────
 
+/* ── Auth-free fetch for public globe endpoints ─────────────── */
+function _globeFetch(url, cb) {
+  fetch(url)
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) { if (d != null) cb(d); })
+    .catch(function(e) { console.warn('[Globe] fetch error', url, e); });
+}
+
+/* ── Stats overlay ──────────────────────────────────────────── */
+function _updateStats(d) {
+  if (!d) return;
+  var evEl   = document.getElementById('db-globe-stats-ev');
+  var crEl   = document.getElementById('db-globe-stats-cr');
+  var sevEl  = document.getElementById('db-globe-stats-sev');
+  if (evEl)  evEl.textContent  = d.events_24h || d.last_24h || 0;
+  if (crEl)  crEl.textContent  = d.high_impact || d.high_impact_24h || 0;
+  if (sevEl) sevEl.textContent = (d.avg_severity || d.global_risk_index || 0).toFixed(1);
+}
+
 function _loadRegions() {
-  if (!G.token) return;
-  rq('/api/globe/regions').then(function(data) {
-    if (!Array.isArray(data) || !data.length) return;
+  // Globe endpoints are public — no auth token needed
+  _globeFetch('/api/globe/regions', function(data) {
+    if (!data || !Array.isArray(data) || !data.length) return;
     DG.regions = data;
     _buildBeacons(data);
     _buildRegionDots(data);
@@ -211,9 +230,12 @@ function _loadRegions() {
     _startCycle();
   });
 
-  // Also load heatmap markers
-  rq('/api/globe/heatmap-points').then(function(pts) {
+  // Also load heatmap markers (public endpoint — use raw fetch)
+  _globeFetch('/api/globe/heatmap-points', function(pts) {
     if (Array.isArray(pts)) _buildMarkers(pts);
+  });
+  _globeFetch('/api/globe/stats', function(stats) {
+    _updateStats(stats);
   });
 }
 
