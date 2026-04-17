@@ -987,10 +987,20 @@ input,textarea,select{font-family:var(--fb);outline:none}
 .ew-signal-type { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; margin-bottom:3px; }
 .ew-signal-title { font-size:12px; line-height:1.4; margin-bottom:4px; }
 .ew-signal-meta  { font-size:10px; color:var(--t3); }
-.ew-confidence { display:flex; align-items:center; gap:5px; margin-top:4px; }
-.ew-conf-bar { width:40px; height:2px; background:var(--bg3); border-radius:1px; overflow:hidden; }
-.ew-conf-fill { height:100%; border-radius:1px; background:var(--am); }
+.ew-confidence { display:flex; align-items:center; gap:5px; margin-top:5px; flex-wrap:wrap; }
+.ew-conf-bar { width:48px; height:3px; background:var(--bg3); border-radius:2px; overflow:hidden; flex-shrink:0; }
+.ew-conf-fill { height:100%; border-radius:2px; transition:width .6s ease; }
 .ew-signals-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ew-assess-block { font-size:12px; color:var(--t2); line-height:1.7; }
+.ew-assess-block p:first-child { color:var(--t1); font-weight:600; }
+@media (max-width:600px) {
+  .ew-score-hero { grid-template-columns:auto 1fr; gap:12px; padding:14px 16px; }
+  .ew-score-hero > div:last-child { grid-column:1/-1; }
+  .ew-score-num { font-size:48px; min-width:64px; }
+  .ew-signals-grid { grid-template-columns:1fr; }
+  #ew-gauges { grid-template-columns:1fr 1fr !important; }
+  .pattern-grid { grid-template-columns:1fr 1fr !important; }
+}
 
 /* Pattern risk matrix */
 .pattern-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
