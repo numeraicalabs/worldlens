@@ -68,28 +68,50 @@ async def _ensure_tables(db):
 # ── Signal classification ─────────────────────────────
 CRISIS_PATTERNS = {
     "CONFLICT_ESCALATION": {
-        "keywords": ["military","offensive","troops","airstrike","escalation","invasion","mobilization"],
+        "keywords": ["military","offensive","troops","airstrike","escalation","invasion",
+                     "mobilization","strike","attack","missile","drone strike","war","combat",
+                     "ceasefire","casualties","frontline","shelling"],
         "weight": 0.9, "icon": "⚔️", "color": "#EF4444"
     },
     "ECONOMIC_STRESS": {
-        "keywords": ["recession","default","collapse","crash","crisis","inflation","stagflation","debt"],
+        "keywords": ["recession","default","collapse","crash","crisis","inflation","stagflation",
+                     "debt","banking","rate hike","yield","currency","devaluation","tariff",
+                     "trade war","gdp","contraction","unemployment","bailout"],
         "weight": 0.8, "icon": "📉", "color": "#F97316"
     },
     "POLITICAL_INSTABILITY": {
-        "keywords": ["coup","protest","riot","election","unrest","government","overthrow","sanctions"],
+        "keywords": ["coup","protest","riot","election","unrest","overthrow","sanctions",
+                     "impeach","resign","parliament","opposition","authoritarian","crackdown",
+                     "censorship","martial law","state of emergency"],
         "weight": 0.7, "icon": "🏛️", "color": "#8B5CF6"
     },
     "SUPPLY_DISRUPTION": {
-        "keywords": ["port","shipping","blockade","shortage","supply","logistics","cargo","container"],
+        "keywords": ["port","shipping","blockade","shortage","supply chain","logistics","cargo",
+                     "container","chokepoint","suez","hormuz","red sea","houthi","disruption",
+                     "semiconductor","chip","rare earth","critical mineral"],
         "weight": 0.75, "icon": "🚢", "color": "#F59E0B"
     },
     "ENERGY_CRISIS": {
-        "keywords": ["oil","gas","energy","pipeline","opec","refinery","embargo","blackout"],
+        "keywords": ["oil","gas","energy","pipeline","opec","refinery","embargo","blackout",
+                     "lng","nuclear","power grid","electricity","fuel","petrochemical",
+                     "energy security","natural gas","crude"],
         "weight": 0.8, "icon": "⚡", "color": "#EAB308"
     },
     "HUMANITARIAN": {
-        "keywords": ["famine","refugee","displacement","humanitarian","civilian","aid","crisis"],
+        "keywords": ["famine","refugee","displacement","humanitarian","civilian","aid",
+                     "starvation","cholera","epidemic","flood","earthquake","wildfire",
+                     "climate","drought","displaced","food insecurity"],
         "weight": 0.6, "icon": "🚨", "color": "#EC4899"
+    },
+    "NUCLEAR_CHEMICAL": {
+        "keywords": ["nuclear","chemical weapon","biological","radiological","wmd",
+                     "radiation","fallout","detonation","reactor","enrichment","nonproliferation"],
+        "weight": 1.0, "icon": "☢️", "color": "#DC2626"
+    },
+    "CYBER_INFORMATION": {
+        "keywords": ["cyberattack","cyber","hack","ransomware","disinformation","propaganda",
+                     "interference","infrastructure attack","grid attack","data breach"],
+        "weight": 0.65, "icon": "💻", "color": "#7C3AED"
     },
 }
 
@@ -140,43 +162,100 @@ def _detect_sc_relevance(text: str) -> List[str]:
 
 
 def _compute_ew_score_rule_based(events: List[Dict], indicators: List[Dict]) -> Dict:
-    """Compute Early Warning score without AI."""
+    """
+    Compute Early Warning score without AI.
+    Multi-factor scoring across velocity, severity, sentiment, macro, crisis patterns.
+    """
     if not events:
         return {
             "global_ew_score": 3.0, "sentiment_trend": 0.0,
-            "macro_stress": 4.0, "market_stress": 4.0, "event_velocity": 0.0
+            "macro_stress": 4.0, "market_stress": 4.0, "event_velocity": 0.0,
         }
 
-    # Event velocity: events per hour in last 24h vs previous 24h
     now = datetime.utcnow()
-    recent = [e for e in events if (now - datetime.fromisoformat(e["timestamp"].replace("Z",""))).total_seconds() < 86400]
-    older  = [e for e in events if 86400 <= (now - datetime.fromisoformat(e["timestamp"].replace("Z",""))).total_seconds() < 172800]
-    velocity = (len(recent) / 24) / max(len(older) / 24, 0.01) if older else 1.0
 
-    # Severity trend
-    avg_sev = sum(e.get("severity", 5) for e in recent[:30]) / max(len(recent[:30]), 1)
-    high_ratio = sum(1 for e in recent if e.get("impact") == "High") / max(len(recent), 1)
+    def _age_hours(ev):
+        try:
+            return (now - datetime.fromisoformat(ev["timestamp"].replace("Z",""))).total_seconds() / 3600
+        except Exception:
+            return 999
 
-    # Macro stress from VIX and key indicators
-    vix = next((i for i in indicators if "VIX" in i.get("name", "")), None)
+    recent = [e for e in events if _age_hours(e) < 24]
+    prior  = [e for e in events if 24 <= _age_hours(e) < 48]
+
+    # ── Event velocity (ratio recent/prior, normalised)
+    vel_raw  = (len(recent) / 24) / max(len(prior) / 24, 0.1) if prior else 1.0
+    velocity = round(min(3.0, vel_raw), 3)
+
+    # ── Severity metrics
+    sevs     = [float(e.get("severity", 5)) for e in recent[:40]]
+    avg_sev  = sum(sevs) / max(len(sevs), 1)
+    max_sev  = max(sevs) if sevs else 5.0
+    high_cnt = sum(1 for e in recent if str(e.get("impact","")).lower() == "high")
+    high_ratio = high_cnt / max(len(recent), 1)
+
+    # ── Crisis category weighting
+    CAT_WEIGHTS = {
+        "CONFLICT": 1.0, "MILITARY": 1.0, "SECURITY": 0.9,
+        "DISASTER": 0.8, "HUMANITARIAN": 0.7,
+        "ECONOMICS": 0.8, "ENERGY": 0.75,
+        "TECHNOLOGY": 0.5, "POLITICS": 0.65,
+    }
+    weighted_sev = 0.0
+    weight_sum   = 0.0
+    for e in recent[:40]:
+        w = CAT_WEIGHTS.get(e.get("category","").upper(), 0.5)
+        weighted_sev += float(e.get("severity", 5)) * w
+        weight_sum   += w
+    cat_score = (weighted_sev / max(weight_sum, 1))
+
+    # ── Macro stress from indicators
     macro_stress = 5.0
-    if vix:
-        macro_stress = min(10, vix.get("value", 18) / 4.0)
+    for ind in indicators:
+        name = ind.get("name","").upper()
+        val  = float(ind.get("value") or 0)
+        if "VIX" in name:
+            macro_stress = max(macro_stress, min(10, val / 3.5))
+        elif "YIELD" in name and "10" in name:
+            # Inverted yield → stress signal
+            if val > 5.0:
+                macro_stress = max(macro_stress, min(10, val))
+        elif "PMI" in name:
+            if val < 48:
+                macro_stress = max(macro_stress, min(10, (50 - val) * 1.5 + 4))
+        elif "UNEMPLOY" in name:
+            if val > 6.0:
+                macro_stress = max(macro_stress, min(10, val * 0.9))
 
-    # Sentiment trend (negative events ratio)
-    neg_cats = {"CONFLICT", "SECURITY", "DISASTER", "HUMANITARIAN"}
-    neg_ratio = sum(1 for e in recent if e.get("category") in neg_cats) / max(len(recent), 1)
-    sentiment_trend = round(-neg_ratio, 2)
+    # ── Sentiment trend (negative category ratio, weighted by recency)
+    neg_cats   = {"CONFLICT","SECURITY","DISASTER","HUMANITARIAN","MILITARY"}
+    neg_recent = sum(1 for e in recent if e.get("category","").upper() in neg_cats)
+    neg_prior  = sum(1 for e in prior  if e.get("category","").upper() in neg_cats)
+    neg_ratio_r = neg_recent / max(len(recent), 1)
+    neg_ratio_p = neg_prior  / max(len(prior),  1)
+    sentiment_trend = round(-(neg_ratio_r - neg_ratio_p * 0.5) - neg_ratio_r * 0.3, 3)
 
-    market_stress = min(10, 3.0 + avg_sev * 0.5 + high_ratio * 3.0)
-    ew_score = round(min(10, avg_sev * 0.4 + macro_stress * 0.3 + market_stress * 0.3), 1)
+    # ── Market stress
+    market_stress = round(min(10, 2.5
+        + cat_score  * 0.45
+        + high_ratio * 2.5
+        + (velocity - 1.0) * 1.2
+    ), 1)
+
+    # ── Global EW score (weighted composite)
+    ew_score = round(min(10, max(1,
+        cat_score  * 0.30
+        + macro_stress  * 0.25
+        + market_stress * 0.25
+        + min(10, avg_sev + (velocity - 1.0) * 1.5) * 0.20
+    )), 1)
 
     return {
         "global_ew_score": ew_score,
-        "sentiment_trend": round(sentiment_trend, 2),
-        "macro_stress": round(macro_stress, 1),
-        "market_stress": round(market_stress, 1),
-        "event_velocity": round(velocity, 2),
+        "sentiment_trend": round(sentiment_trend, 3),
+        "macro_stress":    round(macro_stress, 1),
+        "market_stress":   market_stress,
+        "event_velocity":  velocity,
     }
 
 
@@ -224,7 +303,7 @@ async def get_early_warning():
         text = (ev.get("title","") + " " + (ev.get("summary") or "")).lower()
         for sig_type, cfg in CRISIS_PATTERNS.items():
             hits = sum(1 for kw in cfg["keywords"] if kw in text)
-            if hits >= 2:
+            if hits >= 1:
                 signal_counts[sig_type] = signal_counts.get(sig_type, 0) + hits * cfg["weight"]
                 cc = ev.get("country_code", "XX")
                 if cc != "XX":
@@ -246,27 +325,49 @@ async def get_early_warning():
             "regions": signal_regions.get(sig_type, [])[:4],
         })
 
-    # AI assessment if key present
+    # AI assessment — deep structured reasoning
     ai_assessment = ""
     if _ai_available() and events:
         ev_summary = "\n".join([
-            "- " + e.get("title","") + " [" + e.get("category","") + ", sev=" + str(e.get("severity",5)) + "]"
-            for e in events[:8]
+            f"[{e.get('category','?')}][sev={e.get('severity',5):.0f}][{e.get('country_name','Global')}] "
+            f"{e.get('title','')} — {(e.get('ai_summary') or e.get('summary',''))[:120]}"
+            for e in events[:20]
         ])
         ind_summary = "\n".join([
-            i.get("name","") + ": " + str(i.get("value","")) + " " + i.get("unit","")
-            for i in indicators[:6]
+            f"{i.get('name','')}: {i.get('value','')} {i.get('unit','')} (trend: {i.get('trend','stable')})"
+            for i in indicators[:10]
         ])
-        prompt = (
-            "You are a crisis intelligence analyst. Based on the following data, "
-            "write a 3-sentence Early Warning assessment identifying the 2-3 most "
-            "critical emerging risks that could escalate in the next 7-30 days.\n\n"
-            "Recent events (48h):\n" + ev_summary + "\n\n"
-            "Macro indicators:\n" + ind_summary + "\n\n"
-            "EW Score: " + str(scores["global_ew_score"]) + "/10. "
-            "Be specific, direct, and actionable for risk managers."
+        # Build detected patterns summary
+        pattern_txt = ", ".join([
+            f"{p['label']} ({p['score']}/10)" for p in top_risks[:4]
+        ]) if top_risks else "None detected"
+
+        system = (
+            "You are a senior geopolitical risk analyst at a top-tier intelligence firm. "
+            "You think in structured analytical frameworks: PMESII (Political, Military, Economic, "
+            "Social, Infrastructure, Information), Red Cell analysis, and escalation ladders. "
+            "Your assessments are read by risk managers, hedge funds, and policy-makers. "
+            "Be precise, calibrated, and cite specific signals from the data. "
+            "Never speculate without grounding in the provided events. "
+            "Write in clear, direct prose — no bullet points, no hedging filler."
         )
-        ai_assessment = await _call_claude(prompt, max_tokens=300) or ""
+        prompt = (
+            f"EARLY WARNING ASSESSMENT REQUEST\n"
+            f"EW Score: {scores['global_ew_score']}/10 | Macro Stress: {scores['macro_stress']}/10 | "
+            f"Market Stress: {scores['market_stress']}/10 | Event Velocity: {scores['event_velocity']:.2f}x\n"
+            f"Crisis Patterns Detected: {pattern_txt}\n\n"
+            f"EVENTS (last 48h, {len(events)} total):\n{ev_summary}\n\n"
+            f"MACRO INDICATORS:\n{ind_summary}\n\n"
+            f"TASK: Write a structured 4-part Early Warning assessment:\n"
+            f"1. CURRENT THREAT LEVEL — One sentence naming the dominant risk and why EW score is {scores['global_ew_score']}/10.\n"
+            f"2. PRIMARY ESCALATION RISK — The single most likely scenario to deteriorate in the next 7-14 days, "
+            f"with specific triggering conditions to watch.\n"
+            f"3. SECOND-ORDER EFFECTS — One interconnection that risk managers may be underpricing "
+            f"(e.g. a regional conflict affecting a supply chain, or a macro event affecting a political risk).\n"
+            f"4. MONITORING SIGNALS — Two specific, observable data points that would confirm or deny escalation.\n\n"
+            f"Write continuously, 4 short paragraphs, no headers, no bullet points. Maximum 220 words."
+        )
+        ai_assessment = await _call_claude(prompt, system=system, max_tokens=500) or ""
 
     result = {
         **scores,
@@ -332,7 +433,7 @@ async def get_active_signals():
         text = (ev.get("title","") + " " + (ev.get("summary") or "")).lower()
         for sig_type, cfg in CRISIS_PATTERNS.items():
             hits = sum(1 for kw in cfg["keywords"] if kw in text)
-            if hits >= 2:
+            if hits >= 1:
                 key = sig_type + "_" + ev.get("country_code","XX")
                 if key in seen:
                     continue
