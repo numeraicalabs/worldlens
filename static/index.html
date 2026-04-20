@@ -13,19 +13,17 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/css/worldlens.css?v=20260420">
-<link rel="stylesheet" href="/static/css/worldlens_neo.css?v=20260420">
-  <link rel="stylesheet" href="/static/css/tradgentic.css?v=20260420">
-  <link rel="stylesheet" href="/static/css/backtest.css?v=20260420">
-  <link rel="stylesheet" href="/static/css/onboarding.css?v=20260420">
-<link rel="stylesheet" href="/static/css/worldlens_mobile.css?v=20260420">
-<link rel="stylesheet" href="/static/css/worldlens_fire.css?v=20260420">
-<link rel="stylesheet" href="/static/css/globe_widget.css?v=20260420">
+<link rel="stylesheet" href="/static/css/worldlens.css?v=20260421">
+<link rel="stylesheet" href="/static/css/worldlens_neo.css?v=20260421">
+  <link rel="stylesheet" href="/static/css/tradgentic.css?v=20260421">
+  <link rel="stylesheet" href="/static/css/backtest.css?v=20260421">
+  <link rel="stylesheet" href="/static/css/onboarding.css?v=20260421">
+<link rel="stylesheet" href="/static/css/worldlens_mobile.css?v=20260421">
+<link rel="stylesheet" href="/static/css/worldlens_fire.css?v=20260421">
+<link rel="stylesheet" href="/static/css/globe_widget.css?v=20260421">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Puter.js — free AI (gpt-4o-mini), no API key needed -->
-  <script src="https://js.puter.com/v2/"></script>
 
   <script>
     /* Failsafe: remove loader after 8s regardless */
@@ -281,9 +279,10 @@
 <div id="content">
 
 <!-- DASHBOARD -->
+<!-- DASHBOARD v21 — Ring of Fire -->
 <div class="view on" id="view-dash">
 
-<!-- ── TICKER ── -->
+<!-- ── TICKER (unchanged, wired by existing 04_events.js) ── -->
 <div id="ticker-wrap">
   <div class="ticker-label">LIVE</div>
   <div id="ticker-track" class="ticker-track"></div>
@@ -291,193 +290,446 @@
 
 <div class="db-root">
 
-  <!-- ═══════════════════════════ ROW 1: Header + KPIs ═══════════════════════════ -->
-  <div class="db-header-row">
-    <div class="db-greeting">
-      <div class="db-greeting-time" id="db-time-label">Good morning</div>
-      <div class="db-greeting-title">Global Intelligence<br>Briefing</div>
-      <div class="db-greeting-sub" id="d-last-update"></div>
-      <div id="db-affinity-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px;min-height:20px"></div>
-      <div id="db-sev-indicator" style="font-size:9px;color:var(--t3);margin-bottom:6px"></div>
-      <div class="db-header-actions">
-        <button class="btn btn-ai btn-sm" onclick="sv('ai',document.querySelector('[data-v=ai]'))">
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M5 8h6M8 5v6"/></svg>
-          AI Analyst
-        </button>
-        <button class="btn btn-g btn-sm" onclick="sv('map',document.querySelector('[data-v=map]'))">
-          🗺 Live Map
-        </button>
+  <!-- ═══════════════════ SECTION 0: HERO — Globe + AI Zone Briefing ═══════════════════ -->
+  <section class="fire-section">
+    <div class="fire-section-head">
+      <div class="fire-section-head-l">
+        <div class="fire-overline">
+          <span>/ GLOBAL INTELLIGENCE</span>
+          <span style="color:var(--fire-text-dim)">—</span>
+          <span id="fire-hero-date" style="color:var(--fire-text-dim)">LOADING…</span>
+        </div>
+        <h1 class="fire-title" style="font-size:36px">The world in motion</h1>
       </div>
+      <div class="fire-greeting-sub" id="d-last-update" style="font-family:var(--fire-mono);font-size:9px;letter-spacing:0.15em;color:var(--fire-text-dim)"></div>
     </div>
-    <!-- Globe Intelligence Card -->
-    <div class="db-globe-card" id="db-globe-card">
-      <div class="db-globe-header">
-        <span class="db-globe-live-dot"></span>
-        <span class="db-globe-title">Live Globe</span>
-        <span class="db-globe-region-name" id="db-globe-region-name">—</span>
-      </div>
-      <div class="db-globe-canvas-wrap" id="db-globe-canvas-wrap">
+
+    <div class="fire-globe-controls">
+      <button class="fire-timepill" data-tf="1H">1H</button>
+      <button class="fire-timepill" data-tf="6H">6H</button>
+      <button class="fire-timepill active" data-tf="24H">24H</button>
+      <button class="fire-timepill" data-tf="7D">7D</button>
+      <button class="fire-timepill" data-tf="30D">30D</button>
+      <button class="fire-globe-pausebtn" id="fire-globe-pausebtn">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="2" y="1" width="2" height="8"/><rect x="6" y="1" width="2" height="8"/></svg>
+        PAUSE
+      </button>
+    </div>
+
+    <div class="fire-hero">
+      <!-- 3D GLOBE — uses existing db-globe-canvas wiring via 23_dash_globe.js -->
+      <div class="fire-globe-wrap" id="db-globe-canvas-wrap">
         <canvas id="db-globe-canvas"></canvas>
-        <!-- Click-target regions overlay: invisible, just for hover/click -->
         <div id="db-globe-click-overlay" style="position:absolute;inset:0;cursor:pointer"></div>
-      </div>
-      <!-- Loading skeleton -->
-      <div class="db-globe-skeleton" id="db-globe-skeleton">
-        <div class="db-globe-skel-line" style="width:60%"></div>
-        <div class="db-globe-skel-line" style="width:90%;height:8px;margin-top:3px"></div>
-        <div class="db-globe-skel-line" style="width:75%;height:8px;margin-top:3px"></div>
-      </div>
-      <!-- Region summary panel -->
-      <div class="db-globe-summary" id="db-globe-summary" style="display:none">
-        <div class="db-globe-trend-row">
-          <span class="db-globe-trend" id="db-globe-trend">→</span>
-          <span class="db-globe-risk" id="db-globe-risk-badge">—</span>
-          <span class="db-globe-ev-count" id="db-globe-ev-count">—</span>
+
+        <!-- Legacy hidden nodes kept so 23_dash_globe.js writes do not crash -->
+        <div style="display:none">
+          <div id="db-globe-skeleton"></div>
+          <div id="db-globe-summary">
+            <span id="db-globe-trend">→</span>
+            <span id="db-globe-risk-badge">—</span>
+            <span id="db-globe-ev-count">—</span>
+            <div id="db-globe-top-event"></div>
+            <div id="db-globe-text">Loading…</div>
+            <div id="db-globe-topics"></div>
+          </div>
+          <div id="db-globe-regions"></div>
+          <span id="db-globe-region-name">—</span>
+          <span id="db-globe-footer-label"></span>
         </div>
-        <div class="db-globe-top-event" id="db-globe-top-event" style="display:none"></div>
-        <div class="db-globe-text" id="db-globe-text">Loading…</div>
-        <div class="db-globe-topics" id="db-globe-topics"></div>
+
+        <div class="fire-globe-zones" id="fire-globe-zones"></div>
+        <div class="fire-globe-legend">
+          <span><span class="fire-globe-legend-dot" style="background:var(--fire-ember)"></span>CRITICAL</span>
+          <span><span class="fire-globe-legend-dot" style="background:var(--fire-corona)"></span>MAJOR</span>
+          <span><span class="fire-globe-legend-dot" style="background:var(--fire-sunrise)"></span>WATCH</span>
+        </div>
       </div>
-      <!-- Region quick-nav dots -->
-      <div class="db-globe-regions" id="db-globe-regions"></div>
-      <!-- Open full globe link -->
-      <div class="db-globe-footer">
-        <span id="db-globe-footer-label">Auto-cycling 9 regions</span>
-        <a onclick="window.open('/static/globe.html','_blank')" class="db-globe-fullscreen-link">⊞ Full Globe →</a>
+
+      <!-- AI ZONE BRIEFING POPUP — rotates every 5.5s -->
+      <div class="fire-zone-popup zone-critical" id="fire-zone-popup">
+        <div class="fire-zone-head">
+          <div class="fire-zone-head-l">
+            <div class="fire-pulse-dot"></div>
+            <span class="fire-zone-overline">AI ZONE BRIEFING</span>
+          </div>
+          <span class="fire-zone-window" id="fire-zone-window">24H WINDOW</span>
+        </div>
+        <h3 class="fire-zone-name" id="fire-zone-name">Loading regions…</h3>
+        <div class="fire-zone-stats">
+          <div>
+            <div class="fire-zone-stat-val danger" id="fire-zone-severity">—</div>
+            <div class="fire-zone-stat-lbl">SEVERITY</div>
+          </div>
+          <div>
+            <div class="fire-zone-stat-val" id="fire-zone-events">—</div>
+            <div class="fire-zone-stat-lbl">EVENTS</div>
+          </div>
+          <div>
+            <div class="fire-zone-stat-val danger" id="fire-zone-trend">—</div>
+            <div class="fire-zone-stat-lbl">TREND</div>
+          </div>
+        </div>
+        <p class="fire-zone-quote" id="fire-zone-quote">« AI briefing will appear here — auto-rotating through monitored regions. »</p>
+        <div class="fire-zone-foot">
+          <span class="fire-zone-byline" id="fire-zone-byline">— AI GEOPOL AGENT</span>
+          <a class="fire-link" onclick="sv('ai',document.querySelector('[data-v=ai]'))">DEEP DIVE ↗</a>
+        </div>
       </div>
     </div>
 
-    <div class="db-kpi-strip">
-      <div class="db-kpi" id="dbk-risk">
-        <div class="db-kpi-icon">🌡</div>
-        <div class="db-kpi-body">
-          <div class="db-kpi-lbl">Global Risk Index</div>
-          <div class="db-kpi-val" id="d-risk">—</div>
-          <div class="db-kpi-bar"><div id="d-risk-b" class="db-kpi-bar-fill"></div></div>
-          <div class="db-kpi-sub" id="d-risk-l">Loading…</div>
+    <!-- RISK INDEX STRIP -->
+    <div class="fire-risk-strip">
+      <div>
+        <div class="fire-overline">/ GLOBAL RISK INDEX</div>
+        <div class="fire-risk-num" id="d-risk">—<span class="fire-risk-num-suffix">/100</span></div>
+        <div class="fire-risk-delta">
+          <span class="fire-risk-delta-val" id="d-risk-l">Loading…</span>
+          <span class="fire-risk-badge" id="d-risk-badge">—</span>
         </div>
+        <!-- Hidden legacy bar used by renderDash -->
+        <div style="display:none"><div id="d-risk-b"></div></div>
       </div>
-      <div class="db-kpi" id="dbk-ev" onclick="sv('feed',document.querySelector('[data-v=feed]'))" style="cursor:pointer">
-        <div class="db-kpi-icon">⚡</div>
-        <div class="db-kpi-body">
-          <div class="db-kpi-lbl">Events 24h</div>
-          <div class="db-kpi-val" id="d-ev">—</div>
-          <div class="db-kpi-sub" id="d-hi" style="color:var(--re)">— critical</div>
+      <div class="fire-risk-quote" id="d-brief-txt">Loading AI briefing…
+        <div class="fire-risk-quote-byline">— AI CHIEF ANALYST</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SECTION 1: MARKET PULSE — KPI Strip ═══════════════════ -->
+  <section class="fire-section">
+    <div class="fire-section-head">
+      <div class="fire-section-head-l">
+        <div class="fire-overline">/ 01 — MARKET PULSE</div>
+        <h2 class="fire-title">Markets at a glance</h2>
+      </div>
+      <a class="fire-link" onclick="sv('markets',document.querySelector('[data-v=markets]'))">FULL MARKETS ↗</a>
+    </div>
+
+    <div class="fire-kpi-grid">
+      <div class="fire-kpi" id="dbk-ev" onclick="sv('feed',document.querySelector('[data-v=feed]'))">
+        <div class="fire-kpi-lbl">EVENTS / 24H</div>
+        <div class="fire-kpi-val" id="d-ev">—</div>
+        <div class="fire-kpi-chg up" id="d-hi">—</div>
+        <div class="fire-kpi-spark" id="fire-spark-events"></div>
+      </div>
+      <div class="fire-kpi" id="dbk-sp" onclick="sv('markets',document.querySelector('[data-v=markets]'))">
+        <div class="fire-kpi-lbl">S&amp;P 500</div>
+        <div class="fire-kpi-val" id="d-sp">—</div>
+        <div class="fire-kpi-chg" id="d-sp-c">—</div>
+        <div class="fire-kpi-spark" id="fire-spark-sp"></div>
+      </div>
+      <div class="fire-kpi" id="dbk-btc">
+        <div class="fire-kpi-lbl">BTC / USD</div>
+        <div class="fire-kpi-val" id="d-btc">—</div>
+        <div class="fire-kpi-chg" id="d-btc-c">—</div>
+        <div class="fire-kpi-spark" id="fire-spark-btc"></div>
+      </div>
+      <div class="fire-kpi" id="dbk-vix">
+        <div class="fire-kpi-lbl">VIX FEAR</div>
+        <div class="fire-kpi-val" id="d-vix">—</div>
+        <div class="fire-kpi-chg up" id="d-vix-l">—</div>
+        <div class="fire-kpi-spark" id="fire-spark-vix"></div>
+      </div>
+      <div class="fire-kpi" id="dbk-gold">
+        <div class="fire-kpi-lbl">GOLD / OZ</div>
+        <div class="fire-kpi-val" id="d-gold">—</div>
+        <div class="fire-kpi-chg" id="d-gold-c">—</div>
+        <div class="fire-kpi-spark" id="fire-spark-gold"></div>
+      </div>
+      <div class="fire-kpi" id="dbk-dxy">
+        <div class="fire-kpi-lbl">DXY</div>
+        <div class="fire-kpi-val" id="d-dxy">—</div>
+        <div class="fire-kpi-chg" id="d-dxy-c">—</div>
+        <div class="fire-kpi-spark" id="fire-spark-dxy"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SECTION 2: EARLY WARNING SYSTEM ═══════════════════ -->
+  <section class="fire-section fire-ew-section">
+    <div class="fire-section-head">
+      <div class="fire-section-head-l">
+        <div class="fire-overline fire-overline-critical">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M8 13v1M2 14h12L8 2z"/></svg>
+          / 02 — EARLY WARNING SYSTEM
         </div>
+        <h2 class="fire-title">Signals before they become news</h2>
       </div>
-      <div class="db-kpi" id="dbk-sp" onclick="sv('markets',document.querySelector('[data-v=markets]'))" style="cursor:pointer">
-        <div class="db-kpi-icon">📈</div>
-        <div class="db-kpi-body">
-          <div class="db-kpi-lbl">S&amp;P 500</div>
-          <div class="db-kpi-val" id="d-sp">—</div>
-          <div class="db-kpi-sub" id="d-sp-c">—</div>
+    </div>
+
+    <div class="fire-ew-tabs">
+      <button class="fire-ew-tab active" data-tab="signals">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l4-6 3 4 5-8"/></svg>
+        ACTIVE SIGNALS
+      </button>
+      <button class="fire-ew-tab" data-tab="escalation">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13V3M2 3l5 4 4-2 3 5"/></svg>
+        ESCALATION PIPELINE
+      </button>
+      <button class="fire-ew-tab" data-tab="predictions">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2"/></svg>
+        PREDICTIVE MATRIX
+      </button>
+    </div>
+
+    <!-- TAB: ACTIVE SIGNALS -->
+    <div class="fire-ew-panel active" data-panel="signals">
+      <div class="fire-signal-grid" id="fire-signals-grid">
+        <div class="fire-signal">
+          <div class="fire-signal-head">
+            <div class="fire-signal-level critical">
+              <span class="fire-signal-level-dot"></span>CRITICAL
+            </div>
+          </div>
+          <div class="fire-signal-label">CROSS-ASSET DECORRELATION</div>
+          <div class="fire-signal-val-row">
+            <span class="fire-signal-val">Active</span>
+            <span class="fire-signal-delta critical">+142% vs baseline</span>
+          </div>
+          <div class="fire-signal-meta">3rd session · EUR/USD vs Gold</div>
         </div>
-      </div>
-      <div class="db-kpi" id="dbk-btc">
-        <div class="db-kpi-icon">₿</div>
-        <div class="db-kpi-body">
-          <div class="db-kpi-lbl">Bitcoin</div>
-          <div class="db-kpi-val" id="d-btc">—</div>
-          <div class="db-kpi-sub" id="d-btc-c">—</div>
+
+        <div class="fire-signal">
+          <div class="fire-signal-head">
+            <div class="fire-signal-level critical">
+              <span class="fire-signal-level-dot"></span>CRITICAL
+            </div>
+          </div>
+          <div class="fire-signal-label">SANCTIONS CASCADE PROBABILITY</div>
+          <div class="fire-signal-val-row">
+            <span class="fire-signal-val">34%</span>
+            <span class="fire-signal-delta critical">+8pt today</span>
+          </div>
+          <div class="fire-signal-meta">72h horizon · Eastern Europe</div>
         </div>
-      </div>
-      <div class="db-kpi" id="dbk-vix">
-        <div class="db-kpi-icon">😨</div>
-        <div class="db-kpi-body">
-          <div class="db-kpi-lbl">VIX Fear</div>
-          <div class="db-kpi-val" id="d-vix">—</div>
-          <div class="db-kpi-sub" id="d-vix-l">—</div>
+
+        <div class="fire-signal">
+          <div class="fire-signal-head">
+            <div class="fire-signal-level major">
+              <span class="fire-signal-level-dot"></span>MAJOR
+            </div>
+          </div>
+          <div class="fire-signal-label">SHIPPING INSURANCE PREMIUM</div>
+          <div class="fire-signal-val-row">
+            <span class="fire-signal-val">+18%</span>
+            <span class="fire-signal-delta major">Breach of 2024 peak</span>
+          </div>
+          <div class="fire-signal-meta">Strait of Hormuz · 5-day MA</div>
         </div>
-      </div>
-      <div class="db-kpi" id="dbk-gold">
-        <div class="db-kpi-icon">🥇</div>
-        <div class="db-kpi-body">
-          <div class="db-kpi-lbl">Gold</div>
-          <div class="db-kpi-val" id="d-gold">—</div>
-          <div class="db-kpi-sub" id="d-gold-c">—</div>
+
+        <div class="fire-signal">
+          <div class="fire-signal-head">
+            <div class="fire-signal-level major">
+              <span class="fire-signal-level-dot"></span>MAJOR
+            </div>
+          </div>
+          <div class="fire-signal-label">SOCIAL SENTIMENT SPIKE</div>
+          <div class="fire-signal-val-row">
+            <span class="fire-signal-val">3 EM</span>
+            <span class="fire-signal-delta major">Concurrent events</span>
+          </div>
+          <div class="fire-signal-meta">Multilingual NLP detection</div>
+        </div>
+
+        <div class="fire-signal">
+          <div class="fire-signal-head">
+            <div class="fire-signal-level watch">
+              <span class="fire-signal-level-dot"></span>WATCH
+            </div>
+          </div>
+          <div class="fire-signal-label">OPTIONS FLOW ANOMALY</div>
+          <div class="fire-signal-val-row">
+            <span class="fire-signal-val">VIX $22</span>
+            <span class="fire-signal-delta watch">Hedging regime</span>
+          </div>
+          <div class="fire-signal-meta">2.3M contracts · unusual</div>
+        </div>
+
+        <div class="fire-signal">
+          <div class="fire-signal-head">
+            <div class="fire-signal-level watch">
+              <span class="fire-signal-level-dot"></span>WATCH
+            </div>
+          </div>
+          <div class="fire-signal-label">COMMODITY SPREAD COMPRESSION</div>
+          <div class="fire-signal-val-row">
+            <span class="fire-signal-val">Brent/WTI</span>
+            <span class="fire-signal-delta watch">Bottleneck relief</span>
+          </div>
+          <div class="fire-signal-meta">$4.20 → $3.10 in 48h</div>
         </div>
       </div>
     </div>
+
+    <!-- TAB: ESCALATION PIPELINE -->
+    <div class="fire-ew-panel" data-panel="escalation">
+      <div class="fire-pipeline">
+        <div class="fire-pipe-stage s1">
+          <div class="fire-pipe-overline">STAGE 1</div>
+          <div class="fire-pipe-name">Monitoring</div>
+          <div class="fire-pipe-count">24</div>
+          <div class="fire-pipe-pct">55% of flows</div>
+        </div>
+        <div class="fire-pipe-stage s2">
+          <div class="fire-pipe-overline">STAGE 2</div>
+          <div class="fire-pipe-name">Watch</div>
+          <div class="fire-pipe-count">12</div>
+          <div class="fire-pipe-pct">27% of flows</div>
+        </div>
+        <div class="fire-pipe-stage s3">
+          <div class="fire-pipe-overline">STAGE 3</div>
+          <div class="fire-pipe-name">Major</div>
+          <div class="fire-pipe-count">6</div>
+          <div class="fire-pipe-pct">14% of flows</div>
+        </div>
+        <div class="fire-pipe-stage s4">
+          <div class="fire-pipe-overline">STAGE 4</div>
+          <div class="fire-pipe-name">Critical</div>
+          <div class="fire-pipe-count">2</div>
+          <div class="fire-pipe-pct">4% of flows</div>
+        </div>
+      </div>
+      <div class="fire-pipe-summary">
+        « 44 events under active monitoring. 8 events escalated to major/critical in the last 24h — 62% above 7-day baseline.
+        Two events in critical tier both concern energy corridor stress. »
+      </div>
+    </div>
+
+    <!-- TAB: PREDICTIVE MATRIX -->
+    <div class="fire-ew-panel" data-panel="predictions">
+      <div class="fire-pred-grid">
+        <div class="fire-pred-card">
+          <div class="fire-pred-horizon">HORIZON · 24H</div>
+          <div class="fire-pred-label">Sanctions expansion</div>
+          <div class="fire-pred-prob high">34%</div>
+          <div class="fire-pred-bar"><div class="fire-pred-bar-fill" style="width:34%;background:var(--fire-ember)"></div></div>
+          <div class="fire-pred-ci">90% CI · 28–41%</div>
+        </div>
+        <div class="fire-pred-card">
+          <div class="fire-pred-horizon">HORIZON · 72H</div>
+          <div class="fire-pred-label">Military escalation</div>
+          <div class="fire-pred-prob mid">18%</div>
+          <div class="fire-pred-bar"><div class="fire-pred-bar-fill" style="width:18%;background:var(--fire-corona)"></div></div>
+          <div class="fire-pred-ci">90% CI · 12–24%</div>
+        </div>
+        <div class="fire-pred-card">
+          <div class="fire-pred-horizon">HORIZON · 7D</div>
+          <div class="fire-pred-label">Diplomatic breakthrough</div>
+          <div class="fire-pred-prob high">42%</div>
+          <div class="fire-pred-bar"><div class="fire-pred-bar-fill" style="width:42%;background:var(--fire-ember)"></div></div>
+          <div class="fire-pred-ci">90% CI · 34–51%</div>
+        </div>
+        <div class="fire-pred-card">
+          <div class="fire-pred-horizon">HORIZON · 30D</div>
+          <div class="fire-pred-label">Regime transition</div>
+          <div class="fire-pred-prob low">12%</div>
+          <div class="fire-pred-bar"><div class="fire-pred-bar-fill" style="width:12%;background:var(--fire-sunrise)"></div></div>
+          <div class="fire-pred-ci">90% CI · 7–19%</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SECTION 3: CRISIS SPOTLIGHT (populated by 04_events.js into #d-evlist, but we wrap visually) ═══════════════════ -->
+  <section class="fire-section">
+    <div class="fire-section-head">
+      <div class="fire-section-head-l">
+        <div class="fire-overline fire-overline-critical">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v4M8 11h0"/></svg>
+          / 03 — CRISIS SPOTLIGHT
+        </div>
+        <h2 class="fire-title">What demands your attention</h2>
+      </div>
+      <a class="fire-link" onclick="sv('feed',document.querySelector('[data-v=feed]'))">FULL FEED ↗</a>
+    </div>
+
+    <!-- Legacy evlist container — 04_events.js will populate this -->
+    <div id="d-evlist" class="db-evlist fire-crisis-list"></div>
+  </section>
+
+  <!-- ═══════════════════ SECTION 4: AI AGENTS BOTS (kept — live) ═══════════════════ -->
+  <section class="fire-section">
+    <div class="fire-section-head">
+      <div class="fire-section-head-l">
+        <div class="fire-overline">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h8v8H4zM2 8h2M12 8h2M8 2v2M8 12v2"/></svg>
+          / 04 — AI AGENT BOTS
+          <span class="ast-badge">LIVE</span>
+        </div>
+        <h2 class="fire-title">Your 4 intelligence bots</h2>
+        <div class="agents-section-sub">Finance · Geopolitics · Science · Technology — autonomous analysts monitoring your focus areas</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="agents-refresh-btn" onclick="loadAllDigests && loadAllDigests()">☀ DIGEST</button>
+        <button class="agents-refresh-btn" onclick="loadAllPredictions && loadAllPredictions()">📅 PREDICT</button>
+        <button class="agents-refresh-btn" onclick="refreshAgentBriefs && refreshAgentBriefs()">↻ REFRESH</button>
+      </div>
+    </div>
+    <div id="agents-grid">
+      <div style="padding:28px 0;text-align:center;color:var(--fire-text-dim);font-size:12px">Loading 4 agents…</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SECTION 5: REGIONS + AI INSIGHTS (two-col) ═══════════════════ -->
+  <section class="fire-section">
+    <div class="fire-two-col">
+      <!-- REGIONAL HEATMAP -->
+      <div>
+        <div class="fire-overline">/ 05 — REGIONAL HEATMAP</div>
+        <h2 class="fire-title" style="margin-bottom:20px">Pressure by region</h2>
+        <!-- Populated by existing renderHotspots into #d-hot -->
+        <div id="d-hot" class="db-hotspot-grid"></div>
+        <!-- Legacy threat matrix still rendered into #d-threats -->
+        <div id="d-threats" class="threat-matrix" style="margin-top:20px"></div>
+      </div>
+
+      <!-- AI AGENT FINDINGS / MARKET SNAPSHOT -->
+      <div>
+        <div class="fire-overline">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.5 3.5l2 2M10.5 10.5l2 2M3.5 12.5l2-2M10.5 5.5l2-2"/></svg>
+          / 06 — MARKET SNAPSHOT
+        </div>
+        <h2 class="fire-title" style="margin-bottom:20px">Cross-asset signals</h2>
+        <!-- Populated by renderMarketList into #d-mktlist -->
+        <div id="d-mktlist" class="db-mktlist"></div>
+
+        <div class="fire-overline" style="margin-top:28px">/ EVENTS BY CATEGORY</div>
+        <div id="d-catbars" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SECTION 6: RISK TIMELINE ═══════════════════ -->
+  <section class="fire-section">
+    <div class="fire-section-head">
+      <div class="fire-section-head-l">
+        <div class="fire-overline">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+          / 07 — LIVE TIMELINE
+        </div>
+        <h2 class="fire-title">As it unfolds</h2>
+      </div>
+      <span style="font-family:var(--fire-mono);font-size:9px;letter-spacing:0.2em;color:var(--fire-text-dim)">LAST 24H</span>
+    </div>
+    <!-- Populated by renderTimeline into #d-timeline -->
+    <div id="d-timeline" class="timeline fire-timeline"></div>
+  </section>
+
+  <!-- Legacy compatibility: hidden greeting block so 04_events.js setters don't crash -->
+  <div style="display:none">
+    <div id="db-time-label"></div>
+    <div id="db-affinity-chips"></div>
+    <div id="db-sev-indicator"></div>
+    <div id="d-evlist-label"></div>
+    <div id="d-pers-badge"></div>
+    <div id="d-brief-label"></div>
+    <div id="d-brief-badge"></div>
   </div>
 
-  <!-- ═══════════════════════════ AGENT BOTS SECTION ════════════════════════════ -->
-  <div class="agents-section-header">
-    <div>
-      <div class="agents-section-title">
-        ⬡ AI Agent Bots
-        <span class="ast-badge">LIVE</span>
-      </div>
-      <div class="agents-section-sub">4 autonomous analysts — continuously monitoring your focus areas</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-      <button class="agents-refresh-btn" onclick="loadAllDigests && loadAllDigests()" title="Morning digest">☀ Digest</button>
-      <button class="agents-refresh-btn" onclick="loadAllPredictions && loadAllPredictions()" title="This week's predictions">📅 Predict</button>
-      <button class="agents-refresh-btn" onclick="refreshAgentBriefs && refreshAgentBriefs()">↻ Refresh</button>
-    </div>
-  </div>
-  <div id="agents-grid">
-    <!-- Populated by 21_agents_dash.js -->
-    <div style="grid-column:1/-1;padding:28px 0;text-align:center;color:var(--t3);font-size:12px">Loading agents…</div>
-  </div>
-
-  <!-- ═══════════════════════════ ROW 3: BENTO GRID ═════════════════════════════ -->
-  <div class="db-bento">
-    <div class="db-bento-cell db-cell-events">
-      <div class="db-cell-header">
-        <div class="db-cell-title">
-          <span class="db-cell-icon">⚡</span>
-          <span id="d-evlist-label">High-Impact Events</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="d-pers-badge" style="display:none;font-size:9px;padding:1px 7px;border-radius:100px;background:rgba(59,130,246,.12);color:var(--b4);border:1px solid rgba(59,130,246,.2)">✦ For You</span>
-          <a class="db-cell-link" onclick="sv('feed',document.querySelector('[data-v=feed]'))">View all →</a>
-        </div>
-      </div>
-      <div id="d-evlist" class="db-evlist"></div>
-    </div>
-    <div class="db-bento-cell db-cell-threats">
-      <div class="db-cell-header">
-        <div class="db-cell-title"><span class="db-cell-icon">🎯</span>Threat Matrix</div>
-      </div>
-      <div class="threat-matrix" id="d-threats"></div>
-    </div>
-    <div class="db-bento-cell db-cell-markets">
-      <div class="db-cell-header">
-        <div class="db-cell-title"><span class="db-cell-icon">💹</span>Market Snapshot</div>
-        <a class="db-cell-link" onclick="sv('markets',document.querySelector('[data-v=markets]'))">All →</a>
-      </div>
-      <div id="d-mktlist" class="db-mktlist"></div>
-    </div>
-    <div class="db-bento-cell db-cell-ai">
-      <div class="db-cell-header">
-        <div class="db-cell-title">
-          <span class="db-cell-icon" style="background:rgba(167,139,250,.15);color:#A78BFA">🤖</span>
-          <span id="d-brief-label">AI Macro Briefing</span>
-        </div>
-        <span class="db-ai-badge" id="d-brief-badge">GPT</span>
-      </div>
-      <div class="aib-txt" id="d-brief-txt">Loading AI briefing…</div>
-    </div>
-    <div class="db-bento-cell db-cell-timeline">
-      <div class="db-cell-header">
-        <div class="db-cell-title"><span class="db-cell-icon">🕐</span>Risk Timeline</div>
-        <span style="font-size:9px;color:var(--t3)">Last 24h</span>
-      </div>
-      <div class="timeline" id="d-timeline"></div>
-    </div>
-    <div class="db-bento-cell db-cell-cats">
-      <div class="db-cell-header">
-        <div class="db-cell-title"><span class="db-cell-icon">📊</span>Events by Category</div>
-      </div>
-      <div id="d-catbars"></div>
-    </div>
-    <div class="db-bento-cell db-cell-hotspots">
-      <div class="db-cell-header">
-        <div class="db-cell-title"><span class="db-cell-icon">🔥</span>Active Hotspots</div>
-        <a class="db-cell-link" onclick="sv('map',document.querySelector('[data-v=map]'))">Map →</a>
-      </div>
-      <div id="d-hot" class="db-hotspot-grid"></div>
-    </div>
+  <div class="fire-foot">
+    <div class="fire-foot-l">WORLDLENS · v20 FIRE · GEOPOLITICAL INTELLIGENCE</div>
+    <div class="fire-foot-r">« The world, read slowly. »</div>
   </div>
 
 </div><!-- db-root -->
@@ -2639,37 +2891,38 @@
 </div>
 
 <!-- WorldLens Application Scripts (load order matters) -->
-<script src="/static/js/00_puter_ai.js?v=20260420"></script>
-<script src="/static/js/01_globals.js?v=20260420"></script>
-<script src="/static/js/02_core.js?v=20260420"></script>
-<script src="/static/js/03_map.js?v=20260420"></script>
-<script src="/static/js/04_events.js?v=20260420"></script>
-<script src="/static/js/05_markets.js?v=20260420"></script>
-<script src="/static/js/06_supply_admin.js?v=20260420"></script>
-<script src="/static/js/07_map_advanced.js?v=20260420"></script>
-<script src="/static/js/08_knowledge_graph.js?v=20260420"></script>
-<script src="/static/js/09_historical_events.js?v=20260420"></script>
-<script src="/static/js/10_stubs.js?v=20260420"></script>
-<script src="/static/js/11_insiders.js?v=20260420"></script>
-<script src="/static/js/12_graph.js?v=20260420"></script>
-<script src="/static/js/13_portfolio.js?v=20260420"></script>
+<script src="/static/js/01_globals.js?v=20260421"></script>
+<script src="/static/js/02_core.js?v=20260421"></script>
+<script src="/static/js/03_map.js?v=20260421"></script>
+<script src="/static/js/04_events.js?v=20260421"></script>
+<script src="/static/js/05_markets.js?v=20260421"></script>
+<script src="/static/js/06_supply_admin.js?v=20260421"></script>
+<script src="/static/js/07_map_advanced.js?v=20260421"></script>
+<script src="/static/js/08_knowledge_graph.js?v=20260421"></script>
+<script src="/static/js/09_historical_events.js?v=20260421"></script>
+<script src="/static/js/10_stubs.js?v=20260421"></script>
+<script src="/static/js/11_insiders.js?v=20260421"></script>
+<script src="/static/js/12_graph.js?v=20260421"></script>
+<script src="/static/js/13_portfolio.js?v=20260421"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/js/14_graph3d.js?v=20260420"></script>
-<script src="/static/js/15_knowledge_explorer.js?v=20260420"></script>
-<script src="/static/js/16_timeline_graph.js?v=20260420"></script>
-<script src="/static/js/17_cascade.js?v=20260420"></script>
-<script src="/static/js/18_network_hub.js?v=20260420"></script>
-<script src="/static/js/19_continent_streams.js?v=20260420"></script>
-<script src="/static/js/20_nav_ux.js?v=20260420"></script>
-<script src="/static/js/21_agents_dash.js?v=20260420"></script>
-<script src="/static/js/22_graph_engine.js?v=20260420"></script>
-<script src="/static/js/23_dash_globe.js?v=20260420"></script>
-<script src="/static/js/24_tradgentic.js?v=20260420"></script>
-<script src="/static/js/25_backtest.js?v=20260420"></script>
-<script src="/static/js/26_features.js?v=20260420"></script>
-<script src="/static/js/27_onboarding.js?v=20260420"></script>
-<script src="/static/js/28_ml_bots.js?v=20260420"></script>
-<script src="/static/js/29_sprint_c.js?v=20260420"></script>
+<script src="/static/js/14_graph3d.js?v=20260421"></script>
+<script src="/static/js/15_knowledge_explorer.js?v=20260421"></script>
+<script src="/static/js/16_timeline_graph.js?v=20260421"></script>
+<script src="/static/js/17_cascade.js?v=20260421"></script>
+<script src="/static/js/18_network_hub.js?v=20260421"></script>
+<script src="/static/js/19_continent_streams.js?v=20260421"></script>
+<script src="/static/js/20_nav_ux.js?v=20260421"></script>
+<script src="/static/js/21_agents_dash.js?v=20260421"></script>
+<script src="/static/js/22_graph_engine.js?v=20260421"></script>
+<script src="/static/js/23_dash_globe.js?v=20260421"></script>
+<script src="/static/js/24_tradgentic.js?v=20260421"></script>
+<script src="/static/js/25_backtest.js?v=20260421"></script>
+<script src="/static/js/26_features.js?v=20260421"></script>
+<script src="/static/js/27_onboarding.js?v=20260421"></script>
+<script src="/static/js/28_ml_bots.js?v=20260421"></script>
+<script src="/static/js/29_sprint_c.js?v=20260421"></script>
+<script src="/static/js/30_theme.js?v=20260421"></script>
+<script src="/static/js/31_dash_v2.js?v=20260421"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
