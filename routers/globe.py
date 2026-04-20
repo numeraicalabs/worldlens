@@ -4,7 +4,7 @@ Provides real-time regional summaries, event heatmap data, and AI-generated
 1-2 line summaries per macro-region for the landing page 3D globe widget.
 """
 from __future__ import annotations
-import json, time
+import json, logging, time
 from typing import List, Dict, Optional
 from fastapi import APIRouter
 import aiosqlite
@@ -22,6 +22,23 @@ except ImportError:
     async def _call_claude(p, **kw): return None
     def _parse_json(t): return None
     def _ai_available(): return False
+
+import asyncio
+
+logger = logging.getLogger(__name__)
+
+async def _call_ai_with_retry(prompt: str, max_tokens: int = 180, retries: int = 2):
+    """Call AI with retry — Gemini free tier can timeout occasionally."""
+    for attempt in range(retries + 1):
+        try:
+            result = await _call_claude(prompt, max_tokens=max_tokens)
+            if result:
+                return result
+        except Exception as e:
+            logger.debug("AI attempt %d failed: %s", attempt + 1, e)
+        if attempt < retries:
+            await asyncio.sleep(1.2 * (attempt + 1))
+    return None
 
 router = APIRouter(prefix="/api/globe", tags=["globe"])
 
@@ -124,7 +141,7 @@ async def _ai_region_summary(region: str, events: List[Dict]) -> Dict:
         '{"summary":"1-2 sentences","sentiment":"positive|neutral|negative|critical",'
         '"trend":"↑|→|↓","risk":6.5,"topics":["topic1","topic2","topic3"]}'
     )
-    parsed = _parse_json(await _call_claude(prompt, max_tokens=180))
+    parsed = _parse_json(await _call_ai_with_retry(prompt, max_tokens=200))
     if not parsed:
         trend = "↑" if avg_sev > 6.5 else ("↓" if avg_sev < 4 else "→")
         parsed = {
@@ -141,6 +158,22 @@ async def _ai_region_summary(region: str, events: List[Dict]) -> Dict:
 @router.get("/regions")
 async def get_region_summaries():
     """All regional summaries for the landing page globe widget."""
+    # Re-load AI settings from DB on every call — ensures Gemini key saved
+    # by admin is picked up without requiring a server restart.
+    try:
+        async with aiosqlite.connect(settings.db_path) as _sdb:
+            async with _sdb.execute(
+                "SELECT key, value FROM app_settings WHERE key IN "
+                "('global_ai_provider','gemini_api_key','anthropic_api_key')"
+            ) as _cur:
+                for _key, _val in await _cur.fetchall():
+                    if _val:
+                        if _key == "global_ai_provider":  settings.global_ai_provider = _val
+                        elif _key == "gemini_api_key":    settings.gemini_api_key = _val
+                        elif _key == "anthropic_api_key": settings.anthropic_api_key = _val
+    except Exception:
+        pass  # silently skip if DB not ready — stubs will show
+
     async with aiosqlite.connect(settings.db_path) as db:
         db.row_factory = aiosqlite.Row
         results = []
