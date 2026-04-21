@@ -626,13 +626,31 @@ async function saveAIKey(provider) {
   if (!inp || !inp.value.trim()) { toast('Enter a valid API key', 'e'); return; }
   var r = await rq('/api/admin/settings/ai', {method:'POST', body:{provider:provider, api_key:inp.value.trim()}})
   if (r && r.status === 'ok') {
-    // Auto-test after save
-    var testR = await rq('/api/admin/test-ai');
-    var msg = testR ? (testR.status + ': ' + testR.message) : 'Test failed';
-    var color = testR && testR.status === 'OK' ? 'var(--gr)' : 'var(--re)';
+    // Auto-test after save — show inline result, never alert()
     var testEl = document.getElementById('ai-test-result');
-    if (testEl) { testEl.textContent = msg; testEl.style.color = color; }
-    else { alert('AI Test — ' + msg); }
+    if (testEl) {
+      testEl.style.display = 'block';
+      testEl.textContent = 'Testing connection…';
+      testEl.style.background = 'rgba(255,255,255,0.06)';
+      testEl.style.color = 'var(--t2)';
+    }
+    var testR = await rq('/api/admin/test-ai');
+    if (testEl && testR) {
+      var isOK = testR.status === 'OK';
+      testEl.textContent = (isOK ? '✓ ' : '✗ ') + (testR.message || 'Unknown result');
+      testEl.style.background = isOK
+        ? 'rgba(16,185,129,0.12)'
+        : 'rgba(239,68,68,0.12)';
+      testEl.style.color = isOK ? 'var(--gr)' : 'var(--re)';
+      testEl.style.border = '1px solid ' + (isOK ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)');
+      if (testR.response) {
+        testEl.textContent += ' — Response: "' + testR.response + '"';
+      }
+    } else if (testEl) {
+      testEl.textContent = '✗ Could not reach test endpoint';
+      testEl.style.background = 'rgba(239,68,68,0.12)';
+      testEl.style.color = 'var(--re)';
+    }
   };
   if (r && r.status === 'ok') {
     toast('API key saved' + (r.persisted_to_env ? ' and written to .env' : ' (runtime only)'), 's');
