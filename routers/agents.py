@@ -22,11 +22,12 @@ except Exception:
     async def require_user(): return {"id": 1, "username": "demo"}
 
 try:
-    from ai_layer import _call_claude, _parse_json, _ai_available
+    from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async
 except ImportError:
     async def _call_claude(p, **kw): return None
     def _parse_json(t): return None
     def _ai_available(): return False
+    async def ai_available_async(): return False
 
 try:
     from scheduler import get_finance_cache
@@ -330,7 +331,7 @@ async def _generate_brief(
         return result
 
     # No AI
-    if not _ai_available():
+    if not await ai_available_async():
         high_sev = [e for e in events if float(e.get("severity", 0)) >= 7]
         result = {
             "headline": events[0]["title"][:80],
@@ -628,7 +629,7 @@ async def ask_bot_inline(bot_id: str, payload: dict = Body(...), user=Depends(re
           "Max 200 words. No JSON — just clear prose."
     )
 
-    if not _ai_available():
+    if not await ai_available_async():
         ev_title = events[0]["title"] if events else "No recent events"
         return {
             "bot_id": bot_id,
@@ -681,7 +682,7 @@ async def bot_debate(user=Depends(require_user)):
         config = await _load_user_config(user["id"], bot_id)
         if not config.get("enabled", True):
             continue
-        if not _ai_available():
+        if not await ai_available_async():
             takes.append({
                 "bot_id": bot_id, "name": bot["name"],
                 "icon": bot["icon"], "color": bot["color"],
@@ -963,7 +964,7 @@ async def get_all_predictions(user=Depends(require_user)):
 
 async def _generate_prediction(bot_id: str, config: Dict, events: List[Dict]) -> Optional[Dict]:
     """Generate a specific, verifiable weekly prediction."""
-    if not _ai_available() or not events:
+    if not await ai_available_async() or not events:
         # Fallback: rule-based
         top = events[0] if events else {}
         return {
@@ -1053,7 +1054,7 @@ async def verify_prediction(bot_id: str, week_key: str, user=Depends(require_use
 
 
 async def _verify_prediction_ai(bot_id: str, prediction: Dict, events: List[Dict]) -> Dict:
-    if not _ai_available():
+    if not await ai_available_async():
         return {
             "outcome": "unverifiable",
             "score": 0.5,
@@ -1197,7 +1198,7 @@ async def _generate_digest(bot_id: str, config: Dict, events: List[Dict]) -> Dic
             "top3": [], "signal": "neutral",
         }
 
-    if not _ai_available():
+    if not await ai_available_async():
         return {
             "summary": f"Top event: {events[0]['title'][:80]}",
             "top3": [{"title": e["title"][:70], "severity": float(e.get("severity",5)),

@@ -9,7 +9,7 @@ from typing import List, Dict, Optional
 from fastapi import APIRouter, Depends, Body, Query
 from auth import require_user
 from config import settings
-from ai_layer import _call_claude, _parse_json, _ai_available
+from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 logger = logging.getLogger(__name__)
@@ -327,7 +327,7 @@ async def get_early_warning():
 
     # AI assessment — deep structured reasoning
     ai_assessment = ""
-    if _ai_available() and events:
+    if await ai_available_async() and events:
         ev_summary = "\n".join([
             f"[{e.get('category','?')}][sev={e.get('severity',5):.0f}][{e.get('country_name','Global')}] "
             f"{e.get('title','')} — {(e.get('ai_summary') or e.get('summary',''))[:120]}"
@@ -547,7 +547,7 @@ async def get_supply_chain():
 
     # AI narrative
     ai_summary = ""
-    if _ai_available() and disruptions:
+    if await ai_available_async() and disruptions:
         top_d = sorted(disruptions, key=lambda x: -x["risk_score"])[:4]
         d_text = "\n".join([
             "- " + d["node_name"] + " [" + d["risk_level"] + " " + str(d["risk_score"]) + "/10]: " + d["trigger"]
@@ -662,7 +662,7 @@ async def analyze_event_sc_impact(payload: dict = Body(...)):
     node_info = [n for n in SUPPLY_CHAIN_NODES if n["id"] in affected_nodes]
     sc_impact = ""
 
-    if _ai_available():
+    if await ai_available_async():
         nodes_text = ", ".join([n["name"] for n in node_info])
         prompt = (
             "Analyze supply chain impact of this event. Respond in 2-3 sentences.\n\n"
@@ -700,3 +700,76 @@ async def analyze_event_sc_impact(payload: dict = Body(...)):
         "sc_impact": sc_impact,
         "sectors_at_risk": sectors_at_risk,
     }
+
+
+# ── AI Analyst chat endpoint ──────────────────────────────────────────────────
+
+@router.post("/answer")
+async def ai_analyst_answer(payload: dict = Body(...), user=Depends(require_user)):
+    """
+    General-purpose AI analyst Q&A used by the AI Analyst page and chat widget.
+    Calls _call_claude (Gemini by default) with self-healing settings reload.
+    """
+    question = (payload.get("question") or "").strip()
+    context  = (payload.get("context")  or "").strip()
+
+    if not question:
+        return {"answer": None}
+
+    # Reload Gemini key from DB if not in memory (fixes post-restart blank key)
+    if not await ai_available_async():
+        return {
+            "answer": (
+                "AI provider not configured. Save your Gemini API key in "
+                "Admin → Settings → AI Provider, then retry."
+            )
+        }
+
+    answer = await ai_answer(question, context)
+    return {
+        "answer": answer or (
+            "No response received from the AI provider. "
+            "Check that your Gemini API key is valid in Admin → Settings."
+        )
+    }
+
+
+@router.get("/macro-brief")
+async def macro_brief_endpoint(user=Depends(require_user)):
+    """Dashboard macro briefing text for the Risk Index quote."""
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-24 hours') "
+            "ORDER BY severity DESC LIMIT 5"
+        ) as cur:
+            events = [dict(r) for r in await cur.fetchall()]
+
+    if not await ai_available_async() or not events:
+        return {"brief": "Configure a Gemini key in Admin → Settings for live AI briefings."}
+
+    brief = await ai_macro_briefing([], events)
+    return {"brief": brief or ""}
+
+
+@router.get("/watchlist-digest")
+async def watchlist_digest_endpoint(user=Depends(require_user)):
+    """Personalised digest for the AI Analyst page."""
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT label, value FROM user_watchlist WHERE user_id=? LIMIT 10",
+            (user["id"],)
+        ) as cur:
+            items = [dict(r) for r in await cur.fetchall()]
+        async with db.execute(
+            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-24 hours') "
+            "ORDER BY severity DESC LIMIT 10"
+        ) as cur:
+            events = [dict(r) for r in await cur.fetchall()]
+
+    if not await ai_available_async():
+        return {"digest": "Configure a Gemini key in Admin → Settings to enable personalised digests."}
+
+    digest = await ai_watchlist_digest(items, events)
+    return {"digest": digest or ""}

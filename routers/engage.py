@@ -8,7 +8,7 @@ from typing import Optional, List, Dict
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
-from ai_layer import _call_claude, _parse_json
+from ai_layer import _call_claude, _parse_json, ai_available_async
 
 router = APIRouter(prefix="/api/engage", tags=["engage"])
 

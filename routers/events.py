@@ -5,7 +5,7 @@ import aiosqlite
 from fastapi import APIRouter, Query, Body, HTTPException, Depends
 from auth import get_current_user
 from fastapi.responses import JSONResponse
-from ai_layer import ai_score_event, ai_regional_risk, ai_answer, ai_macro_briefing
+from ai_layer import ai_score_event, ai_regional_risk, ai_answer, ai_macro_briefing, ai_available_async
 from config import settings
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -156,6 +156,7 @@ async def get_region_risk(country_code: str):
             ) as c:
                 events = [dict(r) for r in await c.fetchall()]
 
+        await ai_available_async()  # reload Gemini key from DB if missing
         risk = await ai_regional_risk(cc, events)
         result = {
             "country_code": cc,
@@ -190,8 +191,9 @@ async def ai_ask(payload: dict = Body(...)):
     context = payload.get("context", "")
     if not question:
         return {"answer": None}
+    await ai_available_async()  # reload Gemini key from DB if missing
     answer = await ai_answer(question, context)
-    return {"answer": answer}
+    return {"answer": answer or "No response — verify Gemini key in Admin → Settings."}
 
 
 @router.post("/ai/score/{event_id}")

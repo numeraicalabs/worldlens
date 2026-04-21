@@ -8,7 +8,7 @@ from auth import require_user
 from scheduler import get_finance_cache
 from models import WatchlistItem, AlertCreate
 from config import settings
-from ai_layer import ai_watchlist_digest
+from ai_layer import ai_watchlist_digest, ai_available_async
 
 finance_router = APIRouter(prefix="/api/finance", tags=["finance"])
 user_router = APIRouter(prefix="/api/user", tags=["user"])

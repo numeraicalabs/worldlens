@@ -17,11 +17,12 @@ except ImportError:
     settings = _S()
 
 try:
-    from ai_layer import _call_claude, _parse_json, _ai_available
+    from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async
 except ImportError:
     async def _call_claude(p, **kw): return None
     def _parse_json(t): return None
     def _ai_available(): return False
+    async def ai_available_async(): return False
 
 import asyncio
 
@@ -119,7 +120,7 @@ async def _ai_region_summary(region: str, events: List[Dict]) -> Dict:
     avg_sev = sum(e.get("severity", 5) for e in events) / len(events)
     high_count = sum(1 for e in events if e.get("impact") == "High")
 
-    if not _ai_available():
+    if not await ai_available_async():
         top = events[0]["title"][:80] if events else ""
         trend = "↑" if avg_sev > 6.5 else ("↓" if avg_sev < 4 else "→")
         result = {

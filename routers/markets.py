@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, Query, Body
 from fastapi.responses import JSONResponse
 from config import settings
-from ai_layer import _call_claude, _parse_json, _ai_available
+from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async
 
 router = APIRouter(prefix="/api/markets", tags=["markets"])
 logger = logging.getLogger(__name__)
@@ -368,7 +368,7 @@ async def _guided_analysis(
         "fallback": True,
     }
 
-    if not _ai_available():
+    if not await ai_available_async():
         return rule_based
 
     # Build rich prompt for Claude

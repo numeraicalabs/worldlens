@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
-from ai_layer import _call_claude
+from ai_layer import _call_claude, ai_available_async
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
