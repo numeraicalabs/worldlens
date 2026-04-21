@@ -281,8 +281,13 @@ async def get_early_warning():
         if snap:
             s = dict(snap)
             s["top_risks"] = json.loads(s.get("top_risks") or "[]")
-            s["cached"] = True
-            return s
+            # Invalidate cache if assessment is suspiciously short (truncated)
+            assess = s.get("ai_assessment", "")
+            if assess and len(assess) < 120 and not assess.rstrip().endswith((".", "!", "?")):
+                pass  # fall through to regenerate
+            else:
+                s["cached"] = True
+                return s
 
         # Load data
         async with db.execute(
@@ -351,23 +356,26 @@ async def get_early_warning():
             "Never speculate without grounding in the provided events. "
             "Write in clear, direct prose — no bullet points, no hedging filler."
         )
+        # Keep prompt short to stay well under token limits
+        top_events_txt = "\n".join([
+            f"- [{e.get('category','?')}] {e.get('title','')} ({e.get('country_name','Global')}, sev={e.get('severity',5):.0f})"
+            for e in events[:12]
+        ])
         prompt = (
-            f"EARLY WARNING ASSESSMENT REQUEST\n"
-            f"EW Score: {scores['global_ew_score']}/10 | Macro Stress: {scores['macro_stress']}/10 | "
-            f"Market Stress: {scores['market_stress']}/10 | Event Velocity: {scores['event_velocity']:.2f}x\n"
-            f"Crisis Patterns Detected: {pattern_txt}\n\n"
-            f"EVENTS (last 48h, {len(events)} total):\n{ev_summary}\n\n"
-            f"MACRO INDICATORS:\n{ind_summary}\n\n"
-            f"TASK: Write a structured 4-part Early Warning assessment:\n"
-            f"1. CURRENT THREAT LEVEL — One sentence naming the dominant risk and why EW score is {scores['global_ew_score']}/10.\n"
-            f"2. PRIMARY ESCALATION RISK — The single most likely scenario to deteriorate in the next 7-14 days, "
-            f"with specific triggering conditions to watch.\n"
-            f"3. SECOND-ORDER EFFECTS — One interconnection that risk managers may be underpricing "
-            f"(e.g. a regional conflict affecting a supply chain, or a macro event affecting a political risk).\n"
-            f"4. MONITORING SIGNALS — Two specific, observable data points that would confirm or deny escalation.\n\n"
-            f"Write continuously, 4 short paragraphs, no headers, no bullet points. Maximum 220 words."
+            f"Global EW Score: {scores['global_ew_score']}/10 | "
+            f"Macro Stress: {scores['macro_stress']}/10 | "
+            f"Market Stress: {scores['market_stress']}/10 | "
+            f"Event Velocity: {scores['event_velocity']:.2f}x\n"
+            f"Crisis patterns: {pattern_txt}\n\n"
+            f"Top events (last 72h):\n{top_events_txt}\n\n"
+            f"Write a 3-paragraph intelligence assessment (150-180 words total):\n"
+            f"Para 1: Current threat level and why the EW score is {scores['global_ew_score']}/10.\n"
+            f"Para 2: The primary escalation risk to watch in the next 7 days and its trigger conditions.\n"
+            f"Para 3: One second-order effect risk managers may be underpricing, and two observable "
+            f"signals that would confirm or deny escalation.\n"
+            f"No headers, no bullets, direct prose only."
         )
-        ai_assessment = await _call_claude(prompt, system=system, max_tokens=500) or ""
+        ai_assessment = await _call_claude(prompt, system=system, max_tokens=700) or ""
 
     result = {
         **scores,
@@ -427,38 +435,69 @@ async def get_active_signals():
         ) as c:
             events = [dict(r) for r in await c.fetchall()]
 
+    # Build signals: max 2 per type, deduplicate by event ID, sort by severity
     signals = []
-    seen: set = set()
+    seen_ids: set = set()
+    type_counts: dict = {}
+
     for ev in events:
+        if ev.get("id") in seen_ids:
+            continue
         text = (ev.get("title","") + " " + (ev.get("summary") or "")).lower()
         for sig_type, cfg in CRISIS_PATTERNS.items():
             hits = sum(1 for kw in cfg["keywords"] if kw in text)
-            if hits >= 1:
-                key = sig_type + "_" + ev.get("country_code","XX")
-                if key in seen:
-                    continue
-                seen.add(key)
-                signals.append({
-                    "id": ev.get("id",""),
-                    "type": sig_type,
-                    "label": sig_type.replace("_"," ").title(),
-                    "icon": cfg["icon"],
-                    "color": cfg["color"],
-                    "region": ev.get("country_name") or ev.get("country_code","Global"),
-                    "country_code": ev.get("country_code","XX"),
-                    "severity": ev.get("severity", 5.0),
-                    "title": ev.get("title",""),
-                    "summary": (ev.get("ai_summary") or ev.get("summary",""))[:200],
-                    "timestamp": ev.get("timestamp",""),
-                    "confidence": min(1.0, round(hits * cfg["weight"] / 5, 2)),
-                })
-                if len(signals) >= 20:
-                    break
-        if len(signals) >= 20:
+            if hits < 1:
+                continue
+            # Max 3 signals per type to avoid repetition
+            if type_counts.get(sig_type, 0) >= 3:
+                continue
+            seen_ids.add(ev.get("id",""))
+            type_counts[sig_type] = type_counts.get(sig_type, 0) + 1
+            sev = float(ev.get("severity", 5.0))
+            conf = min(1.0, round(hits * cfg["weight"] / 5, 2))
+            # value: severity score (shown as the main metric)
+            # delta: confidence level as percentage
+            # meta: region + event title snippet
+            summary_text = (ev.get("ai_summary") or ev.get("summary") or ev.get("title",""))[:180]
+            signals.append({
+                "id":           ev.get("id",""),
+                "type":         sig_type,
+                "level":        "critical" if sev >= 7.5 else "major" if sev >= 5.5 else "watch",
+                "label":        sig_type.replace("_"," ").title(),
+                "icon":         cfg["icon"],
+                "color":        cfg["color"],
+                "region":       ev.get("country_name") or ev.get("country_code","Global"),
+                "country_code": ev.get("country_code","XX"),
+                "severity":     sev,
+                "value":        str(round(sev, 1)),        # shown in value slot
+                "delta":        f"{round(conf*100)}% conf",# shown in delta slot
+                "meta":         (ev.get("country_name") or "Global") + " · " + ev.get("title","")[:60],
+                "description":  summary_text,
+                "title":        ev.get("title",""),
+                "summary":      summary_text,
+                "timestamp":    ev.get("timestamp",""),
+                "confidence":   conf,
+            })
+            break  # one signal type per event
+
+        if len(signals) >= 24:
             break
 
-    return {"signals": signals, "count": len(signals)}
+    # Sort: critical first, then by severity
+    signals.sort(key=lambda s: (-{"critical":3,"major":2,"watch":1}.get(s["level"],0), -s["severity"]))
+    return {"signals": signals[:20], "count": len(signals)}
 
+
+
+
+@router.post("/early-warning/refresh")
+async def refresh_early_warning(user=Depends(require_user)):
+    """Force-invalidate the 30-min EW cache. Next GET will regenerate assessment."""
+    async with aiosqlite.connect(settings.db_path) as db:
+        await _ensure_tables(db)
+        await db.execute("DELETE FROM ew_snapshots WHERE snapshot_date=?", (date.today().isoformat(),))
+        await db.commit()
+    return {"status": "ok", "message": "EW cache cleared"}
 
 # ── SUPPLY CHAIN INTELLIGENCE ─────────────────────────
 
