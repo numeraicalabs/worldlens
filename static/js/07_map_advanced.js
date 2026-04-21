@@ -624,7 +624,16 @@ async function setGlobalProvider(provider) {
 async function saveAIKey(provider) {
   var inp = document.getElementById(provider + '-key-inp');
   if (!inp || !inp.value.trim()) { toast('Enter a valid API key', 'e'); return; }
-  var r = await rq('/api/admin/settings/ai', {method:'POST', body:{provider:provider, api_key:inp.value.trim()}});
+  var r = await rq('/api/admin/settings/ai', {method:'POST', body:{provider:provider, api_key:inp.value.trim()}})
+  if (r && r.status === 'ok') {
+    // Auto-test after save
+    var testR = await rq('/api/admin/test-ai');
+    var msg = testR ? (testR.status + ': ' + testR.message) : 'Test failed';
+    var color = testR && testR.status === 'OK' ? 'var(--gr)' : 'var(--re)';
+    var testEl = document.getElementById('ai-test-result');
+    if (testEl) { testEl.textContent = msg; testEl.style.color = color; }
+    else { alert('AI Test — ' + msg); }
+  };
   if (r && r.status === 'ok') {
     toast('API key saved' + (r.persisted_to_env ? ' and written to .env' : ' (runtime only)'), 's');
     inp.value = '';
