@@ -25,36 +25,77 @@ import logging
 import re
 from typing import Dict, List, Optional, Tuple
 from config import settings
+import aiosqlite as _aiosqlite
 
 logger = logging.getLogger(__name__)
 
-_NO_AI_MSG = "AI analysis powered by puter.js (free, no key needed) — running in browser."
+_NO_AI_MSG = "Configure a free Google Gemini key in Admin → Settings to enable AI analysis. Get one at https://aistudio.google.com/app/apikey"
+
+# ── Settings self-heal: reload from DB when in-memory key is missing ──
+
+async def _ensure_ai_settings() -> None:
+    """Reload AI provider + keys from DB if not already in memory.
+    Fixes: key saved by admin is in SQLite but lost from pydantic singleton
+    after restart on read-only filesystems (Render, Railway).
+    DB is hit at most once per worker — once a key is loaded it stays.
+    """
+    if (settings.gemini_api_key or "").strip() or (settings.anthropic_api_key or "").strip():
+        return
+    try:
+        async with _aiosqlite.connect(settings.db_path) as _db:
+            async with _db.execute(
+                "SELECT key, value FROM app_settings "
+                "WHERE key IN ('global_ai_provider','gemini_api_key','anthropic_api_key')"
+            ) as _cur:
+                for _key, _val in await _cur.fetchall():
+                    if _val:
+                        if _key == "global_ai_provider":
+                            settings.global_ai_provider = _val
+                        elif _key == "gemini_api_key":
+                            settings.gemini_api_key = _val
+                        elif _key == "anthropic_api_key":
+                            settings.anthropic_api_key = _val
+        if settings.gemini_api_key or settings.anthropic_api_key:
+            logger.info("AI settings reloaded from DB: provider=%s", settings.global_ai_provider)
+    except Exception as _e:
+        logger.debug("_ensure_ai_settings DB read failed: %s", _e)
+
 
 # ── Provider resolution ───────────────────────────────
 
 def _resolve_provider() -> Tuple[str, str]:
     """Return (provider_name, api_key) based on global admin setting."""
     provider = settings.global_ai_provider  # "gemini" | "claude" | "none"
-    if provider == "gemini" and settings.gemini_api_key:
-        return "gemini", settings.gemini_api_key
-    if provider == "claude" and settings.anthropic_api_key:
-        return "claude", settings.anthropic_api_key
+    gkey = (settings.gemini_api_key or "").strip()
+    ckey = (settings.anthropic_api_key or "").strip()
+    if provider == "gemini" and gkey:
+        return "gemini", gkey
+    if provider == "claude" and ckey:
+        return "claude", ckey
     # Fallback: use whichever key is available
-    if settings.gemini_api_key:
-        return "gemini", settings.gemini_api_key
-    if settings.anthropic_api_key:
-        return "claude", settings.anthropic_api_key
+    if gkey:
+        return "gemini", gkey
+    if ckey:
+        return "claude", ckey
     return "none", ""
 
 def _ai_available() -> bool:
+    """Sync check — only valid after _ensure_ai_settings() has been awaited."""
     provider, key = _resolve_provider()
     return provider != "none" and bool(key)
+
+
+async def ai_available_async() -> bool:
+    """Async check — reloads key from DB if missing, then checks."""
+    await _ensure_ai_settings()
+    return _ai_available()
 
 # ── Central dispatch ──────────────────────────────────
 
 async def _call_claude(prompt: str, system: str = "", max_tokens: int = 400,
                        user_api_key: str = "", user_provider: str = "") -> Optional[str]:
     """Unified AI call. Routes to Gemini by default; Claude if admin sets provider."""
+    await _ensure_ai_settings()  # self-heal: reload key from DB if empty
     provider, api_key = _resolve_provider()
     if user_provider and user_api_key and user_provider == settings.global_ai_provider:
         provider, api_key = user_provider, user_api_key
@@ -673,13 +714,8 @@ async def ai_regional_risk(country: str, recent_events: List[Dict]) -> Dict:
     if not recent_events:
         return {"risk_score": 5.0, "assessment": "Insufficient data.", "trend": "Stable", "drivers": []}
     avg = sum(e.get("severity", 5) for e in recent_events[:10]) / max(len(recent_events[:10]), 1)
-    if not _ai_available():
-        return {
-            "risk_score": round(avg, 1),
-            "assessment": f"Based on {len(recent_events)} recent events. " + _NO_AI_MSG,
-            "trend": "Increasing" if avg > 6 else "Stable",
-            "drivers": [e["title"][:60] for e in recent_events[:3]],
-        }
+    # Note: _call_claude calls _ensure_ai_settings internally,
+    # so we skip the sync _ai_available() guard here.
     ev_text = "\n".join(["- " + e["title"] for e in recent_events[:8]])
     prompt = (
         "Assess geopolitical risk for " + country + " based on:\n" + ev_text + "\n\n"
