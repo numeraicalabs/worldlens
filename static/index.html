@@ -459,7 +459,10 @@
         <h2 class="fire-title">Signals before they become news</h2>
         <div class="fire-subtitle">Live detection from real events — updated every 3 minutes</div>
       </div>
-      <a class="fire-link" onclick="sv('earlywarning',document.querySelector('[data-v=earlywarning]'))">FULL EW VIEW ↗</a>
+      <div style="display:flex;gap:14px;align-items:center">
+        <button onclick="window.refreshEW && window.refreshEW()" style="background:transparent;border:1px solid var(--fire-border);border-radius:6px;padding:5px 12px;font-family:var(--fire-mono);font-size:9px;letter-spacing:0.15em;color:var(--fire-text-dim);cursor:pointer;text-transform:uppercase" title="Regenerate AI assessment">↻ REFRESH</button>
+        <a class="fire-link" onclick="sv('earlywarning',document.querySelector('[data-v=earlywarning]'))">FULL EW VIEW ↗</a>
+      </div>
     </div>
 
     <!-- EW SCORE STRIP — populated by dash_ew_init() -->
@@ -2051,7 +2054,10 @@
 <div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:14px;width:100%">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
     <div><div class="vtit">Crisis Early Warning System</div><div class="vsub">AI pattern analysis across news sentiment, macro stress, market signals and event velocity</div></div>
-    <button class="btn btn-ai btn-sm" onclick="loadEarlyWarning(true)">Refresh Analysis</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ai btn-sm" onclick="loadEarlyWarning(true)">↺ Refresh</button>
+      <button class="btn btn-g btn-sm" onclick="rq('/api/intelligence/early-warning/refresh',{method:'POST'}).then(function(){loadEarlyWarning(true);})">⚡ Regenerate AI</button>
+    </div>
   </div>
 
   <!-- EW Score Hero -->
