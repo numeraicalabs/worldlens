@@ -107,44 +107,77 @@ async def _call_claude(prompt: str, system: str = "", max_tokens: int = 400,
         return await _call_anthropic(prompt, system, max_tokens, api_key)
     return None
 
+# Models to try in order — 2.5-flash is free tier current standard (April 2026)
+# 2.0-flash kept as fallback until its June 2026 deprecation
+_GEMINI_MODELS = [
+    "gemini-2.5-flash",   # Primary: latest free-tier model
+    "gemini-2.0-flash",   # Fallback: still active, deprecated June 2026
+]
+_GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
+
 async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) -> Optional[str]:
-    """Call Gemini 1.5 Flash via Google AI free-tier API."""
-    try:
-        full = (system + "\n\n" + prompt).strip() if system else prompt
-        async with httpx.AsyncClient(timeout=28) as client:
-            resp = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
-                headers={"content-type": "application/json"},
-                json={"contents": [{"parts": [{"text": full}]}],
-                      "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.35}}
-            )
-            # Log non-200 at WARNING so it appears in Render logs (INFO+ default)
-            if resp.status_code != 200:
-                body_preview = resp.text[:300]
+    """
+    Call Gemini via Google AI free-tier API.
+    Tries gemini-2.5-flash first, falls back to gemini-2.0-flash on 404/503.
+    """
+    full = (system + "\n\n" + prompt).strip() if system else prompt
+    body = {
+        "contents": [{"parts": [{"text": full}]}],
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.35},
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        for model in _GEMINI_MODELS:
+            try:
+                url = f"{_GEMINI_BASE}/{model}:generateContent?key={api_key}"
+                resp = await client.post(url, headers={"content-type": "application/json"}, json=body)
+
+                # Model not found or deprecated → try next model in list
+                if resp.status_code in (404, 503):
+                    logger.warning("Gemini model '%s' unavailable (HTTP %d) — trying next", model, resp.status_code)
+                    continue
+
+                # Auth / quota errors — no point retrying with a different model
                 if resp.status_code in (400, 401, 403):
+                    body_preview = resp.text[:300]
                     logger.warning(
                         "Gemini API key error (HTTP %d) — check key in Admin → Settings. "
-                        "Response: %s", resp.status_code, body_preview
+                        "Model: %s. Response: %s", resp.status_code, model, body_preview
                     )
-                elif resp.status_code == 429:
-                    logger.warning("Gemini rate limit hit (HTTP 429) — will retry")
-                else:
-                    logger.warning("Gemini HTTP %d: %s", resp.status_code, body_preview)
-                resp.raise_for_status()
-            data = resp.json()
-            # Handle blocked/empty response
-            candidates = data.get("candidates", [])
-            if not candidates:
-                reason = data.get("promptFeedback", {}).get("blockReason", "unknown")
-                logger.warning("Gemini returned no candidates — blockReason: %s", reason)
+                    return None
+
+                if resp.status_code == 429:
+                    logger.warning("Gemini rate limit (HTTP 429) on model '%s'", model)
+                    return None
+
+                if resp.status_code != 200:
+                    logger.warning("Gemini HTTP %d on model '%s': %s", resp.status_code, model, resp.text[:200])
+                    return None
+
+                data = resp.json()
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    reason = data.get("promptFeedback", {}).get("blockReason", "unknown")
+                    logger.warning("Gemini '%s' returned no candidates — blockReason: %s", model, reason)
+                    return None
+
+                result = candidates[0]["content"]["parts"][0]["text"].strip()
+                logger.debug("Gemini '%s' responded OK (%d chars)", model, len(result))
+                return result
+
+            except httpx.TimeoutException:
+                logger.warning("Gemini '%s' timeout after 30s", model)
                 return None
-            return candidates[0]["content"]["parts"][0]["text"].strip()
-    except httpx.TimeoutException:
-        logger.warning("Gemini timeout after 28s — prompt length: %d chars", len(prompt))
-        return None
-    except Exception as e:
-        logger.warning("Gemini error: %s", e)
-        return None
+            except Exception as e:
+                logger.warning("Gemini '%s' error: %s", model, e)
+                # Only continue to next model if it looks like a model-level issue
+                if "model" in str(e).lower() or "deprecated" in str(e).lower():
+                    continue
+                return None
+
+    logger.warning("All Gemini models exhausted without a successful response")
+    return None
 
 async def _call_anthropic(prompt: str, system: str, max_tokens: int, api_key: str) -> Optional[str]:
     """Call Claude Haiku via Anthropic API. Only active when admin enables it."""
