@@ -647,7 +647,7 @@ window.loadEarlyWarning = function(force) {
     _ewRenderPatterns(r.top_risks || []);
 
     // ── Signals
-    _ewLoadSignals();
+    if (typeof window.loadEWSignals === "function") window.loadEWSignals();
 
     // ── Timeline chart
     _ewLoadTimeline();

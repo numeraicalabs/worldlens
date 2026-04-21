@@ -166,6 +166,13 @@ function sv(name, btn) {
   if (name==='tradgentic') {
     if (typeof initTradgentic === 'function') initTradgentic();
   }
+  if (name==='earlywarning') {
+    if (typeof loadEarlyWarning === 'function') loadEarlyWarning();
+  }
+  if (name==='ai') {
+    // Load AI analyst fresh data when navigating to AI page
+    if (typeof loadMacroBrief === 'function') loadMacroBrief();
+  }
 }
 
 // ── CAT FILTERS INIT ──────────────────────────────────

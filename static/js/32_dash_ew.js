@@ -113,20 +113,28 @@ function _renderSignals(signals) {
   if (cnt) cnt.textContent = signals.length ? '(' + signals.length + ')' : '';
 
   if (!signals.length) {
-    el.innerHTML = '<div class="fire-signal-skeleton">No active signals in the monitoring window</div>';
+    el.innerHTML = '<div class="fire-signal-skeleton">No active signals detected in the monitoring window</div>';
     return;
   }
 
   el.innerHTML = signals.slice(0, 6).map(function(sig) {
-    var level = sig.level || sig.type || 'watch';
+    // Use correct field names from /api/intelligence/early-warning/signals
+    var level    = sig.level || (sig.severity >= 7.5 ? 'critical' : sig.severity >= 5.5 ? 'major' : 'watch');
     var lvlClass = level === 'critical' ? 'critical' : level === 'major' ? 'major' : 'watch';
-    var col = lvlClass === 'critical' ? 'var(--fire-ember)' 
-            : lvlClass === 'major'    ? 'var(--fire-corona)' 
-            : 'var(--fire-sunrise)';
-    var val = sig.value !== undefined ? String(sig.value)
-            : (sig.score !== undefined ? sig.score.toFixed(1) : '—');
-    var delta = sig.delta || sig.change || '';
-    var meta  = sig.description || sig.meta || sig.regions && sig.regions.slice(0,2).join(', ') || '';
+    var sev      = parseFloat(sig.severity || sig.value || 5);
+    var col      = lvlClass === 'critical' ? 'var(--fire-ember)'
+                 : lvlClass === 'major'    ? 'var(--fire-corona)'
+                 : 'var(--fire-sunrise)';
+    // value slot: severity score
+    var val   = sig.value || sev.toFixed(1);
+    // delta slot: confidence percentage
+    var delta = sig.delta || (sig.confidence ? Math.round(sig.confidence * 100) + '% conf' : '');
+    // meta: region + event headline snippet
+    var meta  = sig.meta
+              || (sig.region ? sig.region + (sig.title ? ' · ' + sig.title.slice(0, 55) : '') : '')
+              || (sig.description || '').slice(0, 80);
+    // body text: ai_summary or summary
+    var body  = sig.description || sig.summary || '';
 
     return [
       '<div class="fire-signal">',
@@ -135,13 +143,18 @@ function _renderSignals(signals) {
       '      <span class="fire-signal-level-dot"></span>',
       _esc(level.toUpperCase()),
       '    </div>',
+      (sig.icon ? '<span style="font-size:16px;margin-left:auto">' + sig.icon + '</span>' : ''),
       '  </div>',
-      '  <div class="fire-signal-label">' + _esc((sig.label || sig.type || '').toUpperCase()) + '</div>',
+      '  <div class="fire-signal-label">' + _esc((sig.label || sig.type || '').replace(/_/g,' ').toUpperCase()) + '</div>',
       '  <div class="fire-signal-val-row">',
-      '    <span class="fire-signal-val">' + _esc(val) + '</span>',
-      delta ? '<span class="fire-signal-delta ' + lvlClass + '">' + _esc(delta) + '</span>' : '',
+      '    <span class="fire-signal-val" style="color:' + col + '">' + _esc(String(val)) + '</span>',
+      delta ? '    <span class="fire-signal-delta ' + lvlClass + '">' + _esc(delta) + '</span>' : '',
       '  </div>',
-      meta ? '<div class="fire-signal-meta">' + _esc(meta) + '</div>' : '',
+      meta ? '  <div class="fire-signal-meta">' + _esc(meta) + '</div>' : '',
+      (body && body !== meta)
+        ? '  <div style="font-size:11px;color:var(--fire-text-dim);margin-top:6px;line-height:1.5">'
+          + _esc(body.slice(0, 140)) + '</div>'
+        : '',
       '</div>',
     ].join('');
   }).join('');
@@ -274,5 +287,14 @@ if (document.readyState === 'loading') {
 // Expose for manual reload
 window.dashEWInit = dashEWInit;
 window.renderExtendedBrief = renderExtendedBrief;
+
+// Force-refresh EW (clears 30-min server cache, then reloads)
+window.refreshEW = function() {
+  var rqFn = window.rq || function(url, opts) { return fetch(url, opts).then(function(r){ return r.json(); }); };
+  rqFn('/api/intelligence/early-warning/refresh', { method: 'POST' }).then(function() {
+    dashEWInit();
+  }).catch(function() { dashEWInit(); });
+};
+
 
 })();
