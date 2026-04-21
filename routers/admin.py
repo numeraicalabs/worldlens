@@ -737,8 +737,8 @@ async def behaviour_summary(
 @router.get("/test-ai")
 async def test_ai_connection(admin=Depends(require_admin)):
     """
-    Admin diagnostic: tests Gemini key and returns detailed status.
-    Shows in Admin → Settings as a 'Test Connection' button.
+    Admin diagnostic: tests Gemini key with a real minimal prompt.
+    Returns status OK / ERROR — never WARN (any response = working key).
     """
     from ai_layer import _resolve_provider, ai_available_async, _call_claude
     await ai_available_async()
@@ -752,20 +752,43 @@ async def test_ai_connection(admin=Depends(require_admin)):
 
     if not key:
         info["status"]  = "ERROR"
-        info["message"] = "No API key found. Save it in Admin → Settings → AI Provider."
+        info["message"] = "No API key found. Save it in Admin → Settings first."
         return info
 
     try:
-        resp = await _call_claude("Reply with exactly: CONNECTION_OK", max_tokens=12)
-        if resp and "OK" in resp:
+        # Use a real-world prompt — not an exact-match test.
+        # Any non-empty response means the key is valid and Gemini is reachable.
+        resp = await _call_claude(
+            "In one word, what is the capital of France?",
+            max_tokens=10
+        )
+        if resp and resp.strip():
             info["status"]   = "OK"
-            info["message"]  = f"{provider.capitalize()} is working correctly."
+            info["message"]  = (
+                f"{provider.capitalize()} API key is valid and working. "
+                f"Test response: '{resp.strip()[:40]}'"
+            )
         else:
-            info["status"]   = "WARN"
-            info["message"]  = f"Key accepted but unexpected response: {(resp or '')[:80]}"
-        info["response"] = (resp or "")[:100]
+            info["status"]  = "ERROR"
+            info["message"] = (
+                "Key was accepted by the API but returned an empty response. "
+                "This can happen if the key has no quota remaining or is restricted. "
+                "Check your Google AI Studio usage dashboard."
+            )
+        info["response"] = (resp or "")[:80]
     except Exception as e:
-        info["status"]  = "ERROR"
-        info["message"] = f"Connection failed: {e}"
+        err = str(e)
+        if "401" in err or "403" in err or "API_KEY" in err.upper():
+            info["status"]  = "ERROR"
+            info["message"] = f"Invalid API key (HTTP auth error). Check the key in Google AI Studio."
+        elif "429" in err:
+            info["status"]  = "ERROR"
+            info["message"] = "Rate limit hit. Wait a minute and retry, or check your Gemini quota."
+        elif "timeout" in err.lower():
+            info["status"]  = "ERROR"
+            info["message"] = "Connection timed out. Check that Render can reach generativelanguage.googleapis.com."
+        else:
+            info["status"]  = "ERROR"
+            info["message"] = f"Connection failed: {err[:120]}"
 
     return info
