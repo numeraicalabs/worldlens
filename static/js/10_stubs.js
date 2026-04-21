@@ -429,7 +429,7 @@ function aiSend(prompt) {
   rq('/api/intelligence/answer', { method:'POST', body:{ question:msgText, context:context } })
     .then(function(r) {
       var loading = el('ai-loading'); if (loading) loading.remove();
-      var answer  = (r && (r.answer || r.response)) || 'AI analysis not available. Configure a provider in Admin -> Settings.';
+      var answer  = (r && (r.answer || r.response)) || (r && r.answer) ? r.answer : 'No response — verify Gemini key in Admin → Settings.';
       if (chatEl) {
         var fbDiv  = document.createElement('div'); fbDiv.style.cssText='margin:6px 0';
         var bubble = document.createElement('span');

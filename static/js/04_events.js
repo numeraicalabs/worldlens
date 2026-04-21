@@ -20,7 +20,9 @@ function panelAI(prompt) {
   ans.innerHTML = '<span class="aiload"><span class="ald"></span><span class="ald"></span><span class="ald"></span> Analyzing...</span>';
   var ctx = 'Event: '+ev.title+'\nRegion: '+(ev.country_name||ev.country_code)+'\nCategory: '+ev.category+'\nImpact: '+ev.impact+'\nSeverity: '+ev.severity+'\nSummary: '+(ev.summary||'N/A');
   rq('/api/events/ai/ask',{method:'POST',body:{question:prompt,context:ctx}}).then(function(r) {
-    ans.textContent = (r&&r.answer)?r.answer:'AI not available — configure a provider in Admin → Settings.';
+    ans.textContent = (r&&r.answer) ? r.answer
+    : (r&&r.error) ? r.error
+    : 'No response — check Gemini key is saved in Admin → Settings.';
   });
   rq('/api/portfolio/track',{method:'POST',body:{action:'ai_query'}});
 }
@@ -63,7 +65,7 @@ function showImpactForId(eventId) {
   var titleEl = el('imp-title'); if (titleEl && ev) titleEl.textContent = ev.title || '';
   rq('/api/events/impact/'+eventId, {method:'POST'}).then(function(r) {
     if (!r || r.error) {
-      if (body) body.innerHTML = '<div style="padding:20px;color:var(--t3)">Impact analysis not available. Configure an AI provider in Admin → Settings.</div>';
+      if (body) body.innerHTML = '<div style="padding:20px;color:var(--t3)">Analysing… if this persists check Gemini key in Admin → Settings.</div>';
       return;
     }
     G_IMPACT[eventId] = r; renderImpactModal(r, ev);
@@ -119,7 +121,7 @@ function scoreEvent() {
       xpPop(10, 'Event scored!');
       rq('/api/portfolio/track',{method:'POST',body:{action:'event_score'}});
     } else {
-      ans.textContent = 'AI not available — configure a provider in Admin → Settings.';
+      ans.textContent = 'No response — verify Gemini key is saved in Admin → Settings.';
     }
   });
 }
