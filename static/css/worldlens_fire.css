@@ -8,37 +8,41 @@
    The light theme is a "solar" variant — amber accents on warm off-white.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── DARK (DEFAULT) TOKENS ── */
+/* ── DARK (DEFAULT) TOKENS — lifted to #111 for easier reading ── */
 :root[data-theme="dark"] #view-dash,
 #view-dash {
-  --fire-bg:          #050505;
-  --fire-bg-elev:     #0a0a0a;
-  --fire-surface:     rgba(255, 255, 255, 0.015);
-  --fire-surface-hi:  rgba(255, 255, 255, 0.03);
-  --fire-border:      rgba(255, 143, 0, 0.08);
-  --fire-border-hi:   rgba(255, 143, 0, 0.22);
-  --fire-divider:     rgba(255, 143, 0, 0.06);
+  --fire-bg:          #111214;   /* lifted from #050505 — much easier on eyes */
+  --fire-bg-elev:     #18191d;   /* cards/surfaces */
+  --fire-bg-card:     #1c1e22;   /* distinct card bg */
+  --fire-surface:     rgba(255, 255, 255, 0.04);   /* more visible surfaces */
+  --fire-surface-hi:  rgba(255, 255, 255, 0.07);
+  --fire-border:      rgba(255, 167, 38, 0.18);    /* more visible amber borders */
+  --fire-border-hi:   rgba(255, 167, 38, 0.40);
+  --fire-divider:     rgba(255, 167, 38, 0.10);
 
-  --fire-text:        #e8e4df;
-  --fire-text-mid:    #a89d90;
-  --fire-text-dim:    #6b6b6b;
+  --fire-text:        #f0ece6;   /* warm white — easier to read */
+  --fire-text-mid:    #c4b89e;   /* improved mid contrast */
+  --fire-text-dim:    #8a8072;   /* lifted dim text */
 
-  --fire-corona:      #ff8f00;
-  --fire-ember:       #ff4a1a;
-  --fire-core:        #ffab00;
-  --fire-sunrise:     #ffb547;
-  --fire-calm:        #6b9b5e;
+  --fire-corona:      #ffab00;   /* brighter amber */
+  --fire-ember:       #ff5722;   /* slightly softer red */
+  --fire-core:        #ffc107;
+  --fire-sunrise:     #ffcc02;
+  --fire-calm:        #66bb6a;   /* more visible green */
+  --fire-info:        #42a5f5;   /* new: blue for neutral info */
 
-  --fire-glow-1:      rgba(255, 74, 26, 0.12);
-  --fire-glow-2:      rgba(255, 143, 0, 0.06);
+  --fire-glow-1:      rgba(255, 87, 34, 0.10);
+  --fire-glow-2:      rgba(255, 171, 0, 0.07);
 
   --fire-serif: 'Cormorant Garamond', Georgia, serif;
   --fire-sans:  'DM Sans', system-ui, sans-serif;
   --fire-mono:  'JetBrains Mono', 'Space Mono', monospace;
 
-  --fire-shadow-sm: 0 0 20px rgba(255, 74, 26, 0.08);
-  --fire-shadow-md: 0 0 40px rgba(255, 74, 26, 0.15);
-  --fire-shadow-lg: 0 0 60px rgba(255, 74, 26, 0.25);
+  --fire-radius:      10px;      /* rounded cards */
+  --fire-shadow-card: 0 2px 12px rgba(0,0,0,0.35), 0 0 0 1px var(--fire-border);
+  --fire-shadow-sm:   0 0 20px rgba(255, 87, 34, 0.08);
+  --fire-shadow-md:   0 0 40px rgba(255, 87, 34, 0.14);
+  --fire-shadow-lg:   0 0 60px rgba(255, 87, 34, 0.22);
 }
 
 /* ── LIGHT (SOLAR) TOKENS ── */
@@ -79,7 +83,7 @@
 
 #view-dash .db-root {
   position: relative !important;
-  padding: 24px 28px 48px !important;
+  padding: 28px 36px 56px !important;
   max-width: 1600px;
   margin: 0 auto;
 }
@@ -136,11 +140,18 @@
 
 .fire-title {
   font-family: var(--fire-serif);
-  font-size: 32px;
+  font-size: 28px;           /* reduced from 32px */
   font-weight: 400;
   letter-spacing: -0.02em;
   color: var(--fire-text);
   line-height: 1.15;
+}
+.fire-subtitle {
+  font-family: var(--fire-sans);
+  font-size: 13px;
+  color: var(--fire-text-dim);
+  margin-top: 4px;
+  line-height: 1.5;
 }
 
 .fire-link {
@@ -284,8 +295,10 @@
 .fire-zone-popup {
   position: relative;
   padding: 28px;
-  background: var(--fire-surface);
+  background: var(--fire-bg-card, var(--fire-bg-elev));
   border: 1px solid var(--fire-border);
+  border-radius: var(--fire-radius, 10px);
+  box-shadow: var(--fire-shadow-card);
   min-height: 380px;
   display: flex;
   flex-direction: column;
@@ -401,16 +414,18 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 48px;
-  padding: 32px 0;
-  margin-top: 16px;
-  border-top: 1px solid var(--fire-divider);
-  border-bottom: 1px solid var(--fire-divider);
+  gap: 40px;
+  padding: 28px 32px;
+  margin-top: 20px;
+  background: var(--fire-bg-card, var(--fire-bg-elev));
+  border: 1px solid var(--fire-border);
+  border-radius: var(--fire-radius, 10px);
+  box-shadow: var(--fire-shadow-card);
   flex-wrap: wrap;
 }
 .fire-risk-num {
   font-family: var(--fire-serif);
-  font-size: 108px;
+  font-size: 88px;           /* reduced from 108px */
   font-weight: 300;
   line-height: 0.85;
   letter-spacing: -0.03em;
@@ -448,16 +463,29 @@
 
 .fire-risk-quote {
   flex: 1;
-  max-width: 480px;
+  max-width: 600px;         /* wider to accommodate 3–4 sentence brief */
   font-family: var(--fire-serif);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 400;
-  line-height: 1.5;
+  line-height: 1.7;          /* more breathing room between lines */
   font-style: italic;
   color: var(--fire-text-mid);
-  border-left: 1px solid var(--fire-border-hi);
-  padding-left: 20px;
+  border-left: 2px solid var(--fire-border-hi);
+  padding-left: 24px;
 }
+/* Extended brief paragraphs inside quote */
+.fire-risk-quote p {
+  margin: 0 0 8px;
+  line-height: 1.7;
+}
+.fire-risk-quote p:first-child {
+  color: var(--fire-text);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 15px;
+  font-family: var(--fire-sans);
+}
+.fire-risk-quote p:last-child { margin-bottom: 0; }
 .fire-risk-quote-byline {
   margin-top: 12px;
   font-family: var(--fire-mono);
@@ -472,20 +500,23 @@
 .fire-kpi-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 1px;
-  background: var(--fire-border);
-  border: 1px solid var(--fire-border);
+  gap: 12px;
+  background: transparent;
+  border: none;
 }
 .fire-kpi {
-  background: var(--fire-bg);
+  background: var(--fire-bg-card, var(--fire-bg-elev));
   padding: 20px 18px;
   cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--fire-radius, 10px);
+  box-shadow: var(--fire-shadow-card);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
 }
 .fire-kpi:hover {
   background: var(--fire-surface-hi);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 0 1px var(--fire-border-hi);
 }
 .fire-kpi-lbl {
   font-family: var(--fire-mono);
@@ -564,14 +595,15 @@
 .fire-signal-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
-  background: var(--fire-border);
-  border: 1px solid var(--fire-border);
+  gap: 12px;
+  background: transparent;
+  border: none;
 }
 .fire-signal {
-  background: var(--fire-bg);
+  background: var(--fire-bg-card, var(--fire-bg-elev));
   padding: 22px 24px;
-  border: 1px solid transparent;
+  border-radius: var(--fire-radius, 10px);
+  box-shadow: var(--fire-shadow-card);
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -651,6 +683,7 @@
   min-width: 120px;
   padding: 24px 20px;
   border: 1px solid;
+  border-radius: var(--fire-radius, 10px);
   position: relative;
 }
 .fire-pipe-stage.s1 {
@@ -718,12 +751,14 @@
 .fire-pred-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  background: var(--fire-border);
-  border: 1px solid var(--fire-border);
+  gap: 12px;
+  background: transparent;
+  border: none;
 }
 .fire-pred-card {
-  background: var(--fire-bg);
+  background: var(--fire-bg-card, var(--fire-bg-elev));
+  border-radius: var(--fire-radius, 10px);
+  box-shadow: var(--fire-shadow-card);
   padding: 24px 22px;
 }
 .fire-pred-horizon {
@@ -775,15 +810,17 @@
 .fire-crisis-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  background: var(--fire-border);
-  border: 1px solid var(--fire-border);
+  gap: 12px;
+  background: transparent;
+  border: none;
 }
 .fire-crisis {
-  background: var(--fire-bg);
+  background: var(--fire-bg-card, var(--fire-bg-elev));
   padding: 22px 24px;
+  border-radius: var(--fire-radius, 10px);
+  box-shadow: var(--fire-shadow-card);
   cursor: pointer;
-  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   border: 1px solid transparent;
 }
 .fire-crisis:hover {
@@ -1336,4 +1373,192 @@
   .fire-crisis-expand { display: none; }
   .fire-crisis-detail { grid-template-columns: repeat(2, 1fr); }
   .fire-two-col { grid-template-columns: 1fr; gap: 32px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   EARLY WARNING — Dashboard live strip
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.fire-ew-hero-strip {
+  display: grid;
+  grid-template-columns: 140px 1fr 1.4fr;
+  gap: 24px;
+  padding: 24px 28px;
+  background: var(--fire-bg-card, var(--fire-bg-elev));
+  border: 1px solid var(--fire-border);
+  border-radius: var(--fire-radius, 10px);
+  box-shadow: var(--fire-shadow-card);
+  align-items: start;
+  margin-bottom: 4px;
+}
+
+.fire-ew-score-block {
+  text-align: center;
+  padding-right: 24px;
+  border-right: 1px solid var(--fire-divider);
+}
+.fire-ew-big-score {
+  font-family: var(--fire-serif);
+  font-size: 64px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin: 4px 0;
+}
+.fire-ew-score-denom {
+  font-size: 0.3em;
+  color: var(--fire-text-dim);
+  letter-spacing: 0;
+}
+.fire-ew-score-label {
+  font-family: var(--fire-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--fire-text-dim);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.fire-ew-gauges {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0;
+}
+.fire-ew-gauge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fire-ew-gauge-lbl {
+  font-family: var(--fire-mono);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--fire-text-dim);
+  text-transform: uppercase;
+  width: 106px;
+  flex-shrink: 0;
+}
+.fire-ew-gauge-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--fire-surface-hi);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.fire-ew-gauge-fill {
+  height: 100%;
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fire-ew-gauge-val {
+  font-family: var(--fire-mono);
+  font-size: 10px;
+  width: 28px;
+  text-align: right;
+  color: var(--fire-text-mid);
+}
+
+.fire-ew-assess-block {
+  padding-left: 24px;
+  border-left: 1px solid var(--fire-divider);
+}
+.fire-ew-assess-text {
+  font-family: var(--fire-serif);
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--fire-text-mid);
+  margin-top: 10px;
+}
+.fire-ew-assess-text p {
+  margin: 0 0 8px;
+}
+.fire-ew-assess-text p:first-child {
+  font-family: var(--fire-sans);
+  font-weight: 600;
+  font-size: 13px;
+  font-style: normal;
+  color: var(--fire-text);
+}
+
+/* Skeleton loading state */
+.fire-signal-skeleton {
+  grid-column: 1 / -1;
+  padding: 32px;
+  text-align: center;
+  color: var(--fire-text-dim);
+  font-family: var(--fire-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  background: var(--fire-bg-card, var(--fire-bg-elev));
+  border-radius: var(--fire-radius, 10px);
+  border: 1px dashed var(--fire-border);
+}
+
+/* Risk brief body — multi-paragraph support */
+.fire-risk-brief-body {
+  font-family: var(--fire-serif);
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--fire-text-mid);
+  font-style: italic;
+}
+.fire-risk-brief-body p {
+  margin: 0 0 8px;
+}
+.fire-risk-brief-body p:first-child {
+  font-family: var(--fire-sans);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--fire-text);
+  margin-bottom: 10px;
+}
+.fire-risk-brief-body p:last-child { margin-bottom: 0; }
+
+/* Insight card inside insight section */
+.fire-insight {
+  background: var(--fire-bg-card, var(--fire-bg-elev));
+  border-radius: var(--fire-radius, 10px);
+  box-shadow: var(--fire-shadow-card);
+}
+
+/* Timeline items */
+.fire-tl-item:hover {
+  background: var(--fire-surface);
+  border-radius: 8px;
+  padding-right: 8px;
+}
+
+/* ── RESPONSIVE EW strip ── */
+@media (max-width: 1000px) {
+  .fire-ew-hero-strip {
+    grid-template-columns: 120px 1fr;
+    grid-template-rows: auto auto;
+  }
+  .fire-ew-assess-block {
+    grid-column: 1 / -1;
+    border-left: none;
+    border-top: 1px solid var(--fire-divider);
+    padding-left: 0;
+    padding-top: 16px;
+  }
+}
+@media (max-width: 680px) {
+  .fire-ew-hero-strip {
+    grid-template-columns: 1fr;
+  }
+  .fire-ew-score-block {
+    border-right: none;
+    border-bottom: 1px solid var(--fire-divider);
+    padding-right: 0;
+    padding-bottom: 16px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .fire-ew-big-score { font-size: 48px; }
 }
