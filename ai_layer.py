@@ -111,17 +111,39 @@ async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) 
     """Call Gemini 1.5 Flash via Google AI free-tier API."""
     try:
         full = (system + "\n\n" + prompt).strip() if system else prompt
-        async with httpx.AsyncClient(timeout=25) as client:
+        async with httpx.AsyncClient(timeout=28) as client:
             resp = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
                 headers={"content-type": "application/json"},
                 json={"contents": [{"parts": [{"text": full}]}],
                       "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.35}}
             )
-            resp.raise_for_status()
-            return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            # Log non-200 at WARNING so it appears in Render logs (INFO+ default)
+            if resp.status_code != 200:
+                body_preview = resp.text[:300]
+                if resp.status_code in (400, 401, 403):
+                    logger.warning(
+                        "Gemini API key error (HTTP %d) — check key in Admin → Settings. "
+                        "Response: %s", resp.status_code, body_preview
+                    )
+                elif resp.status_code == 429:
+                    logger.warning("Gemini rate limit hit (HTTP 429) — will retry")
+                else:
+                    logger.warning("Gemini HTTP %d: %s", resp.status_code, body_preview)
+                resp.raise_for_status()
+            data = resp.json()
+            # Handle blocked/empty response
+            candidates = data.get("candidates", [])
+            if not candidates:
+                reason = data.get("promptFeedback", {}).get("blockReason", "unknown")
+                logger.warning("Gemini returned no candidates — blockReason: %s", reason)
+                return None
+            return candidates[0]["content"]["parts"][0]["text"].strip()
+    except httpx.TimeoutException:
+        logger.warning("Gemini timeout after 28s — prompt length: %d chars", len(prompt))
+        return None
     except Exception as e:
-        logger.debug("Gemini error: %s", e)
+        logger.warning("Gemini error: %s", e)
         return None
 
 async def _call_anthropic(prompt: str, system: str, max_tokens: int, api_key: str) -> Optional[str]:
