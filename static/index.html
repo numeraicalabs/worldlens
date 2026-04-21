@@ -390,8 +390,10 @@
         <!-- Hidden legacy bar used by renderDash -->
         <div style="display:none"><div id="d-risk-b"></div></div>
       </div>
-      <div class="fire-risk-quote" id="d-brief-txt">Loading AI briefing…
-        <div class="fire-risk-quote-byline">— AI CHIEF ANALYST</div>
+      <div class="fire-risk-quote">
+        <!-- d-brief-txt populated by renderDash / loadMacroBrief -->
+        <div id="d-brief-txt" class="fire-risk-brief-body">Loading intelligence briefing…</div>
+        <div class="fire-risk-quote-byline">— AI CHIEF ANALYST · <span id="db-brief-time"></span></div>
       </div>
     </div>
   </section>
@@ -446,8 +448,8 @@
     </div>
   </section>
 
-  <!-- ═══════════════════ SECTION 2: EARLY WARNING SYSTEM ═══════════════════ -->
-  <section class="fire-section fire-ew-section">
+  <!-- ═══════════════════ SECTION 2: EARLY WARNING SYSTEM — LIVE DATA ═══════════════════ -->
+  <section class="fire-section fire-ew-section" id="dash-ew-section">
     <div class="fire-section-head">
       <div class="fire-section-head-l">
         <div class="fire-overline fire-overline-critical">
@@ -455,178 +457,63 @@
           / 02 — EARLY WARNING SYSTEM
         </div>
         <h2 class="fire-title">Signals before they become news</h2>
+        <div class="fire-subtitle">Live detection from real events — updated every 3 minutes</div>
+      </div>
+      <a class="fire-link" onclick="sv('earlywarning',document.querySelector('[data-v=earlywarning]'))">FULL EW VIEW ↗</a>
+    </div>
+
+    <!-- EW SCORE STRIP — populated by dash_ew_init() -->
+    <div id="ew-hero" class="fire-ew-hero-strip">
+      <div class="fire-ew-score-block">
+        <div class="fire-overline">EW SCORE</div>
+        <div class="fire-ew-big-score">
+          <span id="ew-score" style="color:var(--fire-corona)">—</span>
+          <span class="fire-ew-score-denom">/10</span>
+        </div>
+        <div id="ew-label" class="fire-ew-score-label">LOADING</div>
+      </div>
+      <div class="fire-ew-gauges">
+        <div class="fire-ew-gauge-row">
+          <span class="fire-ew-gauge-lbl">Macro Stress</span>
+          <div class="fire-ew-gauge-bar"><div id="ewgb-macro" class="fire-ew-gauge-fill"></div></div>
+          <span id="ewg-macro" class="fire-ew-gauge-val">—</span>
+        </div>
+        <div class="fire-ew-gauge-row">
+          <span class="fire-ew-gauge-lbl">Market Stress</span>
+          <div class="fire-ew-gauge-bar"><div id="ewgb-market" class="fire-ew-gauge-fill"></div></div>
+          <span id="ewg-market" class="fire-ew-gauge-val">—</span>
+        </div>
+        <div class="fire-ew-gauge-row">
+          <span class="fire-ew-gauge-lbl">Sentiment</span>
+          <div class="fire-ew-gauge-bar"><div id="ewgb-sent" class="fire-ew-gauge-fill"></div></div>
+          <span id="ewg-sent" class="fire-ew-gauge-val">—</span>
+        </div>
+        <div class="fire-ew-gauge-row">
+          <span class="fire-ew-gauge-lbl">Event Velocity</span>
+          <div class="fire-ew-gauge-bar"><div id="ewgb-vel" class="fire-ew-gauge-fill"></div></div>
+          <span id="ewg-vel" class="fire-ew-gauge-val">—</span>
+        </div>
+      </div>
+      <!-- AI Assessment — this is the live text from /api/intelligence/early-warning -->
+      <div class="fire-ew-assess-block">
+        <div class="fire-overline">AI ASSESSMENT</div>
+        <div id="ew-assess" class="fire-ew-assess-text">Loading assessment…</div>
       </div>
     </div>
 
-    <div class="fire-ew-tabs">
-      <button class="fire-ew-tab active" data-tab="signals">
-        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l4-6 3 4 5-8"/></svg>
-        ACTIVE SIGNALS
-      </button>
-      <button class="fire-ew-tab" data-tab="escalation">
-        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13V3M2 3l5 4 4-2 3 5"/></svg>
-        ESCALATION PIPELINE
-      </button>
-      <button class="fire-ew-tab" data-tab="predictions">
-        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2"/></svg>
-        PREDICTIVE MATRIX
-      </button>
+    <!-- CRISIS PATTERNS — live from API -->
+    <div class="fire-ew-patterns-wrap" style="margin-top:20px">
+      <div class="fire-overline" style="margin-bottom:12px">DETECTED PATTERNS</div>
+      <div id="ew-patterns" class="pattern-grid"></div>
     </div>
 
-    <!-- TAB: ACTIVE SIGNALS -->
-    <div class="fire-ew-panel active" data-panel="signals">
-      <div class="fire-signal-grid" id="fire-signals-grid">
-        <div class="fire-signal">
-          <div class="fire-signal-head">
-            <div class="fire-signal-level critical">
-              <span class="fire-signal-level-dot"></span>CRITICAL
-            </div>
-          </div>
-          <div class="fire-signal-label">CROSS-ASSET DECORRELATION</div>
-          <div class="fire-signal-val-row">
-            <span class="fire-signal-val">Active</span>
-            <span class="fire-signal-delta critical">+142% vs baseline</span>
-          </div>
-          <div class="fire-signal-meta">3rd session · EUR/USD vs Gold</div>
-        </div>
-
-        <div class="fire-signal">
-          <div class="fire-signal-head">
-            <div class="fire-signal-level critical">
-              <span class="fire-signal-level-dot"></span>CRITICAL
-            </div>
-          </div>
-          <div class="fire-signal-label">SANCTIONS CASCADE PROBABILITY</div>
-          <div class="fire-signal-val-row">
-            <span class="fire-signal-val">34%</span>
-            <span class="fire-signal-delta critical">+8pt today</span>
-          </div>
-          <div class="fire-signal-meta">72h horizon · Eastern Europe</div>
-        </div>
-
-        <div class="fire-signal">
-          <div class="fire-signal-head">
-            <div class="fire-signal-level major">
-              <span class="fire-signal-level-dot"></span>MAJOR
-            </div>
-          </div>
-          <div class="fire-signal-label">SHIPPING INSURANCE PREMIUM</div>
-          <div class="fire-signal-val-row">
-            <span class="fire-signal-val">+18%</span>
-            <span class="fire-signal-delta major">Breach of 2024 peak</span>
-          </div>
-          <div class="fire-signal-meta">Strait of Hormuz · 5-day MA</div>
-        </div>
-
-        <div class="fire-signal">
-          <div class="fire-signal-head">
-            <div class="fire-signal-level major">
-              <span class="fire-signal-level-dot"></span>MAJOR
-            </div>
-          </div>
-          <div class="fire-signal-label">SOCIAL SENTIMENT SPIKE</div>
-          <div class="fire-signal-val-row">
-            <span class="fire-signal-val">3 EM</span>
-            <span class="fire-signal-delta major">Concurrent events</span>
-          </div>
-          <div class="fire-signal-meta">Multilingual NLP detection</div>
-        </div>
-
-        <div class="fire-signal">
-          <div class="fire-signal-head">
-            <div class="fire-signal-level watch">
-              <span class="fire-signal-level-dot"></span>WATCH
-            </div>
-          </div>
-          <div class="fire-signal-label">OPTIONS FLOW ANOMALY</div>
-          <div class="fire-signal-val-row">
-            <span class="fire-signal-val">VIX $22</span>
-            <span class="fire-signal-delta watch">Hedging regime</span>
-          </div>
-          <div class="fire-signal-meta">2.3M contracts · unusual</div>
-        </div>
-
-        <div class="fire-signal">
-          <div class="fire-signal-head">
-            <div class="fire-signal-level watch">
-              <span class="fire-signal-level-dot"></span>WATCH
-            </div>
-          </div>
-          <div class="fire-signal-label">COMMODITY SPREAD COMPRESSION</div>
-          <div class="fire-signal-val-row">
-            <span class="fire-signal-val">Brent/WTI</span>
-            <span class="fire-signal-delta watch">Bottleneck relief</span>
-          </div>
-          <div class="fire-signal-meta">$4.20 → $3.10 in 48h</div>
-        </div>
+    <!-- ACTIVE SIGNALS — live from /api/intelligence/early-warning/signals -->
+    <div style="margin-top:20px">
+      <div class="fire-overline" style="margin-bottom:12px">
+        ACTIVE SIGNALS <span id="ew-signal-count" style="color:var(--fire-text-dim)"></span>
       </div>
-    </div>
-
-    <!-- TAB: ESCALATION PIPELINE -->
-    <div class="fire-ew-panel" data-panel="escalation">
-      <div class="fire-pipeline">
-        <div class="fire-pipe-stage s1">
-          <div class="fire-pipe-overline">STAGE 1</div>
-          <div class="fire-pipe-name">Monitoring</div>
-          <div class="fire-pipe-count">24</div>
-          <div class="fire-pipe-pct">55% of flows</div>
-        </div>
-        <div class="fire-pipe-stage s2">
-          <div class="fire-pipe-overline">STAGE 2</div>
-          <div class="fire-pipe-name">Watch</div>
-          <div class="fire-pipe-count">12</div>
-          <div class="fire-pipe-pct">27% of flows</div>
-        </div>
-        <div class="fire-pipe-stage s3">
-          <div class="fire-pipe-overline">STAGE 3</div>
-          <div class="fire-pipe-name">Major</div>
-          <div class="fire-pipe-count">6</div>
-          <div class="fire-pipe-pct">14% of flows</div>
-        </div>
-        <div class="fire-pipe-stage s4">
-          <div class="fire-pipe-overline">STAGE 4</div>
-          <div class="fire-pipe-name">Critical</div>
-          <div class="fire-pipe-count">2</div>
-          <div class="fire-pipe-pct">4% of flows</div>
-        </div>
-      </div>
-      <div class="fire-pipe-summary">
-        « 44 events under active monitoring. 8 events escalated to major/critical in the last 24h — 62% above 7-day baseline.
-        Two events in critical tier both concern energy corridor stress. »
-      </div>
-    </div>
-
-    <!-- TAB: PREDICTIVE MATRIX -->
-    <div class="fire-ew-panel" data-panel="predictions">
-      <div class="fire-pred-grid">
-        <div class="fire-pred-card">
-          <div class="fire-pred-horizon">HORIZON · 24H</div>
-          <div class="fire-pred-label">Sanctions expansion</div>
-          <div class="fire-pred-prob high">34%</div>
-          <div class="fire-pred-bar"><div class="fire-pred-bar-fill" style="width:34%;background:var(--fire-ember)"></div></div>
-          <div class="fire-pred-ci">90% CI · 28–41%</div>
-        </div>
-        <div class="fire-pred-card">
-          <div class="fire-pred-horizon">HORIZON · 72H</div>
-          <div class="fire-pred-label">Military escalation</div>
-          <div class="fire-pred-prob mid">18%</div>
-          <div class="fire-pred-bar"><div class="fire-pred-bar-fill" style="width:18%;background:var(--fire-corona)"></div></div>
-          <div class="fire-pred-ci">90% CI · 12–24%</div>
-        </div>
-        <div class="fire-pred-card">
-          <div class="fire-pred-horizon">HORIZON · 7D</div>
-          <div class="fire-pred-label">Diplomatic breakthrough</div>
-          <div class="fire-pred-prob high">42%</div>
-          <div class="fire-pred-bar"><div class="fire-pred-bar-fill" style="width:42%;background:var(--fire-ember)"></div></div>
-          <div class="fire-pred-ci">90% CI · 34–51%</div>
-        </div>
-        <div class="fire-pred-card">
-          <div class="fire-pred-horizon">HORIZON · 30D</div>
-          <div class="fire-pred-label">Regime transition</div>
-          <div class="fire-pred-prob low">12%</div>
-          <div class="fire-pred-bar"><div class="fire-pred-bar-fill" style="width:12%;background:var(--fire-sunrise)"></div></div>
-          <div class="fire-pred-ci">90% CI · 7–19%</div>
-        </div>
+      <div id="ew-signals" class="fire-signal-grid">
+        <div class="fire-signal-skeleton">Loading signals…</div>
       </div>
     </div>
   </section>
@@ -2923,6 +2810,7 @@
 <script src="/static/js/29_sprint_c.js?v=20260421"></script>
 <script src="/static/js/30_theme.js?v=20260421"></script>
 <script src="/static/js/31_dash_v2.js?v=20260421"></script>
+<script src="/static/js/32_dash_ew.js?v=20260421"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
