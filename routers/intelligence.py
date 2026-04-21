@@ -286,7 +286,7 @@ async def get_early_warning():
 
         # Load data
         async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-48 hours') "
+            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
             "ORDER BY severity DESC LIMIT 100"
         ) as c:
             events = [dict(r) for r in await c.fetchall()]
@@ -422,7 +422,7 @@ async def get_active_signals():
         await _ensure_tables(db)
         # Auto-generate signals from recent events
         async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-48 hours') "
+            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
             "ORDER BY severity DESC LIMIT 80"
         ) as c:
             events = [dict(r) for r in await c.fetchall()]
@@ -740,7 +740,7 @@ async def macro_brief_endpoint(user=Depends(require_user)):
     async with aiosqlite.connect(settings.db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-24 hours') "
+            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
             "ORDER BY severity DESC LIMIT 5"
         ) as cur:
             events = [dict(r) for r in await cur.fetchall()]
@@ -763,7 +763,7 @@ async def watchlist_digest_endpoint(user=Depends(require_user)):
         ) as cur:
             items = [dict(r) for r in await cur.fetchall()]
         async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-24 hours') "
+            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
             "ORDER BY severity DESC LIMIT 10"
         ) as cur:
             events = [dict(r) for r in await cur.fetchall()]

@@ -92,7 +92,7 @@ async def _get_region_events(db, codes: List[str]) -> List[Dict]:
     placeholders = ",".join("?" * len(codes))
     async with db.execute(
         f"SELECT * FROM events WHERE country_code IN ({placeholders}) "
-        f"AND datetime(timestamp) > datetime('now','-24 hours') "
+        f"AND datetime(timestamp) > datetime('now','-72 hours') "
         f"ORDER BY severity DESC LIMIT 20",
         codes
     ) as cur:
@@ -108,13 +108,14 @@ async def _ai_region_summary(region: str, events: List[Dict]) -> Dict:
 
     if not events:
         result = {
-            "summary": "No significant events in the last 24h.",
+            "summary": "No significant events in the last 72 hours.",
             "sentiment": "neutral",
             "trend": "→",
             "risk": 3.0,
             "topics": [],
         }
-        _summary_cache[region] = {"ts": time.time(), "data": result}
+        # Short cache (60s) so result refreshes quickly once scraper populates DB
+        _summary_cache[region] = {"ts": time.time() - 120, "data": result}
         return result
 
     avg_sev = sum(e.get("severity", 5) for e in events) / len(events)
@@ -236,3 +237,67 @@ async def get_globe_stats():
         "avg_severity": round(row["avg_sev"] or 5, 1),
         "countries_affected": countries or 0,
     }
+
+
+@router.get("/debug")
+async def globe_debug():
+    """
+    Diagnostic endpoint — call from browser to test Gemini connectivity.
+    Returns key status, provider, and a test AI call result.
+    Safe to call repeatedly — does NOT cache results.
+    """
+    from ai_layer import _resolve_provider, ai_available_async, _call_claude
+
+    # Reload settings from DB first
+    await ai_available_async()
+    provider, key = _resolve_provider()
+
+    result = {
+        "provider":          provider,
+        "key_configured":    bool(key),
+        "key_preview":       ("***" + key[-4:]) if len(key) >= 4 else ("SET" if key else "EMPTY"),
+        "global_ai_provider": settings.global_ai_provider,
+        "gemini_key_in_memory": bool(settings.gemini_api_key),
+    }
+
+    if not key:
+        result["test"] = "SKIP — no key configured"
+        result["fix"]  = "Go to Admin → Settings → save your Gemini API key"
+        return result
+
+    # Test with a minimal prompt
+    try:
+        test_resp = await _call_claude(
+            "Reply with exactly: WORLDLENS_OK",
+            max_tokens=10
+        )
+        result["test"]     = "PASS" if (test_resp and "OK" in test_resp) else "FAIL"
+        result["response"] = (test_resp or "")[:100]
+    except Exception as e:
+        result["test"]  = "ERROR"
+        result["error"] = str(e)[:200]
+
+    # Also check how many events are in DB
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            async with db.execute("SELECT COUNT(*) FROM events") as cur:
+                total = (await cur.fetchone())[0]
+            async with db.execute(
+                "SELECT COUNT(*) FROM events WHERE datetime(timestamp) > datetime('now','-24 hours')"
+            ) as cur:
+                last24h = (await cur.fetchone())[0]
+            async with db.execute(
+                "SELECT COUNT(*) FROM events WHERE datetime(timestamp) > datetime('now','-72 hours')"
+            ) as cur:
+                last72h = (await cur.fetchone())[0]
+        result["events_total"]  = total
+        result["events_24h"]    = last24h
+        result["events_72h"]    = last72h
+        if total == 0:
+            result["events_note"] = "DB empty — wait 90s for first scraper run after deploy"
+        elif last24h == 0:
+            result["events_note"] = "No events in last 24h — scheduler may have just started"
+    except Exception as e:
+        result["events_error"] = str(e)[:100]
+
+    return result

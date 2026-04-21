@@ -233,7 +233,7 @@ async def _get_bot_events(bot_id: str, config: Dict, limit: int = 15) -> List[Di
                 f"severity, impact, timestamp, source, sentiment_tone "
                 f"FROM events "
                 f"WHERE category IN ({placeholders}){impact_sql}{region_sql} "
-                f"AND datetime(timestamp) > datetime('now','-24 hours') "
+                f"AND datetime(timestamp) > datetime('now','-72 hours') "
                 f"ORDER BY severity DESC, timestamp DESC LIMIT ?",
                 cats + region_params + [limit]
             ) as cur:
@@ -659,7 +659,7 @@ async def bot_debate(user=Depends(require_user)):
         async with aiosqlite.connect(settings.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
-                "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-24 hours') "
+                "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
                 "ORDER BY severity DESC LIMIT 1"
             ) as cur:
                 top_row = await cur.fetchone()

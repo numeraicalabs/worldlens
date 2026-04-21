@@ -732,3 +732,40 @@ async def behaviour_summary(
         },
         "total_saved": total_saved,
     }
+
+
+@router.get("/test-ai")
+async def test_ai_connection(admin=Depends(require_admin)):
+    """
+    Admin diagnostic: tests Gemini key and returns detailed status.
+    Shows in Admin → Settings as a 'Test Connection' button.
+    """
+    from ai_layer import _resolve_provider, ai_available_async, _call_claude
+    await ai_available_async()
+    provider, key = _resolve_provider()
+
+    info = {
+        "provider":    provider,
+        "key_set":     bool(key),
+        "key_preview": ("***" + key[-4:]) if len(key) >= 4 else ("SET" if key else "EMPTY"),
+    }
+
+    if not key:
+        info["status"]  = "ERROR"
+        info["message"] = "No API key found. Save it in Admin → Settings → AI Provider."
+        return info
+
+    try:
+        resp = await _call_claude("Reply with exactly: CONNECTION_OK", max_tokens=12)
+        if resp and "OK" in resp:
+            info["status"]   = "OK"
+            info["message"]  = f"{provider.capitalize()} is working correctly."
+        else:
+            info["status"]   = "WARN"
+            info["message"]  = f"Key accepted but unexpected response: {(resp or '')[:80]}"
+        info["response"] = (resp or "")[:100]
+    except Exception as e:
+        info["status"]  = "ERROR"
+        info["message"] = f"Connection failed: {e}"
+
+    return info

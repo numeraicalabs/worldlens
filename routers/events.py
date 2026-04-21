@@ -152,7 +152,7 @@ async def get_region_risk(country_code: str):
             if cached:
                 return dict(cached)
             async with db.execute(
-                "SELECT * FROM events WHERE country_code=? ORDER BY timestamp DESC LIMIT 15", (cc,)
+                "SELECT * FROM events WHERE country_code=? AND datetime(timestamp) > datetime('now','-72 hours') ORDER BY severity DESC LIMIT 15", (cc,)
             ) as c:
                 events = [dict(r) for r in await c.fetchall()]
 
