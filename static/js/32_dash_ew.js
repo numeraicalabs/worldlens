@@ -97,8 +97,9 @@ function _renderGauges(data) {
     var val = gauges[k];
     var pct = Math.min(100, Math.max(0, (val / 10) * 100));
     var col = k === 'sent' ? sentColor : _col(val);
-    var bar = document.getElementById('ewgb-' + k);
-    var lbl = document.getElementById('ewg-' + k);
+    // dash-ewgb-* / dash-ewg-* are in the dashboard widget
+    var bar = document.getElementById('dash-ewgb-' + k);
+    var lbl = document.getElementById('dash-ewg-' + k);
     if (bar) { bar.style.width = pct + '%'; bar.style.background = col; }
     if (lbl) { lbl.textContent = val.toFixed(1); lbl.style.color = col; }
   });
@@ -160,6 +161,32 @@ function _renderSignals(signals) {
   }).join('');
 }
 
+
+/* ── Render crisis patterns into dashboard widget ──────────────────── */
+function _renderDashPatterns(patterns) {
+  var el = document.getElementById('dash-ew-patterns');
+  if (!el) return;
+  if (!patterns || !patterns.length) {
+    el.innerHTML = '<div style="color:var(--fire-text-dim);font-size:11px;padding:8px 0;grid-column:1/-1">No significant patterns detected.</div>';
+    return;
+  }
+  el.innerHTML = patterns.map(function(p) {
+    var sc  = parseFloat(p.score || 0);
+    var col = sc >= 7.5 ? '#ff5722' : sc >= 6 ? '#ffc107' : '#ffca28';
+    var pct = Math.min(100, sc * 10);
+    var regHtml = (p.regions || []).length
+      ? '<div style="font-size:9px;color:var(--fire-text-dim);margin-top:4px">📍 ' + _esc((p.regions || []).slice(0,3).join(', ')) + '</div>'
+      : '';
+    return '<div class="pattern-card" style="border-color:' + col + '22">'
+      + '<div class="pattern-icon">' + (p.icon || '⚠️') + '</div>'
+      + '<div class="pattern-label" style="color:' + col + '">' + _esc(p.label || p.type || '') + '</div>'
+      + '<div class="pattern-score" style="color:' + col + '">' + sc.toFixed(1) + '<span style="font-size:10px;opacity:.6">/10</span></div>'
+      + '<div class="pattern-bar"><div class="pattern-fill" style="width:' + pct + '%;background:' + col + '"></div></div>'
+      + regHtml
+      + '</div>';
+  }).join('');
+}
+
 /* ── Main loader — called once after enterApp ──────────────────────────── */
 function dashEWInit() {
   var section = document.getElementById('dash-ew-section');
@@ -186,10 +213,8 @@ function dashEWInit() {
       // Assessment text
       _renderAssessment(data.ai_assessment || data.assessment || '', score, data);
 
-      // Patterns (reuse existing _ewRenderPatterns if available)
-      if (typeof window._ewRenderPatterns === 'function') {
-        window._ewRenderPatterns(data.top_risks || []);
-      }
+      // Render patterns into the DASHBOARD widget (dash-ew-patterns)
+      _renderDashPatterns(data.top_risks || []);
     })
     .catch(function() {
       _set('dash-ew-label', 'UNAVAILABLE');

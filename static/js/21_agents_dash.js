@@ -31,12 +31,70 @@ window.initAgentDash = function() {
 
 // ── Load briefs ─────────────────────────────────────────────────────────────
 function loadAllBriefs() {
+  // Step 1: Show instant event-based fallback for each card
+  Object.keys(AGENTS).forEach(function(bid) {
+    _showEventFallback(bid);
+  });
+
+  // Step 2: Fetch AI briefs (now parallel on server — ~4x faster)
   rq('/api/agents/all-briefs').then(function(data) {
     if (!data || data.detail) return;
     Object.keys(data).forEach(function(bid) {
       if (AGENTS[bid]) { AGENTS[bid].brief = data[bid]; refreshCardBrief(bid, data[bid]); }
     });
+  }).catch(function() {
+    // Fallback already shown — nothing more to do
   });
+}
+
+/** Show event data immediately without waiting for AI */
+function _showEventFallback(bid) {
+  var body = document.getElementById('ag-body-' + bid);
+  if (!body) return;
+  // Already has real content — don't overwrite
+  if (body.querySelector('.ag-headline')) return;
+
+  var agent = AGENTS[bid];
+  if (!agent) return;
+
+  // Get events for this bot from G.events
+  var evs = (window.G && G.events) ? G.events.slice()
+    .filter(function(e) {
+      // rough category match by bot type
+      var cat = (e.category || '').toLowerCase();
+      if (bid === 'finance')     return cat.includes('econ') || cat.includes('financ') || cat.includes('market');
+      if (bid === 'geopolitics') return cat.includes('geo') || cat.includes('conflict') || cat.includes('polit');
+      if (bid === 'science')     return cat.includes('sci') || cat.includes('health') || cat.includes('disaster');
+      if (bid === 'technology')  return cat.includes('tech') || cat.includes('cyber') || cat.includes('ai');
+      return true;
+    })
+    .sort(function(a,b){ return (b.severity||0)-(a.severity||0); })
+    .slice(0, 5) : [];
+
+  if (!evs.length && window.G && G.events) {
+    evs = G.events.slice(0, 3);
+  }
+
+  if (!evs.length) {
+    body.innerHTML = '<div class="ag-loading"><div class="ag-spinner"></div><span>Fetching AI analysis…</span></div>';
+    return;
+  }
+
+  var topEv = evs[0];
+  var highSev = evs.filter(function(e){ return (e.severity||0) >= 7; }).length;
+
+  body.innerHTML = [
+    '<div class="ag-headline">' + (topEv.title || '').slice(0, 80) + '</div>',
+    '<div class="ag-brief" style="font-style:italic;color:var(--t3);font-size:10px">AI analysis loading…</div>',
+    evs.slice(0, 3).length ? '<div class="ag-ev-chips">' + evs.slice(0, 3).map(function(ev) {
+      var sev = ev.severity || 5;
+      var col = sev >= 7 ? '#EF4444' : sev >= 5 ? '#F59E0B' : '#10B981';
+      return '<div class="ag-ev-chip" style="--ev-col:' + col + '">'
+        + '<span class="ag-ev-sev" style="color:' + col + ';background:' + col + '1a">' + sev.toFixed(0) + '</span>'
+        + '<span class="ag-ev-title">' + ev.title.slice(0, 48) + '</span></div>';
+    }).join('') + '</div>' : '',
+    '<div class="ag-meta"><span class="ag-ev-count">' + evs.length + ' eventi monitorati</span></div>',
+  ].join('');
 }
 
 window.loadOneBrief = function loadOneBrief(bid) {
