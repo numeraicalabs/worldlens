@@ -204,6 +204,49 @@ function updateRiskUI() {
   var mRisk = el('m-risk'); if (mRisk) { mRisk.textContent = r.toFixed(0); mRisk.style.color = rc; }
   var mRiskb = el('m-riskb'); if (mRiskb) { mRiskb.style.width = Math.min(100,r)+'%'; mRiskb.style.background = rc; }
   var mRiskl = el('m-riskl'); if (mRiskl) { mRiskl.textContent = r>60?'CRITICAL':r>35?'ELEVATED':'STABLE'; mRiskl.style.color = rc; }
+  // Update mobile crisis badge with high-severity event count
+  if (typeof updateMobileBadges === 'function' && G.events) {
+    var highSev = G.events.filter(function(e){ return (e.severity||0) >= 6; }).length;
+    updateMobileBadges({ crisisCount: highSev });
+  }
+  // Update mobile greeting card
+  _updateMobileGreeting(r);
+}
+
+function _updateMobileGreeting(riskScore) {
+  var nameEl   = document.getElementById('mobile-greeting-name');
+  var statusEl = document.getElementById('mobile-greeting-status');
+  var timeEl   = document.getElementById('mobile-greeting-time');
+  if (!nameEl) return;
+
+  // Day + time
+  var days = ['DOMENICA','LUNEDÌ','MARTEDÌ','MERCOLEDÌ','GIOVEDÌ','VENERDÌ','SABATO'];
+  var now  = new Date();
+  var hour = now.getHours();
+  var greeting = hour < 12 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera';
+  if (timeEl) timeEl.textContent = days[now.getDay()] + ' ' + now.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+
+  // Name from profile
+  var name = (G.userProfile && (G.userProfile.display_name || G.userProfile.email || '').split('@')[0]) || '';
+  nameEl.textContent = name ? greeting + ', ' + name : greeting;
+
+  // Status line from risk level
+  var r = parseFloat(riskScore) || (G.stats && G.stats.global_risk_index) || 0;
+  var statusText, statusColor;
+  if (r > 65) {
+    statusText = 'Rischio CRITICO — ' + (G.events ? G.events.length : 0) + ' eventi monitorati';
+    statusColor = '#ff5722';
+  } else if (r > 35) {
+    statusText = 'Rischio ELEVATO — attenzione richiesta';
+    statusColor = '#ffc107';
+  } else {
+    statusText = 'Situazione stabile — ' + (G.events ? G.events.length : 0) + ' eventi in corso';
+    statusColor = '#66bb6a';
+  }
+  if (statusEl) {
+    statusEl.textContent = statusText;
+    statusEl.style.color = statusColor;
+  }
 }
 function renderDash() {
   var st   = G.stats || {};
@@ -1364,15 +1407,38 @@ function mobileNav(view, btn) {
   document.querySelectorAll('.wl-mnav-btn[data-mv]').forEach(function(b) {
     b.classList.remove('active');
   });
-  if (btn) btn.classList.add('active');
-  else {
+  if (btn) {
+    btn.classList.add('active');
+  } else {
     var mb = document.querySelector('.wl-mnav-btn[data-mv="' + view + '"]');
     if (mb) mb.classList.add('active');
   }
 
   // Close more drawer if open
   closeMoreDrawer();
+
+  // Scroll to top of new view on mobile
+  var viewEl = document.getElementById('view-' + view);
+  if (viewEl) viewEl.scrollTop = 0;
 }
+
+/* ── Live badge updater — called from renderDash ── */
+function updateMobileBadges(opts) {
+  opts = opts || {};
+  // Crisis badge: show count of high-severity events
+  var crisisBadge = document.getElementById('wl-crisis-badge');
+  if (crisisBadge) {
+    var count = opts.crisisCount || 0;
+    crisisBadge.style.display = count > 0 ? 'block' : 'none';
+    crisisBadge.textContent = count > 99 ? '99+' : String(count);
+  }
+  // AI badge: show when a new briefing is available
+  var aiBadge = document.getElementById('wl-ai-badge');
+  if (aiBadge && opts.newBriefing) {
+    aiBadge.style.display = 'block';
+  }
+}
+window.updateMobileBadges = updateMobileBadges;
 
 // Sync desktop nav → mobile nav active state
 (function() {
