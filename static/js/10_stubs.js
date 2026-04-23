@@ -391,30 +391,42 @@ function obSetRisk(v,el2) {
 function obNext() { if (OB.step < OB_STEPS.length-1) { OB.step++; _obRender(); } else { _obFinish(); } }
 function obBack() { if (OB.step>0) { OB.step--; _obRender(); } }
 function skipOnboarding() {
+  // Save to localStorage immediately so reload doesn't re-trigger popup
+  try { localStorage.setItem('wl_onboarding_done', '1'); } catch(e) {}
+  if (window.G) {
+    if (!G.userProfile) G.userProfile = {};
+    G.userProfile.onboarding_done = 1;
+  }
   var ov = document.getElementById('ob-overlay');
   if (ov) {
     ov.style.opacity = '0';
     ov.style.transition = 'opacity 0.25s ease';
     setTimeout(function() { ov.style.display = 'none'; ov.style.opacity = ''; }, 260);
   }
-  if (G.userProfile) G.userProfile.onboarding_done = 1;
-  rq('/api/user/profile', { method: 'PUT', body: { onboarding_done: 1 } });
+  rq('/api/user/profile', { method: 'PUT', body: { onboarding_done: 1 } })
+    .catch(function() {});
 }
 function _obFinish() {
-  // Close overlay immediately — never block on network
+  // 1. Save to localStorage FIRST — survives page reload regardless of server
+  try { localStorage.setItem('wl_onboarding_done', '1'); } catch(e) {}
+
+  // 2. Mark in memory immediately
+  if (window.G) {
+    if (!G.userProfile) G.userProfile = {};
+    G.userProfile.onboarding_done = 1;
+    G.userProfile.interests = OB.data.interests || [];
+    G.userProfile.regions   = OB.data.regions   || [];
+  }
+
+  // 3. Close overlay with fade
   var ov = document.getElementById('ob-overlay');
   if (ov) {
     ov.style.opacity = '0';
     ov.style.transition = 'opacity 0.3s ease';
     setTimeout(function() { ov.style.display = 'none'; ov.style.opacity = ''; }, 300);
   }
-  // Mark onboarding done locally right away
-  if (G.userProfile) {
-    G.userProfile.onboarding_done = 1;
-    G.userProfile.interests = OB.data.interests || [];
-    G.userProfile.regions   = OB.data.regions   || [];
-  }
-  // Save to server in background — if it fails, the overlay is already closed
+
+  // 4. Persist to server in background
   var payload = {
     interests:        OB.data.interests || [],
     regions:          OB.data.regions   || [],
@@ -423,8 +435,8 @@ function _obFinish() {
   };
   rq('/api/user/complete-onboarding', { method: 'POST', body: payload })
     .catch(function() {
-      // Silently ignore — mark done locally so it doesn't re-trigger
-      rq('/api/user/profile', { method: 'PUT', body: { onboarding_done: 1 } });
+      rq('/api/user/profile', { method: 'PUT', body: { onboarding_done: 1 } })
+        .catch(function() {});
     });
 }
 

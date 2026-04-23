@@ -259,8 +259,17 @@ function enterApp() {
         var hb = document.getElementById('help-btn');
         if (hb) hb.style.display = 'flex';
       }
-      if (G.isNewUser || (G.userProfile && !G.userProfile.onboarding_done)) {
+      // Check localStorage first — guards against server lag / failed API on prev session
+      var _localDone = false;
+      try { _localDone = localStorage.getItem('wl_onboarding_done') === '1'; } catch(e) {}
+      var _serverDone = G.userProfile && !!G.userProfile.onboarding_done;
+
+      if (!_localDone && !_serverDone && (G.isNewUser || G.userProfile)) {
         setTimeout(startOnboarding, 700);
+      } else if (_localDone && G.userProfile && !G.userProfile.onboarding_done) {
+        // Sync localStorage state to server silently (handles previous failures)
+        rq('/api/user/profile', { method: 'PUT', body: { onboarding_done: 1 } })
+          .catch(function() {});
       }
       G.isNewUser = false;
       // Load engagement
