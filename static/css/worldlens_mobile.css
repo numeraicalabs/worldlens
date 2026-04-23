@@ -2190,3 +2190,404 @@
     min-height: 48px !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE SWIPE DECK — dashboard card navigation (≤480px only)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+
+  /* ── Hide all desktop dashboard sections on phone ── */
+  #view-dash .fire-section,
+  #view-dash .mob-risk-card,
+  #view-dash .mob-kpi-card,
+  #view-dash .mob-ew-card {
+    display: none !important;
+  }
+
+  /* ── Show swipe deck ── */
+  #mob-swipe-deck {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    margin: 0 -12px !important; /* bleed to edges */
+  }
+
+  /* ── Dots indicator ── */
+  #mob-swipe-dots {
+    display: flex !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    padding: 10px 0 6px !important;
+    flex-shrink: 0 !important;
+  }
+  .mob-dot {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: rgba(255,255,255,0.18) !important;
+    transition: all 0.25s ease !important;
+    cursor: pointer !important;
+  }
+  .mob-dot.active {
+    width: 22px !important;
+    border-radius: 3px !important;
+    background: #ffc107 !important;
+  }
+
+  /* ── Track — horizontal scroll snap ── */
+  #mob-swipe-track {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    flex: 1 !important;
+    gap: 0 !important;
+  }
+  #mob-swipe-track::-webkit-scrollbar { display: none !important; }
+
+  /* ── Individual card ── */
+  .mob-swipe-card {
+    flex-shrink: 0 !important;
+    width: 100vw !important;
+    scroll-snap-align: start !important;
+    padding: 16px 20px 80px !important; /* bottom: nav bar clearance */
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── Overline ── */
+  .msc-overline {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.2em !important;
+    color: var(--fire-text-dim, #9a9080) !important;
+    text-transform: uppercase !important;
+    margin-bottom: 4px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  /* ── Greeting ── */
+  .msc-greeting {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 22px !important;
+    font-weight: 600 !important;
+    color: var(--fire-text, #e8e3db) !important;
+    margin-bottom: 16px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* ── Card title ── */
+  .msc-title {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 24px !important;
+    font-weight: 400 !important;
+    color: var(--fire-text, #e8e3db) !important;
+    line-height: 1.2 !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* ── Risk row ── */
+  .msc-risk-row {
+    display: flex !important;
+    gap: 16px !important;
+    align-items: flex-start !important;
+    padding: 16px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,193,7,0.14) !important;
+    margin-bottom: 16px !important;
+  }
+  .msc-risk-label {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 8px !important;
+    letter-spacing: 0.18em !important;
+    color: var(--fire-text-dim) !important;
+    text-transform: uppercase !important;
+    margin-bottom: 4px !important;
+  }
+  .msc-risk-num {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 56px !important;
+    font-weight: 300 !important;
+    line-height: 0.9 !important;
+    letter-spacing: -0.03em !important;
+  }
+  .msc-risk-sub {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    margin-top: 6px !important;
+  }
+  .msc-risk-divider {
+    width: 1px !important;
+    background: rgba(255,193,7,0.12) !important;
+    align-self: stretch !important;
+    flex-shrink: 0 !important;
+  }
+  .msc-brief-wrap { flex: 1 !important; min-width: 0 !important; }
+  .msc-brief-label {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 8px !important;
+    letter-spacing: 0.15em !important;
+    color: var(--fire-text-dim) !important;
+    margin-bottom: 6px !important;
+  }
+  .msc-brief {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+    color: var(--fire-text-mid, #c8bfb0) !important;
+  }
+
+  /* ── Crisis label + top events ── */
+  .msc-crisis-label {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.2em !important;
+    color: var(--fire-text-dim) !important;
+    text-transform: uppercase !important;
+    margin-bottom: 10px !important;
+  }
+  .msc-top-events { display: flex !important; flex-direction: column !important; gap: 8px !important; }
+  .msc-top-event {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px 14px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    cursor: pointer !important;
+    min-height: 48px !important;
+  }
+  .msc-top-event:active { background: rgba(255,255,255,0.06) !important; }
+  .msc-tev-sev {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 28px !important;
+    font-weight: 300 !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+    width: 34px !important;
+  }
+  .msc-tev-body { flex: 1 !important; min-width: 0 !important; }
+  .msc-tev-title {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 1.3 !important;
+    color: var(--fire-text, #e8e3db) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .msc-tev-meta {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+    color: var(--fire-text-dim) !important;
+    margin-top: 2px !important;
+  }
+
+  /* ── KPI grid ── */
+  .msc-kpi-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 8px !important;
+    margin-bottom: 20px !important;
+  }
+  .msc-kpi {
+    padding: 12px 10px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255,193,7,0.08) !important;
+    cursor: pointer !important;
+    min-height: 72px !important;
+  }
+  .msc-kpi:active { background: rgba(255,255,255,0.06) !important; }
+  .msc-kpi-lbl {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 8px !important;
+    letter-spacing: 0.1em !important;
+    color: var(--fire-text-dim) !important;
+    text-transform: uppercase !important;
+    margin-bottom: 4px !important;
+  }
+  .msc-kpi-val {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 20px !important;
+    font-weight: 300 !important;
+    color: var(--fire-text, #e8e3db) !important;
+    line-height: 1 !important;
+    margin-bottom: 2px !important;
+  }
+  .msc-kpi-chg {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+  }
+
+  /* ── Category bars ── */
+  .msc-section-head {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.2em !important;
+    color: var(--fire-text-dim) !important;
+    text-transform: uppercase !important;
+    margin-bottom: 10px !important;
+  }
+  .msc-catbars { display: flex !important; flex-direction: column !important; gap: 6px !important; }
+  .msc-cat-row { display: flex !important; align-items: center !important; gap: 8px !important; }
+  .msc-cat-lbl { width: 70px !important; font-size: 11px !important; color: var(--fire-text-mid) !important; flex-shrink: 0 !important; }
+  .msc-cat-bar-bg { flex: 1 !important; height: 4px !important; background: rgba(255,255,255,0.06) !important; border-radius: 2px !important; overflow: hidden !important; }
+  .msc-cat-bar-fg { height: 100% !important; border-radius: 2px !important; transition: width 0.6s ease !important; }
+  .msc-cat-n { font-family: 'JetBrains Mono', monospace !important; font-size: 10px !important; color: var(--fire-text-dim) !important; width: 28px !important; text-align: right !important; flex-shrink: 0 !important; }
+
+  /* ── Events list (card 2) ── */
+  .msc-events-list { display: flex !important; flex-direction: column !important; gap: 8px !important; }
+  .msc-event-row {
+    display: flex !important;
+    gap: 12px !important;
+    align-items: flex-start !important;
+    padding: 12px 14px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+    cursor: pointer !important;
+    min-height: 52px !important;
+  }
+  .msc-event-row:active { background: rgba(255,255,255,0.06) !important; }
+  .msc-ev-sev {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 26px !important;
+    font-weight: 300 !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+    width: 32px !important;
+    text-align: right !important;
+  }
+  .msc-ev-body { flex: 1 !important; min-width: 0 !important; }
+  .msc-ev-title {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 1.35 !important;
+    color: var(--fire-text, #e8e3db) !important;
+    margin-bottom: 3px !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+  .msc-ev-meta { font-family: 'JetBrains Mono', monospace !important; font-size: 10px !important; color: var(--fire-text-dim) !important; }
+
+  /* View all button */
+  .msc-view-all {
+    background: none !important;
+    border: none !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.15em !important;
+    color: var(--fire-corona, #ffc107) !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  /* ── EW card (card 3) ── */
+  .msc-ew-score-row {
+    display: flex !important;
+    gap: 16px !important;
+    align-items: flex-start !important;
+    padding: 16px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,193,7,0.14) !important;
+    margin-bottom: 16px !important;
+  }
+  .msc-ew-score {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 52px !important;
+    font-weight: 300 !important;
+    line-height: 0.9 !important;
+  }
+  .msc-ew-label {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.2em !important;
+    margin-top: 6px !important;
+    text-transform: uppercase !important;
+  }
+  .msc-ew-assess {
+    flex: 1 !important;
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+    color: var(--fire-text-mid) !important;
+  }
+
+  /* Gauges */
+  .msc-gauges { display: flex !important; flex-direction: column !important; gap: 10px !important; margin-bottom: 4px !important; }
+  .msc-gauge-row { display: flex !important; align-items: center !important; gap: 8px !important; }
+  .msc-gauge-name { font-family: 'JetBrains Mono', monospace !important; font-size: 9px !important; letter-spacing: 0.1em !important; color: var(--fire-text-dim) !important; width: 90px !important; flex-shrink: 0 !important; text-transform: uppercase !important; }
+  .msc-gauge-bar { flex: 1 !important; height: 5px !important; background: rgba(255,255,255,0.08) !important; border-radius: 3px !important; overflow: hidden !important; }
+  .msc-gauge-fill { height: 100% !important; border-radius: 3px !important; transition: width 0.8s cubic-bezier(0.16,1,0.3,1) !important; }
+  .msc-gauge-val { font-family: 'JetBrains Mono', monospace !important; font-size: 10px !important; width: 26px !important; text-align: right !important; color: var(--fire-text-mid) !important; flex-shrink: 0 !important; }
+
+  /* Signals */
+  .msc-signals { display: flex !important; flex-direction: column !important; gap: 6px !important; }
+  .msc-signal-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 8px !important;
+    border-left: 3px solid var(--fire-corona) !important;
+    min-height: 44px !important;
+  }
+  .msc-sig-icon { font-size: 16px !important; flex-shrink: 0 !important; }
+  .msc-sig-label { font-family: 'JetBrains Mono', monospace !important; font-size: 10px !important; letter-spacing: 0.08em !important; color: var(--fire-text-mid) !important; flex: 1 !important; }
+  .msc-sig-sev { font-family: 'Cormorant Garamond', Georgia, serif !important; font-size: 18px !important; font-weight: 300 !important; flex-shrink: 0 !important; }
+
+  /* ── Agents card (card 4) ── */
+  .msc-agents { display: flex !important; flex-direction: column !important; gap: 10px !important; }
+  .msc-agent-card {
+    padding: 14px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
+    border-left-width: 3px !important;
+  }
+  .msc-agent-name { font-family: 'DM Sans', system-ui, sans-serif !important; font-size: 14px !important; font-weight: 600 !important; color: var(--fire-text) !important; margin-bottom: 4px !important; }
+  .msc-agent-brief { font-family: 'DM Sans', system-ui, sans-serif !important; font-size: 12px !important; line-height: 1.55 !important; color: var(--fire-text-dim) !important; }
+
+  /* ── Swipe hint ── */
+  .msc-swipe-hint {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 8px !important;
+    letter-spacing: 0.2em !important;
+    color: rgba(255,255,255,0.12) !important;
+    text-align: center !important;
+    margin-top: auto !important;
+    padding-top: 20px !important;
+    text-transform: uppercase !important;
+  }
+
+  /* ── Hide deck on desktop ── */
+}
+
+@media (min-width: 481px) {
+  #mob-swipe-deck { display: none !important; }
+}
