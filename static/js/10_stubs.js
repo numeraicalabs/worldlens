@@ -336,8 +336,8 @@ function _obRender() {
   if (dots) dots.innerHTML = OB_STEPS.map(function(_,i){
     return '<span style="width:7px;height:7px;border-radius:50%;background:' + (i===OB.step?'var(--b5)':'var(--bg3)') + ';display:inline-block"></span>';
   }).join('');
-  var back = document.getElementById('ob-back'); if (back) back.style.visibility = OB.step>0?'visible':'hidden';
-  var next = document.getElementById('ob-next'); if (next) next.textContent = OB.step===OB_STEPS.length-1?'Start Exploring':'Next';
+  var back = document.getElementById('ob-back'); if (back) { back.style.display = OB.step>0?'inline-flex':'none'; back.style.visibility = 'visible'; }
+  var next = document.getElementById('ob-next'); if (next) next.textContent = OB.step===OB_STEPS.length-1?'Inizia! →':'Avanti →';
   if (OB.step===1) _obInterestPicker();
   if (OB.step===2) _obRegionPicker();
   if (OB.step===3) _obRiskPicker();
@@ -391,14 +391,41 @@ function obSetRisk(v,el2) {
 function obNext() { if (OB.step < OB_STEPS.length-1) { OB.step++; _obRender(); } else { _obFinish(); } }
 function obBack() { if (OB.step>0) { OB.step--; _obRender(); } }
 function skipOnboarding() {
-  var ov=document.getElementById('ob-overlay'); if (ov) ov.style.display='none';
-  rq('/api/user/profile',{method:'PUT',body:{onboarding_done:1}});
+  var ov = document.getElementById('ob-overlay');
+  if (ov) {
+    ov.style.opacity = '0';
+    ov.style.transition = 'opacity 0.25s ease';
+    setTimeout(function() { ov.style.display = 'none'; ov.style.opacity = ''; }, 260);
+  }
+  if (G.userProfile) G.userProfile.onboarding_done = 1;
+  rq('/api/user/profile', { method: 'PUT', body: { onboarding_done: 1 } });
 }
 function _obFinish() {
-  var ov=document.getElementById('ob-overlay'); if (ov) ov.style.display='none';
-  rq('/api/user/complete-onboarding',{method:'POST',body:{interests:OB.data.interests||[],regions:OB.data.regions||[],market_prefs:OB.data.interests||[],experience_level:(OB.data.risk==='Speculative'||OB.data.risk==='Aggressive')?'advanced':'beginner'}}).then(function(r){
-    if (r && !r.detail && G.userProfile) { G.userProfile.onboarding_done=1; G.userProfile.interests=OB.data.interests||[]; G.userProfile.regions=OB.data.regions||[]; }
-  });
+  // Close overlay immediately — never block on network
+  var ov = document.getElementById('ob-overlay');
+  if (ov) {
+    ov.style.opacity = '0';
+    ov.style.transition = 'opacity 0.3s ease';
+    setTimeout(function() { ov.style.display = 'none'; ov.style.opacity = ''; }, 300);
+  }
+  // Mark onboarding done locally right away
+  if (G.userProfile) {
+    G.userProfile.onboarding_done = 1;
+    G.userProfile.interests = OB.data.interests || [];
+    G.userProfile.regions   = OB.data.regions   || [];
+  }
+  // Save to server in background — if it fails, the overlay is already closed
+  var payload = {
+    interests:        OB.data.interests || [],
+    regions:          OB.data.regions   || [],
+    market_prefs:     OB.data.interests || [],
+    experience_level: (OB.data.risk === 'Speculative' || OB.data.risk === 'Aggressive') ? 'advanced' : 'beginner',
+  };
+  rq('/api/user/complete-onboarding', { method: 'POST', body: payload })
+    .catch(function() {
+      // Silently ignore — mark done locally so it doesn't re-trigger
+      rq('/api/user/profile', { method: 'PUT', body: { onboarding_done: 1 } });
+    });
 }
 
 // Tutorial
