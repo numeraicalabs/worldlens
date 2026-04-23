@@ -289,9 +289,24 @@ function _syncCard3() {
   }
 
   if (srcAssess && dstAssess) {
-    var text = (srcAssess.textContent || srcAssess.innerText || '').trim();
-    var sents = text.match(/[^.!?]+[.!?]+/g) || [text];
-    dstAssess.textContent = sents.slice(0, 2).join(' ').trim() || text.slice(0, 150);
+    // dash-ew-assess contains <p> tags — extract clean text from each paragraph
+    var paras = srcAssess.querySelectorAll('p');
+    var text;
+    if (paras.length) {
+      // Join first 2 paragraphs with a space, preserving word boundaries
+      text = Array.from(paras).slice(0, 2).map(function(p) {
+        return (p.textContent || '').trim();
+      }).filter(Boolean).join(' ');
+    } else {
+      text = (srcAssess.textContent || srcAssess.innerText || '').replace(/\s+/g, ' ').trim();
+    }
+    // Show first 200 chars max, cut at sentence boundary
+    if (text.length > 200) {
+      var cut = text.slice(0, 200);
+      var lastDot = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('!'), cut.lastIndexOf('?'));
+      text = lastDot > 80 ? cut.slice(0, lastDot + 1) : cut + '…';
+    }
+    dstAssess.textContent = text || 'Analisi in corso…';
   }
 
   // Gauges — mirror from EW hero strip
@@ -308,37 +323,58 @@ function _syncCard3() {
     if (sVal && dVal) { dVal.textContent = sVal.textContent || '—'; dVal.style.color = sVal.style.color || ''; }
   });
 
-  // Signals — read from ew-signals (populated by loadEWSignals)
+  // Signals — read from dash-ew-signals (dashboard widget, populated by 32_dash_ew.js)
   var sigContainer = _el('msc-signals');
   if (!sigContainer) return;
 
-  var srcSignals = _el('ew-signals');
-  if (!srcSignals) return;
+  // Try dash-ew-signals first (dashboard), fall back to ew-signals (EW page)
+  var srcSignals = _el('dash-ew-signals') || _el('ew-signals');
+  if (!srcSignals) {
+    sigContainer.innerHTML = '<div style="font-size:12px;color:var(--fire-text-dim);padding:8px 0">Segnali in caricamento…</div>';
+    return;
+  }
 
-  // Extract rendered signal data from DOM
-  var sigRows = srcSignals.querySelectorAll('.fire-signal, .ew-signal');
+  // .fire-signal structure from 32_dash_ew.js:
+  //   .fire-signal-level (CRITICAL/MAJOR/WATCH text)
+  //   .fire-signal-label (label like "ECONOMIC STRESS")
+  //   .fire-signal-val   (severity number)
+  //   .fire-signal-meta  (region · event title)
+  var sigRows = srcSignals.querySelectorAll('.fire-signal');
   if (!sigRows.length) {
-    sigContainer.innerHTML = '<div style="font-size:12px;color:var(--fire-text-dim);padding:8px 0">Nessun segnale attivo</div>';
+    // also try ew-signal class (EW page signals)
+    sigRows = srcSignals.querySelectorAll('.ew-signal');
+  }
+  if (!sigRows.length) {
+    sigContainer.innerHTML = '<div style="font-size:12px;color:var(--fire-text-dim);padding:8px 0">Nessun segnale attivo nel periodo</div>';
     return;
   }
 
   sigContainer.innerHTML = Array.from(sigRows).slice(0, 5).map(function(row) {
-    var iconEl = row.querySelector('.fire-signal-icon, .ew-signal-icon');
-    var labelEl = row.querySelector('.fire-signal-label, .ew-signal-type');
-    var valEl = row.querySelector('.fire-signal-val, .ew-conf-bar');
-    var sevEl = row.querySelector('[class*="sev"], .fire-signal-val');
+    var levelEl = row.querySelector('.fire-signal-level, .ew-signal-type');
+    var labelEl = row.querySelector('.fire-signal-label');
+    var valEl   = row.querySelector('.fire-signal-val');
+    var metaEl  = row.querySelector('.fire-signal-meta');
+    var iconEl  = row.querySelector('.fire-signal-icon');
 
-    var icon  = iconEl  ? iconEl.textContent.trim()  : '⚠️';
-    var label = labelEl ? labelEl.textContent.trim() : '—';
-    var sev   = sevEl   ? sevEl.textContent.trim()   : '—';
-    var col   = label.toLowerCase().includes('critical') ? '#ff5722'
-              : label.toLowerCase().includes('major') ? '#ffc107' : '#66bb6a';
+    var levelTxt = levelEl ? (levelEl.textContent || '').replace(/[^a-zA-Z]/g,'').trim() : 'watch';
+    var label = labelEl ? labelEl.textContent.trim() : (levelTxt || '—');
+    var val   = valEl   ? valEl.textContent.trim() : '—';
+    var meta  = metaEl  ? metaEl.textContent.trim().slice(0, 60) : '';
+    var icon  = iconEl  ? iconEl.textContent.trim() : '⚠️';
+
+    var lvl = levelTxt.toLowerCase();
+    var col = lvl.includes('critical') ? '#ff5722'
+            : lvl.includes('major')    ? '#ffc107'
+            : '#66bb6a';
 
     return [
       '<div class="msc-signal-row" style="border-left-color:' + col + '">',
-      '  <span class="msc-sig-icon">' + icon + '</span>',
-      '  <span class="msc-sig-label">' + _esc(label.toUpperCase().slice(0, 30)) + '</span>',
-      '  <span class="msc-sig-sev" style="color:' + col + '">' + _esc(sev.slice(0, 6)) + '</span>',
+      icon !== '⚠️' ? '  <span class="msc-sig-icon">' + icon + '</span>' : '',
+      '  <div style="flex:1;min-width:0">',
+      '    <span class="msc-sig-label" style="color:' + col + '">' + _esc(label.slice(0, 30)) + '</span>',
+      meta ? '    <div style="font-size:10px;color:var(--fire-text-dim);margin-top:2px">' + _esc(meta) + '</div>' : '',
+      '  </div>',
+      '  <span class="msc-sig-sev" style="color:' + col + '">' + _esc(val.slice(0, 6)) + '</span>',
       '</div>',
     ].join('');
   }).join('');
@@ -361,25 +397,92 @@ function _syncCard4() {
     return;
   }
 
-  container.innerHTML = Array.from(agentCards).slice(0, 4).map(function(card) {
-    var nameEl  = card.querySelector('.ag-name,  [class*="ag-name"]');
-    var briefEl = card.querySelector('.ag-brief, [class*="ag-brief"], .ag-desc, [class*="ag-desc"]');
-    var colorStyle = card.style.getPropertyValue('--ag-color') || card.style.borderColor || '#ffc107';
+  // Build rich cards from AGENTS data (21_agents_dash.js)
+  var agentData = window.AGENTS || {};
+  var agentIds  = Object.keys(agentData);
 
-    var name  = nameEl  ? nameEl.textContent.trim()  : '—';
-    var brief = briefEl ? briefEl.textContent.trim().slice(0, 120) : 'Brief in arrivo…';
+  // Also extract from DOM as fallback
+  var cardsHTML = Array.from(agentCards).slice(0, 4).map(function(card) {
+    var bid     = card.id ? card.id.replace('agent-card-', '') : '';
+    var nameEl  = card.querySelector('.ag-name');
+    var headlineEl = card.querySelector('.ag-headline');
+    var briefEl = card.querySelector('.ag-brief');
+    var signalEl = card.querySelector('.ag-signal');
+    var countEl  = card.querySelector('.ag-ev-count');
 
-    // Try to get color from CSS variable
-    var col = card.style.cssText.includes('--ag-color') ?
-      card.style.cssText.match(/--ag-color:\s*([^;]+)/)?.[1]?.trim() || '#ffc107' : '#ffc107';
+    var name     = nameEl     ? nameEl.textContent.trim()     : '—';
+    var headline = headlineEl ? headlineEl.textContent.trim().slice(0, 80) : '';
+    var brief    = briefEl    ? briefEl.textContent.trim().slice(0, 140)   : 'Brief in arrivo…';
+    var signal   = signalEl   ? signalEl.textContent.trim()   : '';
+    var count    = countEl    ? countEl.textContent.trim()    : '';
+
+    // Get color from CSS variable
+    var cssTxt = card.style.cssText || '';
+    var colMatch = cssTxt.match(/--ag-color:\s*([^;]+)/);
+    var col = colMatch ? colMatch[1].trim() : '#ffc107';
+
+    // Signal pill color
+    var sigCol = signal.toLowerCase().includes('bullish') ? '#10B981'
+               : signal.toLowerCase().includes('critical') ? '#EF4444'
+               : signal.toLowerCase().includes('bearish') ? '#F59E0B'
+               : '#94A3B8';
+
+    // Click navigates to full dashboard section scrolled to agents
+    var clickAttr = bid ? 'data-bid="' + _esc(bid) + '"' : '';
 
     return [
-      '<div class="msc-agent-card" style="border-left-color:' + _esc(col) + '">',
-      '  <div class="msc-agent-name">' + _esc(name) + '</div>',
+      '<div class="msc-agent-card" style="border-left-color:' + _esc(col) + ';cursor:pointer" ' + clickAttr + '>',
+      '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">',
+      '    <div class="msc-agent-name">' + _esc(name) + '</div>',
+      signal ? '    <span style="font-family:var(--fire-mono);font-size:9px;letter-spacing:0.1em;padding:2px 8px;border-radius:20px;background:' + sigCol + '22;color:' + sigCol + '">' + _esc(signal) + '</span>' : '',
+      '  </div>',
+      headline ? '  <div style="font-size:13px;font-weight:500;color:var(--fire-text);margin-bottom:4px;line-height:1.35">' + _esc(headline) + '</div>' : '',
       '  <div class="msc-agent-brief">' + _esc(brief) + '</div>',
+      count ? '  <div style="font-family:var(--fire-mono);font-size:9px;color:var(--fire-text-dim);margin-top:6px">' + _esc(count) + '</div>' : '',
       '</div>',
     ].join('');
   }).join('');
+
+  container.innerHTML = cardsHTML;
+
+  // Click: scroll desktop dashboard to agents section, or navigate to dash view
+  container.querySelectorAll('[data-bid]').forEach(function(card) {
+    card.addEventListener('click', function() {
+      var bid = this.dataset.bid;
+      // On mobile: navigate to dash view (desktop sections are hidden by CSS but exist)
+      // Then scroll agents-grid into view after a brief delay
+      if (typeof sv === 'function') {
+        // Already on dash — scroll to agents section
+        var agSection = document.getElementById('agents-grid');
+        if (agSection) {
+          // Exit swipe deck temporarily by scrolling the view
+          var viewDash = document.getElementById('view-dash');
+          if (viewDash) {
+            // Show desktop sections temporarily not possible on phone —
+            // instead navigate to the standalone agents view via the drawer
+            if (typeof mobileNav === 'function') {
+              // Close swipe deck, show full page — user can tap "More → Agents" if needed
+              // Best UX: show toast hinting to use More menu
+              var grid = document.getElementById('agents-grid');
+              if (grid) {
+                // Temporarily make section visible and scroll to it
+                var section = grid.closest('.fire-section');
+                if (section) {
+                  section.style.display = 'block';
+                  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  setTimeout(function() { section.style.display = ''; }, 3000);
+                }
+              }
+            }
+          }
+        }
+      }
+      // Trigger brief refresh for this bot
+      if (bid && typeof window.loadOneBrief === 'function') {
+        window.loadOneBrief(bid);
+      }
+    });
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -398,6 +501,73 @@ window.syncAllSwipeCards = syncAllCards;
 /* ══════════════════════════════════════════════════════════════════
    INIT
    ══════════════════════════════════════════════════════════════════ */
+
+/* ── Direct EW fetch for swipe card (bypasses DOM dependency) ─────── */
+function _fetchEWDirect() {
+  var rqFn = window.rq || function(url) { return fetch(url, {headers: window.G && G.token ? {'Authorization':'Bearer '+G.token} : {}}).then(function(r){return r.json();}); };
+
+  rqFn('/api/intelligence/early-warning').then(function(data) {
+    if (!data) return;
+    var score = parseFloat(data.global_ew_score || data.score || 5);
+    var col   = _ewColor(score);
+
+    // Populate card 3 directly
+    var dstScore  = _el('msc-ew-score');
+    var dstLabel  = _el('msc-ew-label');
+    var dstAssess = _el('msc-ew-assess');
+    if (dstScore) { dstScore.textContent = score.toFixed(1); dstScore.style.color = col; }
+    if (dstLabel) { dstLabel.textContent = score >= 7.5 ? 'CRITICAL' : score >= 6 ? 'ELEVATED' : score >= 4 ? 'MODERATE' : 'STABLE'; dstLabel.style.color = col; }
+
+    if (dstAssess) {
+      var text = data.ai_assessment || data.assessment || '';
+      if (!text || text.length < 20) {
+        text = 'EW Score ' + score.toFixed(1) + '/10. '
+          + (data.event_count_48h || 0) + ' eventi monitorati. '
+          + 'Macro stress: ' + (data.macro_stress || 5).toFixed(1) + '/10.';
+      }
+      var sents = text.match(/[^.!?]+[.!?]+/g) || [text];
+      dstAssess.textContent = sents.slice(0, 3).join(' ').trim();
+    }
+
+    // Gauges
+    var gauges = { macro: data.macro_stress||0, market: data.market_stress||0,
+      sent: Math.abs(data.sentiment_trend||0)*10, vel: Math.min(10,(data.event_velocity||1)*4) };
+    var sentCol = (data.sentiment_trend||0) < -0.3 ? '#ff5722' : (data.sentiment_trend||0) > 0.1 ? '#66bb6a' : '#ffc107';
+    ['macro','market','sent','vel'].forEach(function(k) {
+      var val = gauges[k];
+      var pct = Math.min(100, Math.max(0, (val/10)*100));
+      var c   = k === 'sent' ? sentCol : _ewColor(val);
+      var bar = _el('msc-gb-' + k), lbl = _el('msc-gv-' + k);
+      if (bar) { bar.style.width = pct + '%'; bar.style.background = c; }
+      if (lbl) { lbl.textContent = val.toFixed(1); lbl.style.color = c; }
+    });
+  }).catch(function(){});
+
+  // Signals direct
+  rqFn('/api/intelligence/early-warning/signals').then(function(data) {
+    var signals = (data && data.signals) || [];
+    var sigContainer = _el('msc-signals');
+    if (!sigContainer || !signals.length) return;
+    sigContainer.innerHTML = signals.slice(0, 5).map(function(sig) {
+      var lvl = sig.level || (sig.severity >= 7.5 ? 'critical' : sig.severity >= 5.5 ? 'major' : 'watch');
+      var col = lvl === 'critical' ? '#ff5722' : lvl === 'major' ? '#ffc107' : '#66bb6a';
+      var label = (sig.label || sig.type || '').replace(/_/g,' ');
+      var val   = sig.value || (sig.severity ? parseFloat(sig.severity).toFixed(1) : '—');
+      var meta  = sig.meta || (sig.region ? sig.region + (sig.title ? ' · ' + sig.title.slice(0,50) : '') : '');
+      return [
+        '<div class="msc-signal-row" style="border-left-color:' + col + '">',
+        '  <span class="msc-sig-icon">' + (sig.icon || '⚠️') + '</span>',
+        '  <div style="flex:1;min-width:0">',
+        '    <span class="msc-sig-label" style="color:' + col + '">' + _esc(label.toUpperCase().slice(0,28)) + '</span>',
+        meta ? '    <div style="font-size:10px;color:var(--fire-text-dim);margin-top:2px">' + _esc(meta) + '</div>' : '',
+        '  </div>',
+        '  <span class="msc-sig-sev" style="color:' + col + '">' + _esc(String(val).slice(0,6)) + '</span>',
+        '</div>',
+      ].join('');
+    }).join('');
+  }).catch(function(){});
+}
+
 function init() {
   if (!_isPhone()) return;
 
@@ -440,13 +610,30 @@ function init() {
     }).observe(agGrid, { childList: true, subtree: true });
   }
 
-  // Re-sync when EW signals update
-  var ewSigs = _el('ew-signals');
+  // Re-sync when dashboard EW signals update
+  var ewSigs = _el('dash-ew-signals');
   if (ewSigs) {
     new MutationObserver(function() {
       setTimeout(_syncCard3, 300);
     }).observe(ewSigs, { childList: true, subtree: true });
   }
+
+  // Also watch dash-ew-assess for text updates
+  var ewAssess = _el('dash-ew-assess');
+  if (ewAssess) {
+    new MutationObserver(function() {
+      setTimeout(_syncCard3, 200);
+    }).observe(ewAssess, { childList: true, subtree: true, characterData: true });
+  }
+
+  // If EW data not yet in DOM, fetch it directly after 2s
+  setTimeout(function() {
+    var scoreEl = _el('dash-ew-score');
+    var hasData = scoreEl && scoreEl.textContent.trim() !== '—' && scoreEl.textContent.trim() !== '';
+    if (!hasData && _isPhone()) {
+      _fetchEWDirect();
+    }
+  }, 2000);
 }
 
 if (document.readyState === 'loading') {
