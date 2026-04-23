@@ -520,18 +520,19 @@ async def get_bot_brief(bot_id: str, user=Depends(require_user)):
 
 @router.get("/all-briefs")
 async def get_all_briefs(user=Depends(require_user)):
+    import asyncio
     watchlist = await _load_user_watchlist(user["id"])
-    results   = {}
-    for bot_id in DEFAULT_BOTS:
+
+    async def _one_bot(bot_id: str):
         try:
             config = await _load_user_config(user["id"], bot_id)
             if not config.get("enabled", True):
-                continue
+                return bot_id, None
             events   = await _get_bot_events(bot_id, config)
             previous = await _load_previous_brief(user["id"], bot_id)
             brief    = await _generate_brief(bot_id, config, events, previous, watchlist)
             await _save_brief_history(user["id"], bot_id, brief, len(events))
-            results[bot_id] = {
+            return bot_id, {
                 "bot_id": bot_id, "event_count": len(events),
                 "top_events": [
                     {"id": e.get("id",""), "title": e["title"],
@@ -543,7 +544,11 @@ async def get_all_briefs(user=Depends(require_user)):
             }
         except Exception as e:
             logger.error("all-briefs %s: %s", bot_id, e)
-    return results
+            return bot_id, None
+
+    # Run all 4 bots in parallel — ~4x faster than sequential
+    pairs = await asyncio.gather(*[_one_bot(bid) for bid in DEFAULT_BOTS])
+    return {bid: data for bid, data in pairs if data is not None}
 
 
 @router.get("/history/{bot_id}")
