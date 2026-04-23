@@ -290,6 +290,169 @@
 
 <div class="db-root">
 
+  <!-- ═══════════════════ MOBILE SWIPE DECK (hidden on desktop) ═══════════════════ -->
+  <!--
+    On mobile (≤480px):
+      - .db-root sections are hidden via CSS
+      - This deck shows the same data through mirrored card slots
+      - JS in 34_swipe_dash.js re-projects existing DOM data into these cards
+      - Desktop is completely unaffected
+  -->
+  <div id="mob-swipe-deck">
+
+    <!-- CARD DOTS INDICATOR -->
+    <div id="mob-swipe-dots">
+      <span class="mob-dot active" data-card="0"></span>
+      <span class="mob-dot" data-card="1"></span>
+      <span class="mob-dot" data-card="2"></span>
+      <span class="mob-dot" data-card="3"></span>
+      <span class="mob-dot" data-card="4"></span>
+    </div>
+
+    <!-- SWIPE TRACK -->
+    <div id="mob-swipe-track">
+
+      <!-- CARD 0: RISCHIO — Risk score + AI brief + greeting -->
+      <div class="mob-swipe-card" data-card="0" id="msc-0">
+        <div class="msc-overline">
+          <span id="msc-time-label">BENVENUTO</span>
+          <span id="msc-last-update" style="color:var(--fire-text-dim)"></span>
+        </div>
+        <div id="msc-greeting" class="msc-greeting">WorldLens</div>
+
+        <!-- Risk score block -->
+        <div class="msc-risk-row">
+          <div>
+            <div class="msc-risk-label">RISCHIO GLOBALE</div>
+            <div class="msc-risk-num" id="msc-risk">—</div>
+            <div class="msc-risk-sub" id="msc-risk-l">Caricamento…</div>
+          </div>
+          <div class="msc-risk-divider"></div>
+          <div class="msc-brief-wrap">
+            <div class="msc-brief-label">AI CHIEF ANALYST</div>
+            <div class="msc-brief" id="msc-brief">Caricamento briefing…</div>
+          </div>
+        </div>
+
+        <!-- Top 3 crisis events -->
+        <div class="msc-crisis-label">CRISI ATTIVE</div>
+        <div id="msc-top-events" class="msc-top-events"></div>
+
+        <div class="msc-swipe-hint">Scorri → per Mercati</div>
+      </div>
+
+      <!-- CARD 1: MERCATI — KPI grid -->
+      <div class="mob-swipe-card" data-card="1" id="msc-1">
+        <div class="msc-overline">MERCATI</div>
+        <div class="msc-title">Snapshot live</div>
+
+        <!-- 2x3 KPI grid — mirrors d-sp, d-btc etc. -->
+        <div class="msc-kpi-grid">
+          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+            <div class="msc-kpi-lbl">S&amp;P 500</div>
+            <div class="msc-kpi-val" id="msc-sp">—</div>
+            <div class="msc-kpi-chg" id="msc-sp-c">—</div>
+          </div>
+          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+            <div class="msc-kpi-lbl">BTC/USD</div>
+            <div class="msc-kpi-val" id="msc-btc">—</div>
+            <div class="msc-kpi-chg" id="msc-btc-c">—</div>
+          </div>
+          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+            <div class="msc-kpi-lbl">VIX</div>
+            <div class="msc-kpi-val" id="msc-vix">—</div>
+            <div class="msc-kpi-chg" id="msc-vix-c">—</div>
+          </div>
+          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+            <div class="msc-kpi-lbl">GOLD/OZ</div>
+            <div class="msc-kpi-val" id="msc-gold">—</div>
+            <div class="msc-kpi-chg" id="msc-gold-c">—</div>
+          </div>
+          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+            <div class="msc-kpi-lbl">DXY</div>
+            <div class="msc-kpi-val" id="msc-dxy">—</div>
+            <div class="msc-kpi-chg" id="msc-dxy-c">—</div>
+          </div>
+          <div class="msc-kpi" onclick="mobileNav('feed',null)">
+            <div class="msc-kpi-lbl">EVENTI 24H</div>
+            <div class="msc-kpi-val" id="msc-ev">—</div>
+            <div class="msc-kpi-chg" id="msc-ev-hi" style="color:var(--fire-ember)">—</div>
+          </div>
+        </div>
+
+        <!-- Category bars (mirrors d-catbars) -->
+        <div class="msc-section-head">PER CATEGORIA</div>
+        <div id="msc-catbars" class="msc-catbars"></div>
+
+        <div class="msc-swipe-hint">← Rischio · Crisi →</div>
+      </div>
+
+      <!-- CARD 2: CRISI — top events list -->
+      <div class="mob-swipe-card" data-card="2" id="msc-2">
+        <div class="msc-overline">
+          <span>⚡ CRISI SPOTLIGHT</span>
+          <button class="msc-view-all" onclick="mobileNav('feed',null)">Vedi tutto →</button>
+        </div>
+        <div class="msc-title">Cosa richiede attenzione</div>
+        <div id="msc-events" class="msc-events-list"></div>
+        <div class="msc-swipe-hint">← Mercati · EW →</div>
+      </div>
+
+      <!-- CARD 3: EARLY WARNING -->
+      <div class="mob-swipe-card" data-card="3" id="msc-3">
+        <div class="msc-overline">
+          <span>📡 EARLY WARNING</span>
+          <button class="msc-view-all" onclick="mobileNav('earlywarning',null)">Dettagli →</button>
+        </div>
+        <div class="msc-ew-score-row">
+          <div>
+            <div class="msc-ew-score" id="msc-ew-score" style="color:var(--fire-corona)">—</div>
+            <div class="msc-ew-label" id="msc-ew-label">LOADING</div>
+          </div>
+          <div class="msc-ew-assess" id="msc-ew-assess">Analisi in corso…</div>
+        </div>
+        <div class="msc-gauges">
+          <div class="msc-gauge-row">
+            <span class="msc-gauge-name">Macro Stress</span>
+            <div class="msc-gauge-bar"><div class="msc-gauge-fill" id="msc-gb-macro"></div></div>
+            <span class="msc-gauge-val" id="msc-gv-macro">—</span>
+          </div>
+          <div class="msc-gauge-row">
+            <span class="msc-gauge-name">Market Stress</span>
+            <div class="msc-gauge-bar"><div class="msc-gauge-fill" id="msc-gb-market"></div></div>
+            <span class="msc-gauge-val" id="msc-gv-market">—</span>
+          </div>
+          <div class="msc-gauge-row">
+            <span class="msc-gauge-name">Sentiment</span>
+            <div class="msc-gauge-bar"><div class="msc-gauge-fill" id="msc-gb-sent"></div></div>
+            <span class="msc-gauge-val" id="msc-gv-sent">—</span>
+          </div>
+          <div class="msc-gauge-row">
+            <span class="msc-gauge-name">Velocità</span>
+            <div class="msc-gauge-bar"><div class="msc-gauge-fill" id="msc-gb-vel"></div></div>
+            <span class="msc-gauge-val" id="msc-gv-vel">—</span>
+          </div>
+        </div>
+        <div class="msc-section-head" style="margin-top:16px">SEGNALI ATTIVI</div>
+        <div id="msc-signals" class="msc-signals"></div>
+        <div class="msc-swipe-hint">← Crisi · Agenti →</div>
+      </div>
+
+      <!-- CARD 4: AGENTI AI -->
+      <div class="mob-swipe-card" data-card="4" id="msc-4">
+        <div class="msc-overline">
+          <span>🤖 AI AGENT BOTS</span>
+          <button class="msc-view-all" onclick="refreshAgentBriefs && refreshAgentBriefs()">↻ Refresh</button>
+        </div>
+        <div class="msc-title">I tuoi 4 analyst bot</div>
+        <!-- agents-grid content is mirrored here by 34_swipe_dash.js -->
+        <div id="msc-agents" class="msc-agents"></div>
+        <div class="msc-swipe-hint">← EW</div>
+      </div>
+
+    </div><!-- mob-swipe-track -->
+  </div><!-- mob-swipe-deck -->
+
   <!-- ═══════════════════ MOBILE-ONLY FEED CARDS (hidden on desktop) ═══════════════════ -->
   <!-- These replace the dense grid layout on phones. Desktop ignores them via CSS. -->
 
@@ -544,56 +707,56 @@
     </div>
 
     <!-- EW SCORE STRIP — populated by dash_ew_init() -->
-    <div id="ew-hero" class="fire-ew-hero-strip">
+    <div id="dash-ew-hero" class="fire-ew-hero-strip">
       <div class="fire-ew-score-block">
         <div class="fire-overline">EW SCORE</div>
         <div class="fire-ew-big-score">
-          <span id="ew-score" style="color:var(--fire-corona)">—</span>
+          <span id="dash-ew-score" style="color:var(--fire-corona)">—</span>
           <span class="fire-ew-score-denom">/10</span>
         </div>
-        <div id="ew-label" class="fire-ew-score-label">LOADING</div>
+        <div id="dash-ew-label" class="fire-ew-score-label">LOADING</div>
       </div>
       <div class="fire-ew-gauges">
         <div class="fire-ew-gauge-row">
           <span class="fire-ew-gauge-lbl">Macro Stress</span>
-          <div class="fire-ew-gauge-bar"><div id="ewgb-macro" class="fire-ew-gauge-fill"></div></div>
-          <span id="ewg-macro" class="fire-ew-gauge-val">—</span>
+          <div class="fire-ew-gauge-bar"><div id="dash-ewgb-macro" class="fire-ew-gauge-fill"></div></div>
+          <span id="dash-ewg-macro" class="fire-ew-gauge-val">—</span>
         </div>
         <div class="fire-ew-gauge-row">
           <span class="fire-ew-gauge-lbl">Market Stress</span>
-          <div class="fire-ew-gauge-bar"><div id="ewgb-market" class="fire-ew-gauge-fill"></div></div>
-          <span id="ewg-market" class="fire-ew-gauge-val">—</span>
+          <div class="fire-ew-gauge-bar"><div id="dash-ewgb-market" class="fire-ew-gauge-fill"></div></div>
+          <span id="dash-ewg-market" class="fire-ew-gauge-val">—</span>
         </div>
         <div class="fire-ew-gauge-row">
           <span class="fire-ew-gauge-lbl">Sentiment</span>
-          <div class="fire-ew-gauge-bar"><div id="ewgb-sent" class="fire-ew-gauge-fill"></div></div>
-          <span id="ewg-sent" class="fire-ew-gauge-val">—</span>
+          <div class="fire-ew-gauge-bar"><div id="dash-ewgb-sent" class="fire-ew-gauge-fill"></div></div>
+          <span id="dash-ewg-sent" class="fire-ew-gauge-val">—</span>
         </div>
         <div class="fire-ew-gauge-row">
           <span class="fire-ew-gauge-lbl">Event Velocity</span>
-          <div class="fire-ew-gauge-bar"><div id="ewgb-vel" class="fire-ew-gauge-fill"></div></div>
-          <span id="ewg-vel" class="fire-ew-gauge-val">—</span>
+          <div class="fire-ew-gauge-bar"><div id="dash-ewgb-vel" class="fire-ew-gauge-fill"></div></div>
+          <span id="dash-ewg-vel" class="fire-ew-gauge-val">—</span>
         </div>
       </div>
       <!-- AI Assessment — this is the live text from /api/intelligence/early-warning -->
       <div class="fire-ew-assess-block">
         <div class="fire-overline">AI ASSESSMENT</div>
-        <div id="ew-assess" class="fire-ew-assess-text">Loading assessment…</div>
+        <div id="dash-ew-assess" class="fire-ew-assess-text">Loading assessment…</div>
       </div>
     </div>
 
     <!-- CRISIS PATTERNS — live from API -->
     <div class="fire-ew-patterns-wrap" style="margin-top:20px">
       <div class="fire-overline" style="margin-bottom:12px">DETECTED PATTERNS</div>
-      <div id="ew-patterns" class="pattern-grid"></div>
+      <div id="dash-ew-patterns" class="pattern-grid"></div>
     </div>
 
     <!-- ACTIVE SIGNALS — live from /api/intelligence/early-warning/signals -->
     <div style="margin-top:20px">
       <div class="fire-overline" style="margin-bottom:12px">
-        ACTIVE SIGNALS <span id="ew-signal-count" style="color:var(--fire-text-dim)"></span>
+        ACTIVE SIGNALS <span id="dash-ew-signal-count" style="color:var(--fire-text-dim)"></span>
       </div>
-      <div id="ew-signals" class="fire-signal-grid">
+      <div id="dash-ew-signals" class="fire-signal-grid">
         <div class="fire-signal-skeleton">Loading signals…</div>
       </div>
     </div>
@@ -2921,6 +3084,7 @@
 <script src="/static/js/31_dash_v2.js?v=20260421"></script>
 <script src="/static/js/32_dash_ew.js?v=20260421"></script>
 <script src="/static/js/33_mobile_ux.js?v=20260421"></script>
+<script src="/static/js/34_swipe_dash.js?v=20260421"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
