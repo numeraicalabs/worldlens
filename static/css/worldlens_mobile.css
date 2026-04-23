@@ -2040,11 +2040,15 @@
     position: fixed !important;
     inset: 0 !important;
     background: rgba(10,11,14,0.96) !important;
-    display: flex !important;
+    /* NO display:flex here — JS controls visibility via .ob-visible class */
     align-items: flex-end !important;  /* sheet from bottom on mobile */
     justify-content: center !important;
     z-index: 9999 !important;
     padding: 0 !important;
+  }
+  /* Only show when JS adds this class */
+  #ob-overlay.ob-visible {
+    display: flex !important;
   }
 
   /* Modal becomes a bottom sheet */

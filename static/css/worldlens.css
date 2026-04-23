@@ -545,6 +545,8 @@ input,textarea,select{font-family:var(--fb);outline:none}
 /* ─── ONBOARDING ─── */
 #ob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);z-index:5000;align-items:center;justify-content:center}
 #ob-overlay.on{display:flex}
+#ob-overlay.ob-visible{display:flex!important}
+#ob-overlay.ob-hidden{display:none!important}
 .ob-modal{background:var(--bg1);border:1px solid var(--bdb);border-radius:var(--r20);padding:0;width:100%;max-width:540px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .ob-header{background:linear-gradient(135deg,rgba(59,130,246,.16),rgba(6,182,212,.08));border-bottom:1px solid var(--bdb);padding:22px 26px 18px}
 .ob-dots{display:flex;gap:6px;margin-bottom:12px}
