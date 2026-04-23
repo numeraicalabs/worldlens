@@ -290,8 +290,86 @@
 
 <div class="db-root">
 
+  <!-- ═══════════════════ MOBILE-ONLY FEED CARDS (hidden on desktop) ═══════════════════ -->
+  <!-- These replace the dense grid layout on phones. Desktop ignores them via CSS. -->
+
+  <!-- MOBILE RISK CARD — mirrors d-risk / d-brief-txt -->
+  <div class="mob-risk-card" id="mob-risk-card" style="display:none">
+    <div>
+      <div style="font-family:var(--fire-mono);font-size:9px;letter-spacing:0.15em;color:var(--fire-text-dim);margin-bottom:4px">RISK GLOBALE</div>
+      <div class="mob-risk-num" id="mob-risk-num" style="color:var(--fire-corona)">—</div>
+      <div class="mob-risk-label" id="mob-risk-lbl" style="color:var(--fire-corona)">—</div>
+    </div>
+    <div class="mob-risk-info">
+      <div class="mob-risk-brief" id="mob-risk-brief">Caricamento briefing AI…</div>
+      <div style="font-family:var(--fire-mono);font-size:9px;color:var(--fire-text-dim);margin-top:8px">— AI CHIEF ANALYST</div>
+    </div>
+  </div>
+
+  <!-- MOBILE KPI SCROLL ROW — mirrors d-sp, d-btc, d-vix, d-gold -->
+  <div id="mob-kpi-card" style="display:none;background:var(--fire-bg-card,#1e2026);border-radius:14px;border:1px solid rgba(255,193,7,0.12);margin-top:12px;overflow:hidden">
+    <div class="mob-feed-card-head">
+      <span class="mob-feed-card-label">Mercati</span>
+      <button class="mob-feed-card-action" onclick="mobileNav('markets',null)">Vedi →</button>
+    </div>
+    <div class="mob-kpi-scroll" id="mob-kpi-row">
+      <!-- Populated by _syncMobileKPIs() -->
+      <div class="mob-kpi-item"><div class="mob-kpi-item-lbl">S&P 500</div><div class="mob-kpi-item-val" id="mob-sp">—</div><div class="mob-kpi-item-chg" id="mob-sp-c">—</div></div>
+      <div class="mob-kpi-item"><div class="mob-kpi-item-lbl">BTC/USD</div><div class="mob-kpi-item-val" id="mob-btc">—</div><div class="mob-kpi-item-chg" id="mob-btc-c">—</div></div>
+      <div class="mob-kpi-item"><div class="mob-kpi-item-lbl">VIX</div><div class="mob-kpi-item-val" id="mob-vix">—</div><div class="mob-kpi-item-chg" id="mob-vix-c">—</div></div>
+      <div class="mob-kpi-item"><div class="mob-kpi-item-lbl">Gold/oz</div><div class="mob-kpi-item-val" id="mob-gold">—</div><div class="mob-kpi-item-chg" id="mob-gold-c">—</div></div>
+      <div class="mob-kpi-item"><div class="mob-kpi-item-lbl">DXY</div><div class="mob-kpi-item-val" id="mob-dxy">—</div><div class="mob-kpi-item-chg" id="mob-dxy-c">—</div></div>
+      <div class="mob-kpi-item"><div class="mob-kpi-item-lbl">EVENTI 24h</div><div class="mob-kpi-item-val" id="mob-ev">—</div><div class="mob-kpi-item-chg" id="mob-ev-hi" style="color:var(--fire-ember)">—</div></div>
+    </div>
+  </div>
+
+  <!-- MOBILE EW CARD — summary from EW API -->
+  <div id="mob-ew-card" class="mob-feed-card" style="display:none">
+    <div class="mob-feed-card-head">
+      <span class="mob-feed-card-label">⚡ Early Warning</span>
+      <button class="mob-feed-card-action" onclick="mobileNav('earlywarning',null)">Dettagli →</button>
+    </div>
+    <div class="mob-ew-card">
+      <div class="mob-ew-score-row">
+        <div class="mob-ew-big" id="mob-ew-score" style="color:var(--fire-corona)">—</div>
+        <div>
+          <div class="mob-ew-label" id="mob-ew-label" style="color:var(--fire-corona)">LOADING</div>
+          <div style="font-family:var(--fire-sans);font-size:12px;color:var(--fire-text-dim);margin-top:2px">/ <span id="mob-ew-evcount">—</span> eventi monitorati</div>
+        </div>
+      </div>
+      <div id="mob-ew-assess" style="font-family:var(--fire-sans);font-size:13px;color:var(--fire-text-mid);line-height:1.6;margin-bottom:12px">Analisi in corso…</div>
+      <div class="mob-ew-gauges-row">
+        <div class="mob-ew-gauge-item">
+          <span class="mob-ew-gauge-name">Macro Stress</span>
+          <div class="mob-ew-gauge-bar-wrap"><div class="mob-ew-gauge-bar-fill" id="mob-ewgb-macro" style="width:0%"></div></div>
+        </div>
+        <div class="mob-ew-gauge-item">
+          <span class="mob-ew-gauge-name">Market Stress</span>
+          <div class="mob-ew-gauge-bar-wrap"><div class="mob-ew-gauge-bar-fill" id="mob-ewgb-market" style="width:0%"></div></div>
+        </div>
+        <div class="mob-ew-gauge-item">
+          <span class="mob-ew-gauge-name">Sentiment</span>
+          <div class="mob-ew-gauge-bar-wrap"><div class="mob-ew-gauge-bar-fill" id="mob-ewgb-sent" style="width:0%"></div></div>
+        </div>
+        <div class="mob-ew-gauge-item">
+          <span class="mob-ew-gauge-name">Velocità</span>
+          <div class="mob-ew-gauge-bar-wrap"><div class="mob-ew-gauge-bar-fill" id="mob-ewgb-vel" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- END MOBILE FEED CARDS -->
+
   <!-- ═══════════════════ SECTION 0: HERO — Globe + AI Zone Briefing ═══════════════════ -->
   <section class="fire-section">
+    <!-- Mobile-only greeting card — hidden on desktop -->
+    <div id="mobile-greeting-card" style="display:none;margin-bottom:14px;padding:14px 16px;background:var(--fire-bg-card,var(--fire-bg-elev));border-radius:12px;border:1px solid var(--fire-border)">
+      <div style="font-family:var(--fire-mono);font-size:10px;letter-spacing:0.15em;color:var(--fire-text-dim);margin-bottom:4px" id="mobile-greeting-time">MERCOLEDÌ</div>
+      <div style="font-family:var(--fire-sans);font-size:18px;font-weight:600;color:var(--fire-text);margin-bottom:2px" id="mobile-greeting-name">Benvenuto</div>
+      <div style="font-family:var(--fire-sans);font-size:13px;color:var(--fire-text-mid)" id="mobile-greeting-status">Caricamento intelligence…</div>
+    </div>
+
     <div class="fire-section-head">
       <div class="fire-section-head-l">
         <div class="fire-overline">
@@ -698,6 +776,29 @@
     <button class="mtool-btn" id="mctrl-o" onclick="toggleOrbit()" title="Auto-rotate">O</button>
     <button class="mtool-btn" id="mctrl-c" onclick="clusterToggle()" title="Cluster">C</button>
     <button class="mtool-btn" id="mctrl-a" onclick="toggleAutoFollow()" title="Auto-follow">A</button>
+  </div>
+
+  <!-- ── MOBILE: Category chip filter bar (above map) ── -->
+  <div id="mob-map-chips">
+    <button class="mob-chip active" data-cat="all" onclick="mobMapChip(this,'all')">Tutti</button>
+    <button class="mob-chip" data-cat="Conflict" onclick="mobMapChip(this,'Conflict')">⚔ Conflitto</button>
+    <button class="mob-chip" data-cat="Economics" onclick="mobMapChip(this,'Economics')">📈 Economia</button>
+    <button class="mob-chip" data-cat="Energy" onclick="mobMapChip(this,'Energy')">⚡ Energia</button>
+    <button class="mob-chip" data-cat="Disaster" onclick="mobMapChip(this,'Disaster')">🌊 Disastri</button>
+    <button class="mob-chip" data-cat="Politics" onclick="mobMapChip(this,'Politics')">🏛 Politica</button>
+    <button class="mob-chip" data-cat="Technology" onclick="mobMapChip(this,'Technology')">💡 Tech</button>
+  </div>
+
+  <!-- ── MOBILE: Bottom sheet for events ── -->
+  <div id="mob-map-sheet">
+    <div id="mob-map-sheet-handle"></div>
+    <div id="mob-map-sheet-header">
+      <span id="mob-map-sheet-title">EVENTI RECENTI</span>
+      <span id="mob-map-sheet-count"></span>
+    </div>
+    <div id="mob-map-sheet-body">
+      <!-- Populated by mobInitSheet() -->
+    </div>
   </div>
 
 </div><!-- view-map -->
@@ -2819,6 +2920,7 @@
 <script src="/static/js/30_theme.js?v=20260421"></script>
 <script src="/static/js/31_dash_v2.js?v=20260421"></script>
 <script src="/static/js/32_dash_ew.js?v=20260421"></script>
+<script src="/static/js/33_mobile_ux.js?v=20260421"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
@@ -2874,50 +2976,47 @@
      ════════════════════════════════════════════════════ -->
 <nav id="wl-mobile-nav" aria-label="Mobile navigation">
 
+  <!-- Tab 1: Dashboard (Home) -->
   <button class="wl-mnav-btn active" data-mv="dash" onclick="mobileNav('dash',this)" aria-label="Dashboard">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
-      <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
+      <rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/>
+      <rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/>
     </svg>
-    <span class="wl-mnav-label">Dash</span>
+    <span class="wl-mnav-label">Home</span>
   </button>
 
-  <button class="wl-mnav-btn" data-mv="map" onclick="mobileNav('map',this)" aria-label="Map">
+  <!-- Tab 2: Global Map -->
+  <button class="wl-mnav-btn" data-mv="map" onclick="mobileNav('map',this)" aria-label="Mappa globale">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
       <circle cx="8" cy="7" r="5.5"/>
       <path d="M2.5 7h11M8 1.5c-2 2-3 3.5-3 5.5s1 4 3 5.5M8 1.5c2 2 3 3.5 3 5.5s-1 4-3 5.5"/>
     </svg>
-    <span class="wl-mnav-label">Map</span>
+    <span class="wl-mnav-label">Mappa</span>
   </button>
 
-  <button class="wl-mnav-btn" data-mv="feed" onclick="mobileNav('feed',this)" aria-label="Feed">
+  <!-- Tab 3: Crisi — with live badge from renderDash -->
+  <button class="wl-mnav-btn" data-mv="feed" onclick="mobileNav('feed',this)" aria-label="Feed eventi" style="position:relative">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M1 3h14M1 7h10M1 11h12"/>
+      <path d="M8 1L9.5 5h4L10.3 7.3l1.2 3.7L8 8.8l-3.5 2.2 1.2-3.7L2.5 5h4z"/>
     </svg>
-    <span class="wl-mnav-label">Feed</span>
+    <span id="wl-crisis-badge" style="display:none;position:absolute;top:4px;right:8px;background:#ff5722;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;font-family:var(--fm);line-height:1.4"></span>
+    <span class="wl-mnav-label">Crisi</span>
   </button>
 
-  <button class="wl-mnav-btn" data-mv="markets" onclick="mobileNav('markets',this)" aria-label="Markets">
+  <!-- Tab 4: AI Analyst — with new-briefing badge -->
+  <button class="wl-mnav-btn" data-mv="ai" onclick="mobileNav('ai',this)" aria-label="AI Analyst" style="position:relative">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <polyline points="1,11 5,7 8,9 11,4 15,2"/><line x1="1" y1="14" x2="15" y2="14"/>
+      <path d="M4 4h8v6H4z" rx="1"/><path d="M4 7h8M7 4v6M8 10l-2 2.5M8 10l2 2.5"/>
     </svg>
-    <span class="wl-mnav-label">Markets</span>
-  </button>
-
-  <button class="wl-mnav-btn" data-mv="ai" onclick="mobileNav('ai',this)" aria-label="AI Analyst">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <circle cx="8" cy="6" r="3.5"/><path d="M8 9.5v3M5 14h6"/>
-    </svg>
+    <span id="wl-ai-badge" style="display:none;position:absolute;top:4px;right:8px;background:#ffc107;color:#141518;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;font-family:var(--fm);line-height:1.4">AI</span>
     <span class="wl-mnav-label">AI</span>
   </button>
 
-  <button class="wl-mnav-btn" id="wl-mnav-more-btn" onclick="toggleMoreDrawer()" aria-label="More">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <circle cx="3" cy="8" r="1.2" fill="currentColor" stroke="none"/>
-      <circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/>
-      <circle cx="13" cy="8" r="1.2" fill="currentColor" stroke="none"/>
+  <!-- FAB: More — opens drawer with all secondary views -->
+  <button class="wl-mnav-fab" id="wl-mnav-more-btn" onclick="toggleMoreDrawer()" aria-label="Tutte le sezioni">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M2 4h12M2 8h12M2 12h12"/>
     </svg>
-    <span class="wl-mnav-label">More</span>
   </button>
 
 </nav>
@@ -2968,10 +3067,10 @@
       </svg><span>Insiders</span>
     </div>
 
-    <div class="more-drawer-item" onclick="mobileNav('earlywarning',null)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M8 1l1.5 4h4l-3.2 2.3 1.2 3.7L8 8.8l-3.5 2.2 1.2-3.7L2.5 5h4z"/>
-      </svg><span>EW</span>
+    <div class="more-drawer-item" onclick="mobileNav('earlywarning',null)" style="border:1px solid rgba(255,193,7,0.2);border-radius:10px">
+      <svg viewBox="0 0 16 16" fill="none" stroke="#ffc107" stroke-width="1.5">
+        <path d="M8 2v8M8 13v1M2 14h12L8 2z"/>
+      </svg><span style="color:#ffc107;font-weight:600">Early Warning</span>
     </div>
 
     <div class="more-drawer-item" onclick="mobileNav('gamification',null)">
