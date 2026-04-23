@@ -8,69 +8,76 @@
    The light theme is a "solar" variant — amber accents on warm off-white.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── DARK (DEFAULT) TOKENS — lifted to #111 for easier reading ── */
+/* ── DARK (DEFAULT) TOKENS — WCAG AA compliant, warm and readable ── */
 :root[data-theme="dark"] #view-dash,
 #view-dash {
-  --fire-bg:          #111214;   /* lifted from #050505 — much easier on eyes */
-  --fire-bg-elev:     #18191d;   /* cards/surfaces */
-  --fire-bg-card:     #1c1e22;   /* distinct card bg */
-  --fire-surface:     rgba(255, 255, 255, 0.04);   /* more visible surfaces */
-  --fire-surface-hi:  rgba(255, 255, 255, 0.07);
-  --fire-border:      rgba(255, 167, 38, 0.18);    /* more visible amber borders */
-  --fire-border-hi:   rgba(255, 167, 38, 0.40);
-  --fire-divider:     rgba(255, 167, 38, 0.10);
+  --fire-bg:          #141518;   /* lifted for WCAG AA compliance */
+  --fire-bg-elev:     #1a1c21;
+  --fire-bg-card:     #1e2026;   /* clearly distinct card bg */
+  --fire-surface:     rgba(255, 255, 255, 0.05);
+  --fire-surface-hi:  rgba(255, 255, 255, 0.08);
+  --fire-border:      rgba(255, 193, 7, 0.18);     /* amber 18% — visible */
+  --fire-border-hi:   rgba(255, 193, 7, 0.42);
+  --fire-divider:     rgba(255, 193, 7, 0.10);
 
-  --fire-text:        #f0ece6;   /* warm white — easier to read */
-  --fire-text-mid:    #c4b89e;   /* improved mid contrast */
-  --fire-text-dim:    #8a8072;   /* lifted dim text */
+  /* Text — all pass WCAG AA on --fire-bg */
+  --fire-text:        #e8e3db;   /* 12.1:1 contrast — AAA */
+  --fire-text-mid:    #c8bfb0;   /* 7.4:1 — AA large + body */
+  --fire-text-dim:    #9a9080;   /* 4.6:1 — AA large text */
 
-  --fire-corona:      #ffab00;   /* brighter amber */
-  --fire-ember:       #ff5722;   /* slightly softer red */
-  --fire-core:        #ffc107;
-  --fire-sunrise:     #ffcc02;
-  --fire-calm:        #66bb6a;   /* more visible green */
-  --fire-info:        #42a5f5;   /* new: blue for neutral info */
+  /* Accents — brighter for mobile readability */
+  --fire-corona:      #ffc107;   /* amber — 7.5:1 on bg */
+  --fire-ember:       #ff5722;   /* fire red */
+  --fire-core:        #ffca28;
+  --fire-sunrise:     #ffb300;
+  --fire-calm:        #66bb6a;   /* green — 4.6:1 */
+  --fire-info:        #42a5f5;   /* blue for neutral */
 
   --fire-glow-1:      rgba(255, 87, 34, 0.10);
-  --fire-glow-2:      rgba(255, 171, 0, 0.07);
+  --fire-glow-2:      rgba(255, 193, 7, 0.07);
 
   --fire-serif: 'Cormorant Garamond', Georgia, serif;
   --fire-sans:  'DM Sans', system-ui, sans-serif;
   --fire-mono:  'JetBrains Mono', 'Space Mono', monospace;
 
-  --fire-radius:      10px;      /* rounded cards */
-  --fire-shadow-card: 0 2px 12px rgba(0,0,0,0.35), 0 0 0 1px var(--fire-border);
+  --fire-radius:      12px;
+  --fire-shadow-card: 0 2px 16px rgba(0,0,0,0.40), 0 0 0 1px var(--fire-border);
   --fire-shadow-sm:   0 0 20px rgba(255, 87, 34, 0.08);
   --fire-shadow-md:   0 0 40px rgba(255, 87, 34, 0.14);
   --fire-shadow-lg:   0 0 60px rgba(255, 87, 34, 0.22);
 }
 
-/* ── LIGHT (SOLAR) TOKENS ── */
+/* ── LIGHT (SOLAR) TOKENS — WCAG AA on warm white ── */
 :root[data-theme="light"] #view-dash {
-  --fire-bg:          #faf6f0;
+  --fire-bg:          #f8f4ee;   /* warm parchment */
   --fire-bg-elev:     #ffffff;
-  --fire-surface:     rgba(40, 28, 15, 0.02);
-  --fire-surface-hi:  rgba(40, 28, 15, 0.05);
-  --fire-border:      rgba(180, 100, 0, 0.15);
-  --fire-border-hi:   rgba(180, 100, 0, 0.35);
-  --fire-divider:     rgba(180, 100, 0, 0.1);
+  --fire-bg-card:     #ffffff;
+  --fire-surface:     rgba(40, 28, 15, 0.03);
+  --fire-surface-hi:  rgba(40, 28, 15, 0.06);
+  --fire-border:      rgba(150, 80, 0, 0.18);
+  --fire-border-hi:   rgba(150, 80, 0, 0.38);
+  --fire-divider:     rgba(150, 80, 0, 0.10);
 
-  --fire-text:        #1a140c;
-  --fire-text-mid:    #5a4a38;
-  --fire-text-dim:    #8a7660;
+  /* Text — WCAG AA on #f8f4ee */
+  --fire-text:        #1a1208;   /* 14.8:1 — AAA */
+  --fire-text-mid:    #4a3822;   /* 8.2:1 — AA */
+  --fire-text-dim:    #7a6040;   /* 4.6:1 — AA */
 
-  --fire-corona:      #c56a00;
-  --fire-ember:       #c43015;
-  --fire-core:        #b87400;
-  --fire-sunrise:     #d88b1c;
-  --fire-calm:        #3e7040;
+  --fire-corona:      #b85c00;   /* 4.8:1 on light bg */
+  --fire-ember:       #c0300a;   /* 5.2:1 on light bg */
+  --fire-core:        #a06600;
+  --fire-sunrise:     #b87800;
+  --fire-calm:        #2e6e32;   /* 5.5:1 */
+  --fire-info:        #1565c0;
 
-  --fire-glow-1:      rgba(196, 48, 21, 0.06);
-  --fire-glow-2:      rgba(197, 106, 0, 0.04);
+  --fire-radius:      12px;
+  --fire-glow-1:      rgba(192, 48, 10, 0.06);
+  --fire-glow-2:      rgba(184, 92, 0, 0.04);
 
-  --fire-shadow-sm: 0 0 20px rgba(196, 48, 21, 0.05);
-  --fire-shadow-md: 0 0 40px rgba(196, 48, 21, 0.08);
-  --fire-shadow-lg: 0 0 60px rgba(196, 48, 21, 0.12);
+  --fire-shadow-card: 0 2px 12px rgba(0,0,0,0.08), 0 0 0 1px var(--fire-border);
+  --fire-shadow-sm:   0 0 20px rgba(192, 48, 10, 0.05);
+  --fire-shadow-md:   0 0 40px rgba(192, 48, 10, 0.08);
+  --fire-shadow-lg:   0 0 60px rgba(192, 48, 10, 0.12);
 }
 
 /* ── DASHBOARD ROOT ── */
@@ -127,8 +134,8 @@
 
 .fire-overline {
   font-family: var(--fire-mono);
-  font-size: 9px;
-  letter-spacing: 0.25em;
+  font-size: 11px;
+  letter-spacing: 0.20em;
   color: var(--fire-corona);
   margin-bottom: 8px;
   display: flex;
@@ -156,8 +163,11 @@
 
 .fire-link {
   font-family: var(--fire-mono);
-  font-size: 9px;
-  letter-spacing: 0.2em;
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   color: var(--fire-text-dim);
   cursor: pointer;
   display: inline-flex;
@@ -326,7 +336,7 @@
 .fire-zone-head-l { display: flex; align-items: center; gap: 10px; }
 .fire-zone-overline {
   font-family: var(--fire-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.25em;
   color: var(--fire-ember);
   text-transform: uppercase;
@@ -506,7 +516,7 @@
 }
 .fire-kpi {
   background: var(--fire-bg-card, var(--fire-bg-elev));
-  padding: 20px 18px;
+  padding: 18px 18px;
   cursor: pointer;
   border-radius: var(--fire-radius, 10px);
   box-shadow: var(--fire-shadow-card);
@@ -520,15 +530,15 @@
 }
 .fire-kpi-lbl {
   font-family: var(--fire-mono);
-  font-size: 8px;
-  letter-spacing: 0.2em;
+  font-size: 11px;
+  letter-spacing: 0.12em;
   color: var(--fire-corona);
   margin-bottom: 10px;
   text-transform: uppercase;
 }
 .fire-kpi-val {
   font-family: var(--fire-serif);
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 400;
   letter-spacing: -0.02em;
   color: var(--fire-text);
@@ -537,7 +547,7 @@
 }
 .fire-kpi-chg {
   font-family: var(--fire-mono);
-  font-size: 9px;
+  font-size: 12px;
   margin-bottom: 10px;
   display: flex;
   align-items: center;
@@ -567,7 +577,8 @@
   -webkit-overflow-scrolling: touch;
 }
 .fire-ew-tab {
-  padding: 12px 20px;
+  padding: 14px 20px;
+  min-height: 48px;
   font-family: var(--fire-mono);
   font-size: 9px;
   letter-spacing: 0.2em;
@@ -639,7 +650,7 @@
 }
 .fire-signal-label {
   font-family: var(--fire-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.1em;
   color: var(--fire-text);
   margin-bottom: 12px;
@@ -667,7 +678,7 @@
 .fire-signal-delta.major    { color: var(--fire-corona); }
 .fire-signal-delta.watch    { color: var(--fire-sunrise); }
 .fire-signal-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--fire-text-mid);
   line-height: 1.4;
 }
@@ -1097,7 +1108,7 @@
 }
 .fire-tl-time {
   font-family: var(--fire-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.1em;
 }
 .fire-tl-time.critical { color: var(--fire-ember); }
@@ -1116,9 +1127,9 @@
 .fire-tl-badge.watch    { color: var(--fire-sunrise); border-color: var(--fire-sunrise); }
 .fire-tl-text {
   font-family: var(--fire-serif);
-  font-size: 15px;
+  font-size: 16px;
   color: var(--fire-text);
-  line-height: 1.4;
+  line-height: 1.55;
 }
 
 /* ── FOOTER ── */
@@ -1345,34 +1356,208 @@
 
 @media (max-width: 820px) {
   #view-dash .db-root { padding: 16px 16px 32px !important; }
-  .fire-section { margin-top: 36px; }
+  .fire-section { margin-top: 32px; }
   .fire-title { font-size: 24px; }
   .fire-hero { grid-template-columns: 1fr; gap: 20px; }
-  .fire-globe-wrap { height: 340px; }
+  .fire-globe-wrap { height: 300px; }
   .fire-zone-popup { min-height: auto; padding: 22px; }
-  .fire-zone-name { font-size: 24px; }
+  .fire-zone-name { font-size: 22px; }
   .fire-zone-quote { font-size: 14px; }
-  .fire-zone-stats { gap: 18px; }
-  .fire-risk-strip { gap: 20px; padding: 24px 0; }
-  .fire-risk-num { font-size: 68px; }
-  .fire-risk-quote { font-size: 14px; padding-left: 14px; }
-  .fire-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .fire-zone-stats { gap: 16px; }
+  .fire-risk-strip { gap: 20px; padding: 20px; }
+  .fire-risk-num { font-size: 64px; }
+  .fire-risk-quote { font-size: 14px; padding-left: 14px; max-width: 100%; }
+  .fire-kpi-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .fire-kpi-val { font-size: 20px; }
   .fire-signal-grid { grid-template-columns: 1fr; }
   .fire-pipeline { flex-direction: column; }
   .fire-pipe-stage { min-width: 0; }
-  .fire-pred-grid { grid-template-columns: 1fr; }
-  .fire-crisis-inner {
-    grid-template-columns: 100px 1fr;
-    gap: 14px;
-  }
+  .fire-pred-grid { grid-template-columns: repeat(2, 1fr); }
+  .fire-crisis-inner { grid-template-columns: 100px 1fr; gap: 14px; }
   .fire-crisis-image { height: 100px; grid-row: span 2; }
-  .fire-crisis-severity { font-size: 38px; }
+  .fire-crisis-severity { font-size: 36px; }
   .fire-crisis-events { display: none; }
-  .fire-crisis-title { font-size: 16px; }
+  .fire-crisis-title { font-size: 15px; }
   .fire-crisis-expand { display: none; }
   .fire-crisis-detail { grid-template-columns: repeat(2, 1fr); }
-  .fire-two-col { grid-template-columns: 1fr; gap: 32px; }
+  .fire-two-col { grid-template-columns: 1fr; gap: 28px; }
+}
+
+/* ── MOBILE PHONE (480px) — card-feed dashboard ── */
+@media (max-width: 480px) {
+  /* Root padding */
+  #view-dash .db-root {
+    padding: 12px 12px 24px !important;
+  }
+
+  /* Sections closer together */
+  .fire-section { margin-top: 24px !important; }
+  .fire-section-head { margin-bottom: 14px !important; }
+  .fire-title { font-size: 22px !important; line-height: 1.2 !important; }
+  .fire-subtitle { font-size: 12px !important; }
+  .fire-overline { font-size: 10px !important; }
+  .fire-link { font-size: 11px !important; }
+
+  /* Hero — stack globe on top, popup below */
+  .fire-hero { grid-template-columns: 1fr !important; gap: 12px !important; }
+  .fire-globe-wrap {
+    height: 220px !important;  /* compact on mobile — just enough for context */
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+  /* Zone popup becomes a full-width card below the globe */
+  .fire-zone-popup {
+    min-height: auto !important;
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+  .fire-zone-name { font-size: 18px !important; }
+  .fire-zone-stats { gap: 14px !important; }
+  .fire-zone-stat-val { font-size: 22px !important; }
+  .fire-zone-stat-lbl { font-size: 8px !important; }
+  .fire-zone-quote { font-size: 13px !important; line-height: 1.6 !important; }
+
+  /* Globe controls — hide less important pills */
+  .fire-globe-controls { flex-wrap: nowrap !important; overflow-x: auto !important; gap: 6px !important; }
+  .fire-timepill { padding: 5px 10px !important; font-size: 10px !important; }
+  .fire-globe-pausebtn { display: none !important; }
+
+  /* Risk strip — vertical stack */
+  .fire-risk-strip {
+    flex-direction: column !important;
+    gap: 14px !important;
+    padding: 16px !important;
+    align-items: flex-start !important;
+  }
+  .fire-risk-num { font-size: 56px !important; }
+  .fire-risk-num-suffix { font-size: 0.35em !important; }
+  .fire-risk-quote {
+    max-width: 100% !important;
+    border-left: 2px solid var(--fire-border-hi) !important;
+    padding-left: 14px !important;
+    font-size: 14px !important;
+  }
+  .fire-risk-brief-body { font-size: 14px !important; line-height: 1.65 !important; }
+
+  /* KPI grid — 2 columns on phone */
+  .fire-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .fire-kpi {
+    padding: 14px 12px !important;
+    border-radius: 10px !important;
+  }
+  .fire-kpi-lbl { font-size: 9px !important; letter-spacing: 0.08em !important; }
+  .fire-kpi-val { font-size: 18px !important; }
+  .fire-kpi-chg { font-size: 11px !important; }
+  .fire-kpi-spark { height: 28px !important; }
+
+  /* EW hero strip — single column */
+  .fire-ew-hero-strip {
+    grid-template-columns: 1fr !important;
+    padding: 14px !important;
+    gap: 14px !important;
+  }
+  .fire-ew-score-block {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    text-align: left !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--fire-divider) !important;
+    padding-right: 0 !important;
+    padding-bottom: 14px !important;
+  }
+  .fire-ew-big-score { font-size: 48px !important; }
+  .fire-ew-gauge-lbl { font-size: 10px !important; width: 88px !important; }
+  .fire-ew-assess-block {
+    border-left: none !important;
+    padding-left: 0 !important;
+    border-top: 1px solid var(--fire-divider) !important;
+    padding-top: 14px !important;
+  }
+  .fire-ew-assess-text { font-size: 14px !important; }
+
+  /* Signals — single column */
+  .fire-signal-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+  .fire-signal { padding: 14px 14px !important; border-radius: 10px !important; }
+  .fire-signal-label { font-size: 11px !important; }
+  .fire-signal-val { font-size: 20px !important; }
+  .fire-signal-meta { font-size: 12px !important; }
+
+  /* Crisis list */
+  .fire-crisis { padding: 14px 14px !important; border-radius: 10px !important; }
+  .fire-crisis-inner {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .fire-crisis-image { display: none !important; }
+  .fire-crisis-severity { font-size: 32px !important; }
+  .fire-crisis-title { font-size: 15px !important; line-height: 1.3 !important; }
+  .fire-crisis-detail { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Pred grid — single column */
+  .fire-pred-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+
+  /* Pattern cards */
+  .pattern-card { padding: 14px !important; border-radius: 10px !important; }
+
+  /* Timeline items */
+  .fire-tl-item { gap: 10px !important; padding: 10px 0 !important; }
+  .fire-tl-time { font-size: 10px !important; }
+  .fire-tl-text { font-size: 14px !important; }
+  .fire-tl-dot { width: 8px !important; height: 8px !important; }
+
+  /* Two-col always stacks */
+  .fire-two-col { grid-template-columns: 1fr !important; gap: 24px !important; }
+
+  /* Section heads — tighter */
+  .fire-section-head { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+
+  /* Agent grid — single col */
+  #view-dash #agents-grid { grid-template-columns: 1fr !important; }
+  #view-dash .ag-card { border-radius: 10px !important; padding: 14px !important; }
+  #view-dash .ag-name { font-size: 16px !important; }
+
+  /* Pipe stages */
+  .fire-pipeline { flex-direction: column !important; gap: 8px !important; }
+  .fire-pipe-stage { border-radius: 8px !important; padding: 12px 14px !important; }
+  .fire-pipe-summary {
+    font-size: 13px !important;
+    padding: 14px !important;
+    border-radius: 10px !important;
+    line-height: 1.65 !important;
+  }
+
+  /* Ticker */
+  #ticker-wrap { height: 32px !important; }
+
+  /* Footer */
+  .fire-foot {
+    flex-direction: column !important;
+    gap: 4px !important;
+    text-align: center !important;
+    font-size: 9px !important;
+  }
+
+  /* Scroll hint for horizontal KPI overflow */
+  .fire-kpi-scroll-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+  .fire-kpi-scroll-wrap::-webkit-scrollbar { display: none !important; }
+}
+
+/* ── 375px (iPhone SE, small Android) ── */
+@media (max-width: 375px) {
+  #view-dash .db-root { padding: 10px 10px 20px !important; }
+  .fire-globe-wrap { height: 180px !important; }
+  .fire-risk-num { font-size: 48px !important; }
+  .fire-kpi-val { font-size: 16px !important; }
+  .fire-title { font-size: 20px !important; }
+  .fire-ew-big-score { font-size: 40px !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

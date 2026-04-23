@@ -6,6 +6,17 @@
    bottom-sheet patterns, proper map card rendering.
    ═══════════════════════════════════════════════════════════════════════ */
 
+
+/* ═══════════════════════════════════
+   MOBILE GREETING CARD
+   ═══════════════════════════════════ */
+@media (max-width: 768px) {
+  #mobile-greeting-card { display: block !important; }
+}
+@media (min-width: 769px) {
+  #mobile-greeting-card { display: none !important; }
+}
+
 /* ═══════════════════════════════════
    1. BOTTOM NAV BAR
    ═══════════════════════════════════ */
@@ -37,8 +48,8 @@
     right: 0 !important;
     height: 68px !important;
     z-index: 9000 !important;
-    background: rgba(14,17,23,.97) !important;
-    border-top: 1px solid rgba(255,255,255,.06) !important;
+    background: rgba(20,21,24,0.97) !important;
+    border-top: 1px solid rgba(255,193,7,0.14) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
     box-shadow: 0 -2px 12px rgba(0,0,0,.3) !important;
@@ -81,38 +92,38 @@
 
   .wl-mnav-label {
     font-family: var(--fb) !important;
-    font-size: 9px !important;
+    font-size: 11px !important;
     font-weight: 500 !important;
-    letter-spacing: .02em !important;
-    color: var(--t3) !important;
+    letter-spacing: .01em !important;
+    color: rgba(255,255,255,0.45) !important;
     transition: color .15s !important;
     white-space: nowrap !important;
   }
 
-  /* Active state — clean blue, no neon */
+  /* Active state — amber Fire theme */
   .wl-mnav-btn.active {
-    background: rgba(59,130,246,.08) !important;
+    background: rgba(255,193,7,0.10) !important;
   }
   .wl-mnav-btn.active svg {
-    stroke: var(--b4) !important;
+    stroke: #ffc107 !important;
     filter: none !important;
   }
   .wl-mnav-btn.active .wl-mnav-label {
-    color: var(--b4) !important;
-    font-weight: 600 !important;
+    color: #ffc107 !important;
+    font-weight: 700 !important;
   }
-  /* Active indicator dot */
+  /* Active indicator bar (bottom) */
   .wl-mnav-btn.active::before {
     content: '' !important;
     position: absolute !important;
-    top: 4px !important;
+    bottom: 2px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    width: 4px !important;
-    height: 4px !important;
-    border-radius: 50% !important;
-    background: var(--b5) !important;
-    box-shadow: none !important;
+    width: 20px !important;
+    height: 3px !important;
+    border-radius: 2px !important;
+    background: #ffc107 !important;
+    box-shadow: 0 0 8px rgba(255,193,7,0.5) !important;
     animation: none !important;
   }
 
@@ -135,9 +146,81 @@
     box-shadow: none !important;
   }
 
+  /* ── FAB (More button) ── */
+  .wl-mnav-fab {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 14px !important;
+    background: rgba(255,193,7,0.12) !important;
+    border: 1.5px solid rgba(255,193,7,0.30) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    -webkit-tap-highlight-color: transparent !important;
+    transition: all 0.15s ease !important;
+    flex-shrink: 0 !important;
+  }
+  .wl-mnav-fab svg {
+    width: 18px !important;
+    height: 18px !important;
+    stroke: #ffc107 !important;
+  }
+  .wl-mnav-fab:active {
+    background: rgba(255,193,7,0.22) !important;
+    transform: scale(0.94) !important;
+  }
+
   /* Kill cursor effects */
   #wl-cursor, #wl-cursor + div, #wl-particles { display: none !important; }
   *, *::before, *::after { cursor: auto !important; }
+
+  /* ── GLOBAL TOUCH TARGETS — 44px minimum ── */
+  button, .btn, .btn-sm, [role="button"],
+  .ni, .nd-item, .cpill, .fc, .tab,
+  .fire-ew-tab, .fire-timepill,
+  .fire-globe-pausebtn, .adm-btn,
+  .ew-signal, .fire-crisis,
+  .more-drawer-item, .nav-group-btn {
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  /* Inputs — 48px for easy tapping */
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  input[type="search"],
+  select, textarea {
+    min-height: 48px !important;
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+    border-radius: 10px !important;
+  }
+
+  /* Body text — minimum readable size */
+  body, p, li, .vsub, .card-sub,
+  .ew-signal-title, .fire-tl-text,
+  .more-drawer-item span {
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+  }
+
+  /* Labels / metadata — minimum 11px */
+  .ew-signal-type, .ew-signal-meta,
+  .fire-signal-label, .fire-signal-meta,
+  .vtit, .vsub, .card-tit,
+  small, .label, [class*="-label"] {
+    font-size: 11px !important;
+  }
+
+  /* Cards — proper padding for finger use */
+  .card, .ew-signal, .fire-signal,
+  .adm-provider-card, .adm-chart-box,
+  .pattern-card, .fire-pred-card {
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
 
 }
 
@@ -1556,4 +1639,550 @@
   .db-greeting-title { font-size: 16px !important; }
 
   .aipg { grid-template-columns: 1fr !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE DASHBOARD FEED — card layout (480px and below)
+   Desktop layout (> 480px) is UNCHANGED.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+
+  /* ── Feed wrapper — replace the rigid db-root with a scrollable feed ── */
+  #view-dash .db-root {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 0 12px 80px !important;  /* bottom: room for nav */
+    scroll-behavior: smooth !important;
+  }
+
+  /* Hide the oversized desktop hero text */
+  #view-dash .fire-section:first-child .fire-section-head h1 { display: none !important; }
+  #view-dash .fire-section:first-child .fire-section-head .fire-greeting-sub { display: none !important; }
+
+  /* Ticker — compact */
+  #ticker-wrap {
+    height: 28px !important;
+    font-size: 11px !important;
+    margin: 0 -12px !important;
+  }
+
+  /* ── FEED CARD base ── */
+  .mob-feed-card {
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,193,7,0.12) !important;
+    overflow: hidden !important;
+    margin-top: 12px !important;
+  }
+  .mob-feed-card-head {
+    padding: 14px 16px 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+  .mob-feed-card-label {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.18em !important;
+    color: var(--fire-text-dim, #9a9080) !important;
+    text-transform: uppercase !important;
+  }
+  .mob-feed-card-action {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+    color: var(--fire-corona, #ffc107) !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+    cursor: pointer !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  /* ── RISK CARD ── */
+  .mob-risk-card {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    padding: 16px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,193,7,0.15) !important;
+    margin-top: 12px !important;
+  }
+  .mob-risk-num {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 52px !important;
+    font-weight: 300 !important;
+    line-height: 1 !important;
+    letter-spacing: -0.03em !important;
+    flex-shrink: 0 !important;
+  }
+  .mob-risk-info { flex: 1 !important; min-width: 0 !important; }
+  .mob-risk-label {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.2em !important;
+    text-transform: uppercase !important;
+    margin-bottom: 4px !important;
+  }
+  .mob-risk-brief {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+    color: var(--fire-text-mid, #c8bfb0) !important;
+  }
+
+  /* ── KPI CARD — 3-up scroll ── */
+  .mob-kpi-scroll {
+    display: flex !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 0 16px 16px !important;
+  }
+  .mob-kpi-scroll::-webkit-scrollbar { display: none !important; }
+  .mob-kpi-item {
+    flex-shrink: 0 !important;
+    width: 100px !important;
+    padding: 12px !important;
+    background: rgba(255,255,255,0.04) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255,193,7,0.08) !important;
+  }
+  .mob-kpi-item-lbl {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.1em !important;
+    color: var(--fire-text-dim, #9a9080) !important;
+    margin-bottom: 4px !important;
+    text-transform: uppercase !important;
+  }
+  .mob-kpi-item-val {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 20px !important;
+    font-weight: 300 !important;
+    color: var(--fire-text, #e8e3db) !important;
+    line-height: 1 !important;
+  }
+  .mob-kpi-item-chg {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
+    margin-top: 3px !important;
+  }
+  .mob-kpi-up   { color: var(--fire-ember, #ff5722) !important; }
+  .mob-kpi-down { color: var(--fire-calm,  #66bb6a) !important; }
+  .mob-kpi-flat { color: var(--fire-text-dim, #9a9080) !important; }
+
+  /* ── EW summary card ── */
+  .mob-ew-card {
+    padding: 16px !important;
+    cursor: pointer !important;
+  }
+  .mob-ew-score-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin-bottom: 10px !important;
+  }
+  .mob-ew-big {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 44px !important;
+    font-weight: 300 !important;
+    line-height: 1 !important;
+  }
+  .mob-ew-label {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.2em !important;
+    text-transform: uppercase !important;
+  }
+  .mob-ew-gauges-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin-top: 10px !important;
+  }
+  .mob-ew-gauge-item { display: flex !important; flex-direction: column !important; gap: 3px !important; }
+  .mob-ew-gauge-name {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 8px !important;
+    letter-spacing: 0.1em !important;
+    color: var(--fire-text-dim) !important;
+    text-transform: uppercase !important;
+  }
+  .mob-ew-gauge-bar-wrap {
+    height: 4px !important;
+    background: rgba(255,255,255,0.08) !important;
+    border-radius: 2px !important;
+    overflow: hidden !important;
+  }
+  .mob-ew-gauge-bar-fill {
+    height: 100% !important;
+    border-radius: 2px !important;
+    transition: width 0.8s cubic-bezier(0.16,1,0.3,1) !important;
+  }
+
+  /* ── Section headers compact ── */
+  #view-dash .fire-section {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+  }
+  #view-dash .fire-section > .fire-section-head {
+    padding: 14px 0 10px !important;
+  }
+
+  /* ── Hide desktop-only decorative elements ── */
+  #view-dash .fire-globe-controls { display: none !important; }
+  #view-dash .fire-globe-legend   { display: none !important; }
+  #view-dash .fire-ew-patterns-wrap { display: none !important; }  /* full EW has them */
+  #view-dash .fire-foot-r           { display: none !important; }
+
+  /* ── KPI grid hidden on phone — replaced by mob-kpi-scroll ── */
+  #view-dash .fire-kpi-grid { display: none !important; }
+
+  /* ── Risk strip hidden — replaced by mob-risk-card ── */
+  #view-dash .fire-risk-strip { display: none !important; }
+
+  /* ── EW hero strip hidden on phone — replaced by mob-ew-card ── */
+  #view-dash .fire-ew-hero-strip { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAP — BOTTOM SHEET (mobile only)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* Map takes full screen */
+  #view-map #map {
+    position: absolute !important;
+    inset: 0 !important;
+    height: 100% !important;
+    z-index: 1 !important;
+  }
+  #view-map {
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  /* Hide desktop left sidebar */
+  #mleft { display: none !important; }
+
+  /* ── Map filter chips bar (above map, always visible) ── */
+  #mob-map-chips {
+    position: absolute !important;
+    top: 8px !important;
+    left: 8px !important;
+    right: 8px !important;
+    z-index: 500 !important;
+    display: flex !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 4px 0 !important;
+  }
+  #mob-map-chips::-webkit-scrollbar { display: none !important; }
+  .mob-chip {
+    flex-shrink: 0 !important;
+    padding: 8px 14px !important;
+    border-radius: 20px !important;
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    border: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    transition: all 0.15s !important;
+    white-space: nowrap !important;
+    min-height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    background: rgba(20,21,24,0.88) !important;
+    color: rgba(255,255,255,0.6) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+  }
+  .mob-chip.active {
+    background: rgba(255,193,7,0.18) !important;
+    color: #ffc107 !important;
+    border-color: rgba(255,193,7,0.40) !important;
+    font-weight: 600 !important;
+  }
+
+  /* ── Bottom Sheet ── */
+  #mob-map-sheet {
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 400 !important;
+    background: rgba(20,21,24,0.97) !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-top: 1px solid rgba(255,193,7,0.15) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    touch-action: none !important;
+    transition: transform 0.35s cubic-bezier(0.16,1,0.3,1) !important;
+    max-height: 92% !important;
+  }
+
+  /* Handle */
+  #mob-map-sheet-handle {
+    width: 40px !important;
+    height: 4px !important;
+    border-radius: 2px !important;
+    background: rgba(255,255,255,0.2) !important;
+    margin: 12px auto 8px !important;
+    cursor: grab !important;
+  }
+  #mob-map-sheet-handle:active { cursor: grabbing !important; }
+
+  /* Sheet title bar */
+  #mob-map-sheet-header {
+    padding: 4px 16px 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+  #mob-map-sheet-title {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+    letter-spacing: 0.2em !important;
+    color: rgba(255,255,255,0.5) !important;
+    text-transform: uppercase !important;
+  }
+  #mob-map-sheet-count {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+    color: #ffc107 !important;
+  }
+
+  /* Scrollable content */
+  #mob-map-sheet-body {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 0 12px 20px !important;
+  }
+
+  /* Event row in sheet */
+  .mob-sheet-event {
+    padding: 12px 0 !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    cursor: pointer !important;
+    min-height: 44px !important;
+  }
+  .mob-sheet-event:last-child { border-bottom: none !important; }
+  .mob-sheet-event:active { background: rgba(255,255,255,0.03) !important; border-radius: 8px !important; }
+
+  .mob-sheet-sev {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 26px !important;
+    font-weight: 300 !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+    width: 36px !important;
+    text-align: right !important;
+  }
+  .mob-sheet-info { flex: 1 !important; min-width: 0 !important; }
+  .mob-sheet-title {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    line-height: 1.3 !important;
+    color: rgba(255,255,255,0.9) !important;
+    margin-bottom: 3px !important;
+  }
+  .mob-sheet-meta {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+    letter-spacing: 0.05em !important;
+    color: rgba(255,255,255,0.35) !important;
+  }
+
+  /* Map toolbar hidden — replaced by chips */
+  #map-toolbar { display: none !important; }
+
+  /* Map search bar — compact on mobile */
+  #map-search-bar {
+    top: 52px !important;  /* below chips bar */
+    left: 8px !important;
+    right: 8px !important;
+  }
+  #map-search-inp { font-size: 16px !important; }  /* prevent iOS zoom */
+
+  /* Map controls hidden on mobile */
+  #mctrl { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ONBOARDING — mobile-first redesign
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* Full-screen overlay */
+  #ob-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(10,11,14,0.96) !important;
+    display: flex !important;
+    align-items: flex-end !important;  /* sheet from bottom on mobile */
+    justify-content: center !important;
+    z-index: 9999 !important;
+    padding: 0 !important;
+  }
+
+  /* Modal becomes a bottom sheet */
+  .ob-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92dvh !important;
+    border-radius: 24px 24px 0 0 !important;
+    background: #1a1c20 !important;
+    border-top: 1px solid rgba(255,193,7,0.18) !important;
+    padding: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.5) !important;
+  }
+
+  /* Drag handle */
+  .ob-modal::before {
+    content: '' !important;
+    display: block !important;
+    width: 40px !important;
+    height: 4px !important;
+    border-radius: 2px !important;
+    background: rgba(255,255,255,0.15) !important;
+    margin: 14px auto 0 !important;
+  }
+
+  /* Header */
+  .ob-header {
+    padding: 16px 20px 12px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+  }
+
+  /* Step dots */
+  .ob-dots {
+    display: flex !important;
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+    justify-content: flex-start !important;
+  }
+  .ob-dots span {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    transition: all 0.2s !important;
+  }
+
+  /* Step label */
+  .ob-step-lbl {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.2em !important;
+    color: rgba(255,193,7,0.7) !important;
+    text-transform: uppercase !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Title */
+  .ob-title {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 26px !important;
+    font-weight: 400 !important;
+    color: rgba(255,255,255,0.95) !important;
+    line-height: 1.2 !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* Subtitle */
+  .ob-sub {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 14px !important;
+    color: rgba(255,255,255,0.5) !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Body */
+  .ob-body {
+    padding: 20px 20px 0 !important;
+    min-height: 120px !important;
+  }
+  .ob-body p {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 15px !important;
+    line-height: 1.65 !important;
+    color: rgba(255,255,255,0.65) !important;
+  }
+
+  /* Interest/region/risk chips — bigger touch targets */
+  #ob-interests span,
+  #ob-regions span,
+  #ob-risk span {
+    padding: 10px 18px !important;
+    font-size: 14px !important;
+    border-radius: 24px !important;
+    min-height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+
+  /* Footer */
+  .ob-footer {
+    padding: 16px 20px !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    border-top: 1px solid rgba(255,255,255,0.06) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #1a1c20 !important;
+    position: sticky !important;
+    bottom: 0 !important;
+  }
+
+  /* Skip link */
+  .ob-skip {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 13px !important;
+    color: rgba(255,255,255,0.35) !important;
+    cursor: pointer !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  /* Next/Back buttons */
+  #ob-next {
+    padding: 12px 28px !important;
+    font-size: 14px !important;
+    border-radius: 12px !important;
+    min-height: 48px !important;
+    background: #ffc107 !important;
+    color: #141518 !important;
+    font-weight: 700 !important;
+    border: none !important;
+  }
+  #ob-back {
+    padding: 12px 20px !important;
+    font-size: 14px !important;
+    border-radius: 12px !important;
+    min-height: 48px !important;
+  }
 }
