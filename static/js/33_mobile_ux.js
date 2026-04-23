@@ -104,10 +104,10 @@ function _syncKPIRow() {
 
 /** Sync EW data from the live strip (ew-score etc.) */
 function _syncEWCard() {
-  var srcScore  = _el('ew-score');
-  var srcLabel  = _el('ew-label');
-  var srcAssess = _el('ew-assess');
-  var srcEvCnt  = _el('ew-evcount');
+  var srcScore  = _el('dash-ew-score');
+  var srcLabel  = _el('dash-ew-label');
+  var srcAssess = _el('dash-ew-assess');
+  var srcEvCnt  = _el('dash-ew-evcount');
 
   var dstScore  = _el('mob-ew-score');
   var dstLabel  = _el('mob-ew-label');
@@ -130,10 +130,10 @@ function _syncEWCard() {
 
   // Gauges
   var gaugeMap = [
-    ['ewgb-macro',  'mob-ewgb-macro'],
-    ['ewgb-market', 'mob-ewgb-market'],
-    ['ewgb-sent',   'mob-ewgb-sent'],
-    ['ewgb-vel',    'mob-ewgb-vel'],
+    ['dash-ewgb-macro',  'mob-ewgb-macro'],
+    ['dash-ewgb-market', 'mob-ewgb-market'],
+    ['dash-ewgb-sent',   'mob-ewgb-sent'],
+    ['dash-ewgb-vel',    'mob-ewgb-vel'],
   ];
   gaugeMap.forEach(function(pair) {
     var src = _el(pair[0]), dst = _el(pair[1]);
@@ -408,7 +408,7 @@ function _boot() {
   }
 
   // ── EW data sync: re-sync when ew-score changes
-  var ewEl = _el('ew-score');
+  var ewEl = _el('dash-ew-score');
   if (ewEl) {
     new MutationObserver(function() {
       setTimeout(_syncEWCard, 200);

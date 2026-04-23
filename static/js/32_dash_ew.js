@@ -44,7 +44,7 @@ function _esc(s) {
 
 /* ── Render multi-paragraph assessment ─────────────────────────────────── */
 function _renderAssessment(text, score, data) {
-  var el = document.getElementById('ew-assess');
+  var el = document.getElementById('dash-ew-assess');
   if (!el) return;
 
   if (!text || text.length < 20) {
@@ -106,8 +106,8 @@ function _renderGauges(data) {
 
 /* ── Render live signals list ──────────────────────────────────────────── */
 function _renderSignals(signals) {
-  var el = document.getElementById('ew-signals');
-  var cnt = document.getElementById('ew-signal-count');
+  var el = document.getElementById('dash-ew-signals');
+  var cnt = document.getElementById('dash-ew-signal-count');
   if (!el) return;
 
   if (cnt) cnt.textContent = signals.length ? '(' + signals.length + ')' : '';
@@ -175,9 +175,9 @@ function dashEWInit() {
       var col   = _col(score);
 
       // Score + label
-      var scoreEl = document.getElementById('ew-score');
+      var scoreEl = document.getElementById('dash-ew-score');
       if (scoreEl) { scoreEl.textContent = score.toFixed(1); scoreEl.style.color = col; }
-      var labelEl = document.getElementById('ew-label');
+      var labelEl = document.getElementById('dash-ew-label');
       if (labelEl) { labelEl.textContent = _label(score); labelEl.style.color = col; }
 
       // Gauges
@@ -192,8 +192,8 @@ function dashEWInit() {
       }
     })
     .catch(function() {
-      _set('ew-label', 'UNAVAILABLE');
-      _html('ew-assess', '<p style="color:var(--fire-text-dim);font-size:13px">Could not load Early Warning data.</p>');
+      _set('dash-ew-label', 'UNAVAILABLE');
+      _html('dash-ew-assess', '<p style="color:var(--fire-text-dim);font-size:13px">Could not load Early Warning data.</p>');
     });
 
   // Load signals separately
@@ -203,7 +203,7 @@ function dashEWInit() {
       _renderSignals(signals);
     })
     .catch(function() {
-      _html('ew-signals', '<div class="fire-signal-skeleton">Could not load signals</div>');
+      _html('dash-ew-signals', '<div class="fire-signal-skeleton">Could not load signals</div>');
     });
 
   // Auto-refresh every 3 minutes
