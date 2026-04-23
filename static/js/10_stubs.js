@@ -321,8 +321,13 @@ var OB_STEPS = [
 function startOnboarding() {
   var ov = document.getElementById('ob-overlay');
   if (!ov) return;
+  // Guard: if already marked done in this session, never show again
+  try { if (localStorage.getItem('wl_onboarding_done') === '1') return; } catch(e) {}
+  if (window.G && G.userProfile && G.userProfile.onboarding_done) return;
   OB.step = 0; OB.data = {};
-  ov.style.display = 'flex';
+  ov.style.display = '';        // clear any inline style
+  ov.classList.remove('ob-hidden');
+  ov.classList.add('ob-visible');
   _obRender();
 }
 function _obRender() {
@@ -399,9 +404,9 @@ function skipOnboarding() {
   }
   var ov = document.getElementById('ob-overlay');
   if (ov) {
-    ov.style.opacity = '0';
-    ov.style.transition = 'opacity 0.25s ease';
-    setTimeout(function() { ov.style.display = 'none'; ov.style.opacity = ''; }, 260);
+    ov.classList.remove('ob-visible');
+    ov.classList.add('ob-hidden');
+    ov.style.display = 'none';   // belt-and-suspenders
   }
   rq('/api/user/profile', { method: 'PUT', body: { onboarding_done: 1 } })
     .catch(function() {});
@@ -418,12 +423,13 @@ function _obFinish() {
     G.userProfile.regions   = OB.data.regions   || [];
   }
 
-  // 3. Close overlay with fade
+  // 3. Close overlay permanently
   var ov = document.getElementById('ob-overlay');
   if (ov) {
-    ov.style.opacity = '0';
-    ov.style.transition = 'opacity 0.3s ease';
-    setTimeout(function() { ov.style.display = 'none'; ov.style.opacity = ''; }, 300);
+    ov.classList.remove('ob-visible');
+    ov.classList.add('ob-hidden');
+    ov.style.display = 'none';   // belt-and-suspenders
+    ov.style.opacity = '';
   }
 
   // 4. Persist to server in background
