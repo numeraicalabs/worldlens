@@ -330,7 +330,7 @@
           <div class="msc-risk-divider"></div>
           <div class="msc-brief-wrap">
             <div class="msc-brief-label">AI CHIEF ANALYST</div>
-            <div class="msc-brief" id="msc-brief">Caricamento briefing…</div>
+            <div class="msc-brief" id="msc-brief" style="font-size:14px;line-height:1.65">Caricamento briefing…</div>
           </div>
         </div>
 
@@ -380,8 +380,12 @@
           </div>
         </div>
 
-        <!-- Category bars (mirrors d-catbars) -->
-        <div class="msc-section-head">PER CATEGORIA</div>
+        <!-- Market movers — best and worst performers -->
+        <div class="msc-section-head" style="margin-top:16px">TOP MOVERS</div>
+        <div id="msc-movers" class="msc-movers"></div>
+
+        <!-- Category bars -->
+        <div class="msc-section-head" style="margin-top:16px">EVENTI PER CATEGORIA</div>
         <div id="msc-catbars" class="msc-catbars"></div>
 
         <div class="msc-swipe-hint">← Rischio · Crisi →</div>
@@ -435,6 +439,10 @@
         </div>
         <div class="msc-section-head" style="margin-top:16px">SEGNALI ATTIVI</div>
         <div id="msc-signals" class="msc-signals"></div>
+
+        <div class="msc-section-head" style="margin-top:16px">ULTIME NEWS CRITICHE</div>
+        <div id="msc-ew-news" class="msc-ew-news"></div>
+
         <div class="msc-swipe-hint">← Crisi · Agenti →</div>
       </div>
 
@@ -2268,6 +2276,23 @@
       <button class="btn btn-ai btn-sm" onclick="loadDigest()">My Digest</button>
     </div>
   </div>
+  <!-- ── Personal AI Key — any user can add their own ── -->
+  <div class="card" id="prof-ai-card" style="margin-bottom:12px">
+    <div class="card-tit" style="display:flex;align-items:center;gap:8px">
+      <span>🔑 La tua chiave AI</span>
+      <span style="font-size:9px;padding:2px 8px;border-radius:100px;background:rgba(255,193,7,.1);color:#ffc107">OPZIONALE</span>
+    </div>
+    <div style="font-size:12px;color:var(--t3);line-height:1.6;margin:8px 0">
+      Aggiungi la tua chiave Gemini gratuita per sbloccare analisi AI personalizzate. 
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--b4)">Ottieni chiave gratis →</a>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="fi" type="password" id="prof-ai-key" placeholder="AIzaSy..." autocomplete="off" style="flex:1;font-size:14px;min-height:44px">
+      <button class="btn btn-p btn-sm" onclick="saveUserAIKey()" style="min-height:44px;padding:0 16px">Salva</button>
+    </div>
+    <div id="prof-ai-key-status" style="font-size:11px;margin-top:6px;display:none"></div>
+  </div>
+
   <div id="digest-box" style="display:none;background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(6,182,212,.05));border:1px solid var(--bdb);border-radius:var(--r12);padding:13px"><div style="font-size:10px;color:var(--b4);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px">PERSONALIZED DIGEST</div><div style="font-size:12px;color:var(--t2);line-height:1.7" id="digest-txt"></div></div>
   <div class="pstats"><div class="ps"><div class="psv" id="ps-wl">0</div><div class="psl">Watchlist</div></div><div class="ps"><div class="psv" id="ps-al">0</div><div class="psl">Alerts</div></div><div class="ps"><div class="psv" id="ps-ev">0</div><div class="psl">Events Today</div></div><div class="ps"><div class="psv" id="ps-hi" style="color:var(--re)">0</div><div class="psl">High Impact</div></div></div>
   <!-- Affinity radar — personalisation profile from real behaviour -->
