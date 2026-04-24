@@ -2591,3 +2591,126 @@
 @media (min-width: 481px) {
   #mob-swipe-deck { display: none !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MARKET MOVERS + EW NEWS — swipe deck additions
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+
+  /* ── Market movers ── */
+  .msc-movers { display: flex !important; flex-direction: column !important; gap: 6px !important; }
+  .msc-mover-row {
+    display: flex !important;
+    align-items: center !important;
+    padding: 10px 12px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+    min-height: 44px !important;
+    gap: 10px !important;
+  }
+  .msc-mover-ticker {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: var(--fire-text, #e8e3db) !important;
+    width: 70px !important;
+    flex-shrink: 0 !important;
+    letter-spacing: 0.05em !important;
+  }
+  .msc-mover-price {
+    font-family: 'Cormorant Garamond', Georgia, serif !important;
+    font-size: 16px !important;
+    font-weight: 300 !important;
+    color: var(--fire-text-mid) !important;
+    flex: 1 !important;
+    text-align: right !important;
+  }
+  .msc-mover-chg {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    min-width: 70px !important;
+    text-align: right !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* ── EW News cards ── */
+  .msc-ew-news { display: flex !important; flex-direction: column !important; gap: 10px !important; }
+  .msc-news-card {
+    padding: 14px !important;
+    background: var(--fire-bg-card, #1e2026) !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    cursor: pointer !important;
+  }
+  .msc-news-card:active { background: rgba(255,255,255,0.06) !important; }
+  .msc-news-head {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+  }
+  .msc-news-sev {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    padding: 2px 8px !important;
+    border-radius: 6px !important;
+    flex-shrink: 0 !important;
+  }
+  .msc-news-meta {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 9px !important;
+    color: var(--fire-text-dim) !important;
+    letter-spacing: 0.05em !important;
+  }
+  .msc-news-title {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: var(--fire-text, #e8e3db) !important;
+    line-height: 1.4 !important;
+    margin-bottom: 6px !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+  .msc-news-desc {
+    font-family: 'DM Sans', system-ui, sans-serif !important;
+    font-size: 12px !important;
+    color: var(--fire-text-dim, #9a9080) !important;
+    line-height: 1.55 !important;
+  }
+
+  /* ── Profile AI key card — larger touch targets ── */
+  #prof-ai-card input {
+    min-height: 48px !important;
+    font-size: 16px !important; /* prevents iOS zoom */
+    border-radius: 10px !important;
+  }
+  #prof-ai-card button {
+    min-height: 48px !important;
+    border-radius: 10px !important;
+    font-size: 14px !important;
+  }
+
+  /* ── Card 0 brief — more space ── */
+  .msc-brief {
+    font-size: 14px !important;
+    line-height: 1.65 !important;
+    color: var(--fire-text-mid, #c8bfb0) !important;
+  }
+
+  /* ── Card 2 event titles — allow 2 lines ── */
+  .msc-ev-title {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+}
