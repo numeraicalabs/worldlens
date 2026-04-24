@@ -135,7 +135,7 @@ function _buildGlobe() {
   /* Try to load texture if available */
   var loader = new THREE.TextureLoader();
   loader.load(
-    'https://unpkg.com/three@0.128.0/examples/textures/planets/earth_atmos_2048.jpg',
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/textures/planets/earth_atmos_2048.jpg',
     function(tex) {
       tex.colorSpace = THREE.SRGBColorSpace || 0; /* compat */
       mat.map        = tex;
