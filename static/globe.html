@@ -86,7 +86,7 @@ function init(){
   var loader = new THREE.TextureLoader();
   loader.crossOrigin = 'anonymous';
   loader.load(
-    'https://unpkg.com/three@0.128.0/examples/textures/planets/earth_atmos_2048.jpg',
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/textures/planets/earth_atmos_2048.jpg',
     function(tex){ mat.map = tex; mat.needsUpdate = true; },
     undefined,
     function(){ /* fail silently — globe still visible with solid color */ }
