@@ -229,3 +229,59 @@ async def toggle_alert(alert_id: int, user=Depends(require_user)):
         )
         await db.commit()
     return {"status": "ok"}
+
+
+# ── Personal AI key management ────────────────────────────────────────────────
+
+@user_router.post("/ai-key")
+async def save_user_ai_key(payload: dict = Body(...), user=Depends(require_user)):
+    """Save user's personal Gemini or Anthropic API key (encrypted at rest in DB)."""
+    provider = (payload.get("provider") or "gemini").strip().lower()
+    key      = (payload.get("api_key") or "").strip()
+
+    if provider not in ("gemini", "claude", "anthropic"):
+        return {"status": "error", "message": "Provider must be gemini or claude"}
+    if provider == "anthropic":
+        provider = "claude"
+
+    col = "user_gemini_key" if provider == "gemini" else "user_anthropic_key"
+
+    async with aiosqlite.connect(settings.db_path) as db:
+        await db.execute(f"UPDATE users SET {col}=? WHERE id=?", (key, user["id"]))
+        await db.commit()
+
+    return {"status": "ok", "provider": provider, "key_preview": ("***" + key[-4:]) if len(key) >= 4 else "SET"}
+
+
+@user_router.delete("/ai-key")
+async def delete_user_ai_key(provider: str = "gemini", user=Depends(require_user)):
+    """Clear the user's personal API key for the given provider."""
+    if provider not in ("gemini", "claude", "anthropic"):
+        return {"status": "error", "message": "Unknown provider"}
+    col = "user_gemini_key" if provider == "gemini" else "user_anthropic_key"
+    async with aiosqlite.connect(settings.db_path) as db:
+        await db.execute(f"UPDATE users SET {col}='' WHERE id=?", (user["id"],))
+        await db.commit()
+    return {"status": "ok"}
+
+
+@user_router.get("/ai-key/status")
+async def get_user_ai_key_status(user=Depends(require_user)):
+    """Return which personal AI keys the user has configured (previews only — never full key)."""
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT user_gemini_key, user_anthropic_key FROM users WHERE id=?", (user["id"],)
+        ) as cur:
+            row = await cur.fetchone()
+
+    if not row:
+        return {"gemini": None, "claude": None}
+
+    gkey = (row["user_gemini_key"] or "").strip()
+    ckey = (row["user_anthropic_key"] or "").strip()
+
+    return {
+        "gemini": {"configured": bool(gkey), "preview": ("***" + gkey[-4:]) if len(gkey) >= 4 else None},
+        "claude": {"configured": bool(ckey), "preview": ("***" + ckey[-4:]) if len(ckey) >= 4 else None},
+    }
