@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WorldLens">
+<title>WorldLens</title>
+
+<!-- Leaflet (map) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ════════════════════════════════════════════════════════════════
+   WORLDLENS MOBILE — Design System
+   ════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:     #0d0f12;
+  --bg1:    #141518;
+  --bg2:    #1a1c20;
+  --bg3:    #20222a;
+  --border: rgba(255,193,7,.14);
+  --amber:  #ffc107;
+  --red:    #ff5722;
+  --green:  #66bb6a;
+  --blue:   #42a5f5;
+  --t1:     #e8e3db;
+  --t2:     #c8bfb0;
+  --t3:     #9a9080;
+  --t4:     #6a6055;
+  --serif:  'Cormorant Garamond', Georgia, serif;
+  --sans:   'DM Sans', system-ui, sans-serif;
+  --mono:   'JetBrains Mono', monospace;
+  --r:      12px;
+  --nav-h:  64px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--t1);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── App shell ── */
+#app {
+  display: flex; flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ── Views ── */
+.view {
+  display: none; flex: 1; overflow: hidden;
+  position: relative;
+}
+.view.active { display: flex; flex-direction: column; }
+
+/* ── Bottom nav ── */
+#nav {
+  flex-shrink: 0;
+  height: calc(var(--nav-h) + var(--safe-b));
+  padding-bottom: var(--safe-b);
+  background: rgba(13,15,18,.97);
+  border-top: 1px solid rgba(255,193,7,.12);
+  display: flex;
+  align-items: flex-start;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100;
+}
+.nav-btn {
+  flex: 1; height: var(--nav-h);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px; background: none; border: none;
+  color: rgba(255,255,255,.35);
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  cursor: pointer; position: relative;
+  transition: color .15s;
+}
+.nav-btn svg { width: 22px; height: 22px; stroke-width: 1.5; }
+.nav-btn.active { color: var(--amber); }
+.nav-btn.active::before {
+  content: ''; position: absolute; top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 24px; height: 3px; border-radius: 0 0 3px 3px;
+  background: var(--amber);
+  box-shadow: 0 0 10px rgba(255,193,7,.5);
+}
+.nav-badge {
+  position: absolute; top: 6px; right: calc(50% - 18px);
+  background: var(--red); color: #fff;
+  font-size: 9px; font-weight: 700; font-family: var(--mono);
+  padding: 1px 5px; border-radius: 8px; min-width: 16px;
+  text-align: center; line-height: 1.4;
+}
+
+/* ── Utility ── */
+.overline {
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--t3);
+}
+.card {
+  background: var(--bg2); border-radius: var(--r);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 18px; border-radius: 10px; border: none;
+  font-family: var(--sans); font-size: 14px; font-weight: 600;
+  cursor: pointer; min-height: 44px; transition: all .15s;
+}
+.btn-amber { background: var(--amber); color: #0d0f12; }
+.btn-ghost {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  color: var(--t2);
+}
+.btn-danger { background: rgba(239,68,68,.15); color: #ef4444; border: 1px solid rgba(239,68,68,.25); }
+input, select, textarea {
+  background: var(--bg3); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px; color: var(--t1);
+  font-family: var(--sans); font-size: 16px; /* iOS no-zoom */
+  padding: 12px 14px; width: 100%;
+  -webkit-appearance: none;
+}
+input:focus, select:focus {
+  outline: none; border-color: rgba(255,193,7,.4);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   VIEW 1 — DASHBOARD (swipe cards)
+   ════════════════════════════════════════════════════════════════ */
+#view-dash {
+  background: var(--bg);
+}
+#ticker {
+  height: 30px; overflow: hidden;
+  background: rgba(255,193,7,.06);
+  border-bottom: 1px solid rgba(255,193,7,.10);
+  display: flex; align-items: center; flex-shrink: 0;
+}
+.ticker-lbl {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .15em;
+  color: var(--amber); padding: 0 10px; flex-shrink: 0;
+  border-right: 1px solid rgba(255,193,7,.15);
+}
+#ticker-inner {
+  flex: 1; overflow: hidden; position: relative; height: 30px;
+}
+#ticker-track {
+  display: flex; gap: 32px; align-items: center;
+  height: 30px; white-space: nowrap;
+  animation: tickerScroll 40s linear infinite;
+  will-change: transform;
+}
+@keyframes tickerScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.tick-item {
+  font-family: var(--mono); font-size: 10px; flex-shrink: 0;
+}
+.tick-up { color: var(--green); }
+.tick-dn { color: var(--red); }
+.tick-fl { color: var(--t3); }
+
+/* Swipe track */
+#dash-track {
+  flex: 1; display: flex;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+#dash-track::-webkit-scrollbar { display: none; }
+
+/* Dots */
+#dash-dots {
+  display: flex; justify-content: center; gap: 8px;
+  padding: 8px 0 4px; flex-shrink: 0;
+}
+.ddot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,.15);
+  transition: all .2s; cursor: pointer;
+}
+.ddot.on {
+  width: 20px; border-radius: 3px;
+  background: var(--amber);
+}
+
+/* Individual cards */
+.dcard {
+  flex-shrink: 0; width: 100vw;
+  scroll-snap-align: start;
+  overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 16px 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.dcard-head {
+  display: flex; align-items: center;
+  justify-content: space-between;
+}
+.dcard-title {
+  font-family: var(--serif); font-size: 26px; font-weight: 300;
+  color: var(--t1); line-height: 1.15;
+}
+.view-all-btn {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--mono); font-size: 9px; letter-spacing: .15em;
+  color: var(--amber); min-height: 44px;
+  display: flex; align-items: center;
+}
+
+/* ── Card 0: Overview ── */
+.greeting { font-family: var(--sans); font-size: 20px; font-weight: 600; }
+.risk-block {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px; background: var(--bg2);
+  border-radius: 14px; border: 1px solid var(--border);
+}
+.risk-num {
+  font-family: var(--serif); font-size: 60px; font-weight: 300;
+  line-height: .9; letter-spacing: -.03em; flex-shrink: 0;
+}
+.risk-divider { width: 1px; background: var(--border); align-self: stretch; flex-shrink: 0; }
+.risk-brief-wrap { flex: 1; min-width: 0; }
+.risk-brief-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: .15em; color: var(--t3); margin-bottom: 6px; }
+.risk-brief-txt { font-family: var(--sans); font-size: 13px; line-height: 1.65; color: var(--t2); }
+
+/* Event list */
+.evt-list { display: flex; flex-direction: column; gap: 8px; }
+.evt-row {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 14px; background: var(--bg2);
+  border-radius: 10px; border: 1px solid rgba(255,255,255,.05);
+  cursor: pointer; min-height: 52px;
+}
+.evt-sev {
+  font-family: var(--serif); font-size: 28px; font-weight: 300;
+  line-height: 1; flex-shrink: 0; width: 34px;
+}
+.evt-body { flex: 1; min-width: 0; }
+.evt-title {
+  font-size: 14px; font-weight: 500; line-height: 1.35;
+  color: var(--t1); margin-bottom: 3px;
+  display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+.evt-meta { font-family: var(--mono); font-size: 10px; color: var(--t3); }
+
+/* ── Card 1: Markets ── */
+.kpi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.kpi-tile {
+  padding: 12px 10px; background: var(--bg2);
+  border-radius: 10px; border: 1px solid rgba(255,193,7,.08);
+  min-height: 72px;
+}
+.kpi-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: .1em; color: var(--t3); text-transform: uppercase; margin-bottom: 4px; }
+.kpi-val { font-family: var(--serif); font-size: 20px; font-weight: 300; line-height: 1; margin-bottom: 2px; }
+.kpi-chg { font-family: var(--mono); font-size: 11px; }
+.chg-up { color: var(--green); }
+.chg-dn { color: var(--red); }
+
+/* Mover rows */
+.mover-list { display: flex; flex-direction: column; gap: 6px; }
+.mover-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--bg2);
+  border-radius: 8px; border: 1px solid rgba(255,255,255,.04);
+  min-height: 44px;
+}
+.mover-tick { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--t1); width: 70px; flex-shrink: 0; }
+.mover-price { font-family: var(--serif); font-size: 16px; font-weight: 300; color: var(--t2); flex: 1; text-align: right; }
+.mover-chg { font-family: var(--mono); font-size: 11px; font-weight: 600; min-width: 68px; text-align: right; flex-shrink: 0; }
+
+/* Catbars */
+.catbar-list { display: flex; flex-direction: column; gap: 6px; }
+.catbar-row { display: flex; align-items: center; gap: 8px; }
+.catbar-lbl { font-size: 11px; color: var(--t2); width: 72px; flex-shrink: 0; }
+.catbar-bg { flex: 1; height: 4px; background: rgba(255,255,255,.06); border-radius: 2px; overflow: hidden; }
+.catbar-fg { height: 100%; border-radius: 2px; transition: width .6s ease; }
+.catbar-n { font-family: var(--mono); font-size: 10px; color: var(--t3); width: 28px; text-align: right; flex-shrink: 0; }
+
+/* ── Card 2: Crisi+EW news ── */
+.news-card {
+  padding: 14px; background: var(--bg2);
+  border-radius: 12px; border: 1px solid rgba(255,255,255,.06);
+  cursor: pointer; transition: background .15s;
+}
+.news-card:active { background: var(--bg3); }
+.news-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.news-sev-pill {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 6px; flex-shrink: 0;
+}
+.news-meta-txt { font-family: var(--mono); font-size: 9px; color: var(--t3); letter-spacing: .05em; }
+.news-title { font-size: 14px; font-weight: 600; color: var(--t1); line-height: 1.4; margin-bottom: 6px; }
+.news-desc { font-size: 12px; color: var(--t3); line-height: 1.55; }
+
+/* ── Card 3: EW Gauges ── */
+.ew-score-block {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px; background: var(--bg2);
+  border-radius: 14px; border: 1px solid var(--border);
+}
+.ew-big { font-family: var(--serif); font-size: 56px; font-weight: 300; line-height: .9; }
+.ew-label { font-family: var(--mono); font-size: 9px; letter-spacing: .2em; text-transform: uppercase; margin-top: 6px; }
+.ew-assess { flex: 1; font-size: 13px; line-height: 1.65; color: var(--t2); }
+.gauge-list { display: flex; flex-direction: column; gap: 10px; }
+.gauge-row { display: flex; align-items: center; gap: 8px; }
+.gauge-name { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; color: var(--t3); text-transform: uppercase; width: 92px; flex-shrink: 0; }
+.gauge-bar-bg { flex: 1; height: 5px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; }
+.gauge-fill { height: 100%; border-radius: 3px; transition: width .8s cubic-bezier(.16,1,.3,1); }
+.gauge-val { font-family: var(--mono); font-size: 10px; width: 26px; text-align: right; flex-shrink: 0; }
+
+.sig-list { display: flex; flex-direction: column; gap: 6px; }
+.sig-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--bg2);
+  border-radius: 8px; border-left: 3px solid var(--amber);
+  min-height: 44px;
+}
+.sig-icon { font-size: 16px; flex-shrink: 0; }
+.sig-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; flex: 1; }
+.sig-val { font-family: var(--mono); font-size: 10px; flex-shrink: 0; }
+
+/* Swipe hint */
+.swipe-hint {
+  font-family: var(--mono); font-size: 8px; letter-spacing: .2em;
+  color: rgba(255,255,255,.1); text-align: center; text-transform: uppercase;
+  margin-top: auto; padding-top: 16px;
+}
+
+/* Section label */
+.sec-lbl {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--t3);
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   VIEW 2 — MAPPA
+   ════════════════════════════════════════════════════════════════ */
+#view-map { background: #0d0f12; }
+#m-map { flex: 1; z-index: 1; }
+
+/* Chip bar */
+#m-chips {
+  position: absolute; top: 8px; left: 8px; right: 8px;
+  z-index: 500; display: flex; gap: 6px;
+  overflow-x: auto; padding: 2px 0;
+  scrollbar-width: none;
+}
+#m-chips::-webkit-scrollbar { display: none; }
+.m-chip {
+  flex-shrink: 0; padding: 7px 14px; border-radius: 20px;
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  cursor: pointer; border: 1px solid rgba(255,255,255,.12);
+  background: rgba(13,15,18,.90); color: rgba(255,255,255,.55);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  min-height: 36px; display: flex; align-items: center;
+  white-space: nowrap; transition: all .15s;
+}
+.m-chip.on {
+  background: rgba(255,193,7,.18); color: var(--amber);
+  border-color: rgba(255,193,7,.40); font-weight: 600;
+}
+
+/* Bottom sheet */
+#m-sheet {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(20,21,24,.97); z-index: 400;
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid rgba(255,193,7,.14);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  height: 50vh; display: flex; flex-direction: column;
+  touch-action: none; transition: height .3s cubic-bezier(.16,1,.3,1);
+}
+#m-sheet-handle {
+  width: 40px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,.18); margin: 12px auto 8px;
+  cursor: grab; flex-shrink: 0;
+}
+#m-sheet-head {
+  padding: 4px 16px 10px; display: flex;
+  justify-content: space-between; align-items: center; flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+#m-sheet-title { font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: rgba(255,255,255,.45); text-transform: uppercase; }
+#m-sheet-count { font-family: var(--mono); font-size: 10px; color: var(--amber); }
+#m-sheet-body {
+  flex: 1; overflow-y: auto; padding: 8px 12px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+.m-evt-row {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.05);
+  cursor: pointer; min-height: 52px;
+}
+.m-evt-row:last-child { border-bottom: none; }
+.m-evt-row:active { background: rgba(255,255,255,.03); border-radius: 8px; padding-right: 8px; }
+.m-sev { font-family: var(--serif); font-size: 26px; font-weight: 300; line-height: 1; flex-shrink: 0; width: 32px; text-align: right; }
+.m-info { flex: 1; min-width: 0; }
+.m-ttl { font-size: 14px; font-weight: 500; line-height: 1.3; color: var(--t1); margin-bottom: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.m-meta { font-family: var(--mono); font-size: 10px; color: var(--t3); }
+
+/* ════════════════════════════════════════════════════════════════
+   VIEW 3 — TRADGENTIC
+   ════════════════════════════════════════════════════════════════ */
+#view-tg { background: var(--bg); overflow-y: auto; }
+#tg-inner {
+  padding: 14px 16px 20px;
+  display: flex; flex-direction: column; gap: 16px;
+  min-height: 100%;
+}
+
+/* Top header */
+.tg-header { display: flex; align-items: center; justify-content: space-between; }
+.tg-logo-wrap { display: flex; align-items: center; gap: 10px; }
+.tg-logo-icon { font-size: 24px; }
+.tg-logo-name { font-family: var(--serif); font-size: 22px; font-weight: 300; color: var(--t1); }
+.tg-logo-sub { font-family: var(--mono); font-size: 8px; letter-spacing: .15em; color: var(--amber); text-transform: uppercase; }
+.tg-paper-tag {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .12em;
+  padding: 4px 10px; border-radius: 20px;
+  background: rgba(255,193,7,.12); color: var(--amber);
+  border: 1px solid rgba(255,193,7,.25);
+}
+
+/* Stats row */
+.tg-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.tg-stat {
+  padding: 12px 10px; background: var(--bg2);
+  border-radius: 10px; border: 1px solid var(--border); text-align: center;
+}
+.tg-stat-val { font-family: var(--serif); font-size: 22px; font-weight: 300; color: var(--t1); }
+.tg-stat-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: .1em; color: var(--t3); text-transform: uppercase; margin-top: 3px; }
+
+/* Scanner tiles */
+.tg-scanner-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.tg-scan-tile {
+  padding: 12px; background: var(--bg2);
+  border-radius: 10px; border: 1px solid rgba(255,255,255,.06);
+  cursor: pointer; transition: background .15s;
+}
+.tg-scan-tile:active { background: var(--bg3); }
+.tg-scan-sym { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--t1); margin-bottom: 3px; }
+.tg-scan-price { font-family: var(--serif); font-size: 18px; font-weight: 300; color: var(--t2); }
+.tg-scan-chg { font-family: var(--mono); font-size: 11px; font-weight: 600; margin-top: 2px; }
+.tg-scan-sig {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 6px; font-family: var(--mono); font-size: 9px;
+  padding: 2px 8px; border-radius: 20px;
+}
+.sig-long  { background: rgba(16,185,129,.12); color: #10b981; }
+.sig-short { background: rgba(239,68,68,.12);  color: #ef4444; }
+.sig-hold  { background: rgba(255,255,255,.06); color: var(--t3); }
+
+/* Bot cards */
+.tg-bots-list { display: flex; flex-direction: column; gap: 10px; }
+.tg-bot-card {
+  padding: 14px; background: var(--bg2);
+  border-radius: var(--r); border: 1px solid rgba(255,255,255,.07);
+  border-left-width: 3px;
+}
+.tg-bot-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.tg-bot-name { font-size: 15px; font-weight: 600; color: var(--t1); }
+.tg-bot-strat { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; color: var(--t3); text-transform: uppercase; }
+.tg-bot-pnl { font-family: var(--serif); font-size: 20px; font-weight: 300; }
+.tg-bot-pnl-lbl { font-family: var(--mono); font-size: 8px; color: var(--t3); text-transform: uppercase; }
+.tg-bot-meta { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.tg-bot-meta-item { font-family: var(--mono); font-size: 9px; color: var(--t3); }
+.tg-bot-meta-item span { color: var(--t2); }
+.tg-bot-actions { display: flex; gap: 6px; margin-top: 10px; }
+.tg-bot-btn {
+  flex: 1; padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.05); color: var(--t2);
+  font-family: var(--sans); font-size: 12px; font-weight: 600;
+  cursor: pointer; min-height: 40px; transition: all .15s;
+}
+.tg-bot-btn.primary { background: rgba(255,193,7,.15); color: var(--amber); border-color: rgba(255,193,7,.25); }
+.tg-bot-btn:active { opacity: .7; }
+
+/* Empty state */
+.tg-empty {
+  padding: 40px 20px; text-align: center;
+  font-family: var(--sans); font-size: 14px; color: var(--t3); line-height: 1.7;
+}
+.tg-empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+/* Wizard overlay */
+#tg-wizard {
+  position: absolute; inset: 0; background: rgba(10,11,14,.96);
+  display: none; flex-direction: column;
+  z-index: 900; overflow-y: auto;
+}
+#tg-wizard.open { display: flex; }
+.wiz-inner {
+  padding: 20px 16px;
+  display: flex; flex-direction: column;
+  gap: 16px; flex: 1;
+}
+.wiz-title { font-family: var(--serif); font-size: 28px; font-weight: 300; }
+.wiz-sub { font-size: 14px; color: var(--t3); line-height: 1.6; }
+.wiz-step-dots { display: flex; gap: 6px; }
+.wiz-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.15); transition: all .2s; }
+.wiz-dot.on { width: 20px; border-radius: 4px; background: var(--amber); }
+.wiz-body { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.wiz-label { font-family: var(--mono); font-size: 10px; letter-spacing: .15em; color: var(--t3); text-transform: uppercase; margin-bottom: 4px; }
+.wiz-option {
+  padding: 14px 16px; background: var(--bg2);
+  border-radius: 10px; border: 1px solid rgba(255,255,255,.08);
+  cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; gap: 12px; min-height: 52px;
+}
+.wiz-option:active, .wiz-option.sel {
+  border-color: var(--amber); background: rgba(255,193,7,.08);
+}
+.wiz-option-icon { font-size: 20px; flex-shrink: 0; }
+.wiz-option-name { font-size: 14px; font-weight: 600; color: var(--t1); }
+.wiz-option-desc { font-size: 12px; color: var(--t3); margin-top: 2px; }
+.wiz-footer { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; }
+
+/* Loading state */
+.loading-shimmer {
+  background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px; height: 14px;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Login overlay */
+#login-overlay {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; padding: 24px;
+}
+.login-box { width: 100%; max-width: 380px; }
+.login-logo { font-family: var(--serif); font-size: 42px; font-weight: 300; color: var(--t1); margin-bottom: 4px; }
+.login-tag { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; color: var(--amber); text-transform: uppercase; margin-bottom: 32px; }
+.login-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.login-err { font-size: 12px; color: var(--red); min-height: 16px; }
+.login-footer { margin-top: 16px; text-align: center; font-size: 12px; color: var(--t3); }
+.login-footer a { color: var(--amber); cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ─────────────────────────────────────────────────── -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">WorldLens</div>
+    <div class="login-tag">Intelligence Platform</div>
+    <div class="login-fields">
+      <input type="email"    id="l-email" placeholder="Email" autocomplete="email">
+      <input type="password" id="l-pass"  placeholder="Password" autocomplete="current-password">
+    </div>
+    <div id="l-err" class="login-err"></div>
+    <button class="btn btn-amber" style="width:100%;justify-content:center;font-size:16px" onclick="doLogin()">Accedi</button>
+    <div class="login-footer">
+      Non hai un account? <a onclick="showReg()">Registrati</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP SHELL ──────────────────────────────────────────────── -->
+<div id="app" style="display:none">
+
+  <!-- VIEW 1: DASHBOARD -->
+  <div class="view active" id="view-dash">
+    <div id="ticker">
+      <div class="ticker-lbl">LIVE</div>
+      <div id="ticker-inner"><div id="ticker-track"></div></div>
+    </div>
+    <div id="dash-dots">
+      <span class="ddot on" data-i="0"></span>
+      <span class="ddot"    data-i="1"></span>
+      <span class="ddot"    data-i="2"></span>
+      <span class="ddot"    data-i="3"></span>
+    </div>
+    <div id="dash-track">
+
+      <!-- CARD 0: OVERVIEW -->
+      <div class="dcard" data-card="0">
+        <div>
+          <div class="overline" id="d-time-lbl">WORLDLENS</div>
+          <div class="greeting" id="d-greeting">Benvenuto</div>
+        </div>
+        <div class="risk-block">
+          <div>
+            <div class="overline" style="margin-bottom:4px">RISCHIO</div>
+            <div class="risk-num" id="d-risk-num" style="color:var(--amber)">—</div>
+            <div style="font-family:var(--mono);font-size:9px;letter-spacing:.15em;text-transform:uppercase;margin-top:6px" id="d-risk-lbl" style="color:var(--amber)">—</div>
+          </div>
+          <div class="risk-divider"></div>
+          <div class="risk-brief-wrap">
+            <div class="risk-brief-lbl">AI CHIEF ANALYST</div>
+            <div class="risk-brief-txt" id="d-brief">Caricamento analisi…</div>
+          </div>
+        </div>
+        <div>
+          <div class="sec-lbl" style="margin-bottom:10px">
+            CRISI ATTIVE
+            <span style="color:var(--amber)" id="d-ev-cnt"></span>
+          </div>
+          <div class="evt-list" id="d-evt-list"></div>
+        </div>
+        <div class="swipe-hint">Scorri → Mercati</div>
+      </div>
+
+      <!-- CARD 1: MERCATI -->
+      <div class="dcard" data-card="1">
+        <div class="dcard-head">
+          <div>
+            <div class="overline">MERCATI</div>
+            <div class="dcard-title">Snapshot live</div>
+          </div>
+          <button class="view-all-btn" onclick="showTG()">TradGentic →</button>
+        </div>
+        <div class="kpi-grid" id="d-kpi-grid">
+          <!-- populated by JS -->
+        </div>
+        <div>
+          <div class="sec-lbl" style="margin-bottom:10px">TOP MOVERS</div>
+          <div class="mover-list" id="d-movers"></div>
+        </div>
+        <div>
+          <div class="sec-lbl" style="margin-bottom:10px">PER CATEGORIA</div>
+          <div class="catbar-list" id="d-catbars"></div>
+        </div>
+        <div class="swipe-hint">← Overview · Crisi →</div>
+      </div>
+
+      <!-- CARD 2: CRISI + NEWS -->
+      <div class="dcard" data-card="2">
+        <div class="dcard-head">
+          <div>
+            <div class="overline">⚡ NEWS CRITICHE</div>
+            <div class="dcard-title">Crisi in corso</div>
+          </div>
+        </div>
+        <div class="evt-list" id="d-news-list"></div>
+        <div class="swipe-hint">← Mercati · EW →</div>
+      </div>
+
+      <!-- CARD 3: EARLY WARNING -->
+      <div class="dcard" data-card="3">
+        <div class="dcard-head">
+          <div>
+            <div class="overline">📡 EARLY WARNING</div>
+            <div class="dcard-title">Segnali predittivi</div>
+          </div>
+        </div>
+        <div class="ew-score-block">
+          <div>
+            <div class="overline" style="margin-bottom:4px">EW SCORE</div>
+            <div class="ew-big" id="d-ew-score" style="color:var(--amber)">—</div>
+            <div class="ew-label" id="d-ew-lbl" style="color:var(--amber)">LOADING</div>
+          </div>
+          <div class="ew-assess" id="d-ew-assess">Analisi in corso…</div>
+        </div>
+        <div>
+          <div class="sec-lbl" style="margin-bottom:10px">STRESS INDICATORS</div>
+          <div class="gauge-list">
+            <div class="gauge-row">
+              <span class="gauge-name">Macro Stress</span>
+              <div class="gauge-bar-bg"><div class="gauge-fill" id="gf-macro" style="width:0%"></div></div>
+              <span class="gauge-val" id="gv-macro">—</span>
+            </div>
+            <div class="gauge-row">
+              <span class="gauge-name">Market Stress</span>
+              <div class="gauge-bar-bg"><div class="gauge-fill" id="gf-market" style="width:0%"></div></div>
+              <span class="gauge-val" id="gv-market">—</span>
+            </div>
+            <div class="gauge-row">
+              <span class="gauge-name">Sentiment</span>
+              <div class="gauge-bar-bg"><div class="gauge-fill" id="gf-sent" style="width:0%"></div></div>
+              <span class="gauge-val" id="gv-sent">—</span>
+            </div>
+            <div class="gauge-row">
+              <span class="gauge-name">Velocità</span>
+              <div class="gauge-bar-bg"><div class="gauge-fill" id="gf-vel" style="width:0%"></div></div>
+              <span class="gauge-val" id="gv-vel">—</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="sec-lbl" style="margin-bottom:10px">SEGNALI ATTIVI</div>
+          <div class="sig-list" id="d-sig-list"></div>
+        </div>
+        <div class="swipe-hint">← Crisi</div>
+      </div>
+
+    </div><!-- dash-track -->
+  </div><!-- view-dash -->
+
+  <!-- VIEW 2: MAPPA -->
+  <div class="view" id="view-map">
+    <div id="m-chips">
+      <button class="m-chip on" data-cat="all"        onclick="mChip(this,'all')">Tutti</button>
+      <button class="m-chip"    data-cat="Conflict"   onclick="mChip(this,'Conflict')">⚔ Conflitto</button>
+      <button class="m-chip"    data-cat="Economics"  onclick="mChip(this,'Economics')">📈 Economia</button>
+      <button class="m-chip"    data-cat="Energy"     onclick="mChip(this,'Energy')">⚡ Energia</button>
+      <button class="m-chip"    data-cat="Disaster"   onclick="mChip(this,'Disaster')">🌊 Disastri</button>
+      <button class="m-chip"    data-cat="Politics"   onclick="mChip(this,'Politics')">🏛 Politica</button>
+    </div>
+    <div id="m-map"></div>
+    <div id="m-sheet">
+      <div id="m-sheet-handle"></div>
+      <div id="m-sheet-head">
+        <span id="m-sheet-title">EVENTI RECENTI</span>
+        <span id="m-sheet-count"></span>
+      </div>
+      <div id="m-sheet-body"></div>
+    </div>
+  </div>
+
+  <!-- VIEW 3: TRADGENTIC -->
+  <div class="view" id="view-tg">
+    <div id="tg-inner">
+      <div class="tg-header">
+        <div class="tg-logo-wrap">
+          <div class="tg-logo-icon">🤖</div>
+          <div>
+            <div class="tg-logo-name">Tradgentic</div>
+            <div class="tg-logo-sub">Virtual Trading Lab</div>
+          </div>
+        </div>
+        <div class="tg-paper-tag">📄 PAPER</div>
+      </div>
+
+      <!-- Portfolio stats -->
+      <div class="tg-stats" id="tg-stats">
+        <div class="tg-stat"><div class="tg-stat-val" id="tg-total-pnl">—</div><div class="tg-stat-lbl">P&amp;L Totale</div></div>
+        <div class="tg-stat"><div class="tg-stat-val" id="tg-bot-count">—</div><div class="tg-stat-lbl">Bot Attivi</div></div>
+        <div class="tg-stat"><div class="tg-stat-val" id="tg-win-rate">—</div><div class="tg-stat-lbl">Win Rate</div></div>
+      </div>
+
+      <!-- New bot button -->
+      <button class="btn btn-amber" style="width:100%;justify-content:center" onclick="openWiz()">
+        ＋ Nuovo Bot
+      </button>
+
+      <!-- Market scanner -->
+      <div>
+        <div class="sec-lbl" style="margin-bottom:10px">
+          MARKET SCANNER
+          <button class="view-all-btn" onclick="loadScanner()">↻ Aggiorna</button>
+        </div>
+        <div class="tg-scanner-grid" id="tg-scanner"></div>
+      </div>
+
+      <!-- Bot list -->
+      <div>
+        <div class="sec-lbl" style="margin-bottom:10px">I TUOI BOT</div>
+        <div class="tg-bots-list" id="tg-bots"></div>
+      </div>
+    </div>
+
+    <!-- Wizard overlay -->
+    <div id="tg-wizard">
+      <div class="wiz-inner">
+        <div class="wiz-step-dots" id="wiz-dots">
+          <div class="wiz-dot on"></div>
+          <div class="wiz-dot"></div>
+          <div class="wiz-dot"></div>
+        </div>
+        <div class="wiz-title" id="wiz-title">Scegli Strategia</div>
+        <div class="wiz-sub" id="wiz-sub">Seleziona l'algoritmo di trading per il tuo nuovo bot.</div>
+        <div class="wiz-body" id="wiz-body"></div>
+        <div class="wiz-footer">
+          <button class="btn btn-ghost" id="wiz-back" onclick="wizBack()" style="display:none">← Indietro</button>
+          <button class="btn btn-amber" id="wiz-next" onclick="wizNext()">Avanti →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav id="nav">
+    <button class="nav-btn active" id="nb-dash" onclick="showView('dash')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      Home
+      <span class="nav-badge" id="nb-badge" style="display:none"></span>
+    </button>
+    <button class="nav-btn" id="nb-map" onclick="showView('map')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="10" r="8"/><path d="M4 10h16M12 2c-3 3-4.5 5.5-4.5 8s1.5 6 4.5 8M12 2c3 3 4.5 5.5 4.5 8s-1.5 6-4.5 8"/></svg>
+      Mappa
+    </button>
+    <button class="nav-btn" id="nb-tg" onclick="showView('tg')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      TradGentic
+    </button>
+  </nav>
+</div>
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   WORLDLENS MOBILE APP — core JS
+   ════════════════════════════════════════════════════════════════ */
+'use strict';
+
+var G = { token: null, user: null, events: [], finance: {}, ew: null, ewSigs: [] };
+var API = location.origin;
+
+/* ── Fetch helper ────────────────────────────────────────────── */
+function api(path, opts) {
+  opts = opts || {};
+  var headers = { 'Content-Type': 'application/json' };
+  if (G.token) headers['Authorization'] = 'Bearer ' + G.token;
+  return fetch(API + path, {
+    method: opts.method || 'GET',
+    headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  }).then(function(r) {
+    if (r.status === 401) { logout(); return null; }
+    return r.json();
+  }).catch(function() { return null; });
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function tAgo(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr), diff = Math.round((Date.now()-d)/60000);
+  return diff < 60 ? diff+'m fa' : diff < 1440 ? Math.round(diff/60)+'h fa' : Math.round(diff/1440)+'g fa';
+}
+function sevCol(s) {
+  return s >= 7.5 ? '#ff5722' : s >= 5.5 ? '#ffc107' : '#66bb6a';
+}
+function ewCol(s) {
+  return s >= 7.5 ? '#ff5722' : s >= 6 ? '#ffc107' : s >= 4 ? '#ffca28' : '#66bb6a';
+}
+
+/* ── Auth ────────────────────────────────────────────────────── */
+function doLogin() {
+  var email = document.getElementById('l-email').value.trim();
+  var pass  = document.getElementById('l-pass').value;
+  var errEl = document.getElementById('l-err');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Inserisci email e password'; return; }
+  api('/api/auth/login', { method:'POST', body:{ email:email, password:pass } }).then(function(r) {
+    if (!r) { errEl.textContent = 'Errore di rete'; return; }
+    if (r.access_token) {
+      G.token = r.access_token;
+      G.user  = r.user || {};
+      try { localStorage.setItem('wl_m_token', G.token); } catch(e){}
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      bootApp();
+    } else {
+      errEl.textContent = r.detail || 'Credenziali non valide';
+    }
+  });
+}
+function showReg() {
+  document.getElementById('l-err').textContent = 'Registrazione disponibile su worldlens.onrender.com';
+}
+function logout() {
+  G.token = null;
+  try { localStorage.removeItem('wl_m_token'); } catch(e){}
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+// Auto-login from stored token
+(function() {
+  try { G.token = localStorage.getItem('wl_m_token'); } catch(e){}
+  if (G.token) {
+    api('/api/auth/me').then(function(r) {
+      if (r && r.id) {
+        G.user = r;
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('app').style.display = 'flex';
+        bootApp();
+      } else {
+        G.token = null;
+      }
+    });
+  }
+})();
+
+/* ── Boot ────────────────────────────────────────────────────── */
+function bootApp() {
+  loadDash();
+  buildTicker();
+  initMap();
+  loadTG();
+  // Refresh every 90s
+  setInterval(function() { loadDash(); }, 90000);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DASHBOARD
+   ════════════════════════════════════════════════════════════════ */
+function loadDash() {
+  Promise.all([
+    api('/api/events?limit=200&hours=72'),
+    api('/api/events/stats/summary'),
+    api('/api/markets/universe'),
+    api('/api/intelligence/early-warning'),
+    api('/api/intelligence/early-warning/signals'),
+    api('/api/intelligence/macro-brief'),
+  ]).then(function(results) {
+    var evs  = (results[0]||{}).events || results[0] || [];
+    var stats = results[1] || {};
+    var fin   = results[2] || {};
+    var ew    = results[3] || {};
+    var sigs  = (results[4]||{}).signals || [];
+    var brief = (results[5]||{}).brief   || '';
+
+    G.events = Array.isArray(evs) ? evs : [];
+    G.ew = ew;
+    G.ewSigs = sigs;
+
+    renderCard0(stats, brief);
+    renderCard1(fin, stats);
+    renderCard2();
+    renderCard3(ew, sigs);
+    buildTicker();
+  });
+}
+
+function renderCard0(stats, brief) {
+  // Greeting
+  var name = G.user && (G.user.display_name || G.user.username || (G.user.email||'').split('@')[0]) || '';
+  var h = new Date().getHours();
+  var sal = h<12?'Buongiorno':h<18?'Buon pomeriggio':'Buonasera';
+  var days = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+  var el = document.getElementById('d-time-lbl');
+  if (el) el.textContent = days[new Date().getDay()].toUpperCase() + ' · ' + new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+  var gr = document.getElementById('d-greeting');
+  if (gr) gr.textContent = name ? sal+', '+name : sal;
+
+  // Risk
+  var r = parseFloat(stats.global_risk_index || stats.avg_severity || 0) || 0;
+  var col = r>60?'#ff5722':r>35?'#ffc107':'#66bb6a';
+  var rn = document.getElementById('d-risk-num'), rl = document.getElementById('d-risk-lbl');
+  if (rn) { rn.textContent = r>0?r.toFixed(0):'—'; rn.style.color=col; }
+  if (rl) { rl.textContent = r>60?'CRITICO':r>35?'ELEVATO':'STABILE'; rl.style.color=col; }
+
+  // Badge
+  var high = G.events.filter(function(e){return (e.severity||0)>=7;}).length;
+  var badge = document.getElementById('nb-badge');
+  if (badge) { badge.style.display = high>0?'block':'none'; badge.textContent = high>99?'99+':String(high); }
+  var cnt = document.getElementById('d-ev-cnt');
+  if (cnt) cnt.textContent = G.events.length>0?'('+G.events.length+')':'';
+
+  // Brief
+  var bEl = document.getElementById('d-brief');
+  if (bEl && brief && brief.length>10) bEl.textContent = brief.slice(0,280) + (brief.length>280?'…':'');
+
+  // Events
+  var top = G.events.slice().sort(function(a,b){return (b.severity||0)-(a.severity||0);}).slice(0,6);
+  var list = document.getElementById('d-evt-list');
+  if (list) list.innerHTML = top.map(function(ev) {
+    var s = parseFloat(ev.severity||5), col = sevCol(s);
+    return '<div class="evt-row" onclick="openEvt(\''+esc(ev.id||'')+'\')">'
+      +'<div class="evt-sev" style="color:'+col+'">'+s.toFixed(0)+'</div>'
+      +'<div class="evt-body">'
+      +'<div class="evt-title">'+esc(ev.title||'')+'</div>'
+      +'<div class="evt-meta">'+esc(ev.country_name||ev.country_code||'Global')+' · '+esc((ev.category||'').slice(0,8))+' · '+tAgo(ev.timestamp)+'</div>'
+      +'</div></div>';
+  }).join('');
+}
+
+function renderCard1(fin, stats) {
+  var KPIS = [
+    {id:'SPY',  lbl:'S&P 500'},  {id:'BTC-USD', lbl:'BTC/USD'},
+    {id:'VIX',  lbl:'VIX'},      {id:'GC=F',    lbl:'Gold/oz'},
+    {id:'DX-Y.NYB', lbl:'DXY'},  {id:'_ev',     lbl:'EVENTI 24H'},
+  ];
+  var grid = document.getElementById('d-kpi-grid');
+  if (!grid) return;
+
+  grid.innerHTML = KPIS.map(function(k) {
+    var d = fin[k.id] || {};
+    var price = d.price||d.last||0;
+    var chg   = parseFloat(d.change_pct||d.changePct||d.change||0);
+    var val   = k.id === '_ev' ? (stats.event_count||G.events.length||'—') : (price>0?(price>100?price.toFixed(0):price.toFixed(2)):'—');
+    var chgStr = k.id === '_ev' ? (stats.high_impact||'') : (chg!==0?(chg>0?'+':'')+chg.toFixed(2)+'%':'');
+    var chgCls = chg>0?'chg-up':chg<0?'chg-dn':'';
+    return '<div class="kpi-tile">'
+      +'<div class="kpi-lbl">'+esc(k.lbl)+'</div>'
+      +'<div class="kpi-val">'+esc(String(val))+'</div>'
+      +(chgStr?'<div class="kpi-chg '+chgCls+'">'+esc(chgStr)+'</div>':'')
+      +'</div>';
+  }).join('');
+
+  // Movers
+  var entries = Object.entries(fin).map(function(kv) {
+    var d = kv[1]||{}, chg = parseFloat(d.change_pct||d.changePct||d.change||0);
+    return {ticker:kv[0], price:d.price||d.last||0, chg:chg, name:d.name||kv[0]};
+  }).filter(function(a){return a.price>0&&!isNaN(a.chg);})
+    .sort(function(a,b){return Math.abs(b.chg)-Math.abs(a.chg);}).slice(0,6);
+
+  var mv = document.getElementById('d-movers');
+  if (mv) mv.innerHTML = entries.map(function(a) {
+    var c = a.chg>=0?'#10b981':'#ef4444', arrow = a.chg>=0?'▲':'▼';
+    var sign = a.chg>=0?'+':'';
+    return '<div class="mover-row">'
+      +'<div class="mover-tick">'+esc(a.ticker.slice(0,10))+'</div>'
+      +'<div class="mover-price">'+(a.price>100?a.price.toFixed(0):a.price.toFixed(2))+'</div>'
+      +'<div class="mover-chg" style="color:'+c+'">'+arrow+' '+sign+a.chg.toFixed(2)+'%</div>'
+      +'</div>';
+  }).join('');
+
+  // Catbars
+  var bycat = (stats && stats.by_category) || {};
+  var total = Object.values(bycat).reduce(function(a,b){return a+b;},0)||1;
+  var sorted = Object.entries(bycat).sort(function(a,b){return b[1]-a[1];}).slice(0,6);
+  var COLORS = {Conflict:'#ef4444',Economics:'#f59e0b',Politics:'#8b5cf6',Energy:'#f97316',Technology:'#3b82f6',Disaster:'#10b981'};
+  var cb = document.getElementById('d-catbars');
+  if (cb) cb.innerHTML = sorted.map(function(kv) {
+    var col = COLORS[kv[0]]||'#64748b', pct = Math.round(kv[1]/total*100);
+    return '<div class="catbar-row">'
+      +'<div class="catbar-lbl" style="color:'+col+'">'+esc(kv[0].slice(0,9))+'</div>'
+      +'<div class="catbar-bg"><div class="catbar-fg" style="width:'+pct+'%;background:'+col+'"></div></div>'
+      +'<div class="catbar-n">'+kv[1]+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderCard2() {
+  var evs = G.events.slice().filter(function(e){return (e.severity||0)>=5;})
+    .sort(function(a,b){return (b.severity||0)-(a.severity||0);}).slice(0,12);
+  var el = document.getElementById('d-news-list');
+  if (!el) return;
+  el.innerHTML = evs.map(function(ev) {
+    var s = parseFloat(ev.severity||5), col = sevCol(s);
+    var desc = (ev.ai_summary||ev.summary||'').slice(0,130);
+    return '<div class="news-card" onclick="openEvt(\''+esc(ev.id||'+')+'\')">'
+      +'<div class="news-head">'
+      +'<span class="news-sev-pill" style="color:'+col+';background:'+col+'15">'+s.toFixed(0)+'</span>'
+      +'<span class="news-meta-txt">'+esc(ev.country_name||'Global')+' · '+tAgo(ev.timestamp)+'</span>'
+      +'</div>'
+      +'<div class="news-title">'+esc(ev.title||'')+'</div>'
+      +(desc?'<div class="news-desc">'+esc(desc)+(desc.length>=128?'…':'')+'</div>':'')
+      +'</div>';
+  }).join('');
+}
+
+function renderCard3(ew, sigs) {
+  var sc = parseFloat(ew.global_ew_score||ew.score||0), col = ewCol(sc);
+  var sEl = document.getElementById('d-ew-score'), lEl = document.getElementById('d-ew-lbl');
+  if (sEl) { sEl.textContent = sc>0?sc.toFixed(1):'—'; sEl.style.color=col; }
+  if (lEl) { lEl.textContent = sc>=7.5?'CRITICAL':sc>=6?'ELEVATED':sc>=4?'MODERATE':'STABLE'; lEl.style.color=col; }
+
+  var assess = ew.ai_assessment||ew.assessment||'';
+  var aEl = document.getElementById('d-ew-assess');
+  if (aEl && assess) aEl.textContent = assess.slice(0,260)+(assess.length>260?'…':'');
+
+  var gauges = {macro:ew.macro_stress||0, market:ew.market_stress||0, sent:Math.abs(ew.sentiment_trend||0)*10, vel:Math.min(10,(ew.event_velocity||1)*4)};
+  var sentCol = (ew.sentiment_trend||0)<-0.3?'#ff5722':'#ffc107';
+  ['macro','market','sent','vel'].forEach(function(k) {
+    var v = gauges[k], pct = Math.min(100,Math.max(0,(v/10)*100));
+    var c = k==='sent'?sentCol:ewCol(v);
+    var f = document.getElementById('gf-'+k), lv = document.getElementById('gv-'+k);
+    if (f) { f.style.width=pct+'%'; f.style.background=c; }
+    if (lv) { lv.textContent=v.toFixed(1); lv.style.color=c; }
+  });
+
+  var sl = document.getElementById('d-sig-list');
+  if (sl && sigs.length) {
+    sl.innerHTML = sigs.slice(0,5).map(function(sig) {
+      var lvl = sig.level||(sig.severity>=7.5?'critical':sig.severity>=5.5?'major':'watch');
+      var c = lvl==='critical'?'#ff5722':lvl==='major'?'#ffc107':'#66bb6a';
+      var label = (sig.label||sig.type||'').replace(/_/g,' ').toUpperCase();
+      var val = sig.value||(sig.severity?parseFloat(sig.severity).toFixed(1):'—');
+      var meta = sig.meta||(sig.region?(sig.region+(sig.title?' · '+sig.title.slice(0,50):'')):'');
+      return '<div class="sig-row" style="border-left-color:'+c+'">'
+        +'<span class="sig-icon">'+(sig.icon||'⚠️')+'</span>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div class="sig-lbl" style="color:'+c+'">'+esc(label.slice(0,30))+'</div>'
+        +(meta?'<div style="font-size:10px;color:var(--t3);margin-top:1px">'+esc(meta.slice(0,55))+'</div>':'')
+        +'</div>'
+        +'<span class="sig-val" style="color:'+c+';font-family:var(--mono);font-size:10px">'+esc(String(val).slice(0,6))+'</span>'
+        +'</div>';
+    }).join('');
+  }
+}
+
+/* ── Ticker ── */
+function buildTicker() {
+  var evs = G.events.slice().sort(function(a,b){return (b.severity||0)-(a.severity||0);}).slice(0,15);
+  if (!evs.length) return;
+  var items = evs.map(function(ev) {
+    var s = parseFloat(ev.severity||5);
+    var cls = s>=7?'tick-dn':s>=5?'tick-item':'tick-fl';
+    return '<span class="tick-item '+cls+'">▸ '+esc((ev.title||'').slice(0,60))+'</span>';
+  });
+  // Duplicate for infinite scroll
+  var full = items.concat(items).join('');
+  var tr = document.getElementById('ticker-track');
+  if (tr) tr.innerHTML = full;
+}
+
+/* ── Swipe navigation ── */
+var _curCard = 0;
+(function() {
+  var track = document.getElementById('dash-track');
+  if (!track) return;
+  track.addEventListener('scroll', function() {
+    var i = Math.round(track.scrollLeft / window.innerWidth);
+    if (i !== _curCard) {
+      _curCard = i;
+      document.querySelectorAll('.ddot').forEach(function(d, idx) {
+        d.classList.toggle('on', idx===i);
+      });
+    }
+  }, {passive:true});
+  document.querySelectorAll('.ddot').forEach(function(d) {
+    d.addEventListener('click', function() {
+      var i = parseInt(this.dataset.i)||0;
+      track.scrollTo({left: i*window.innerWidth, behavior:'smooth'});
+    });
+  });
+})();
+
+/* ── View navigation ── */
+function showView(name) {
+  var map = {dash:'view-dash', map:'view-map', tg:'view-tg'};
+  var nb  = {dash:'nb-dash', map:'nb-map', tg:'nb-tg'};
+  Object.keys(map).forEach(function(k) {
+    var v = document.getElementById(map[k]);
+    if (v) v.classList.toggle('active', k===name);
+    var b = document.getElementById(nb[k]);
+    if (b) b.classList.toggle('active', k===name);
+  });
+  if (name==='map') initMap();
+  if (name==='tg')  loadTG();
+}
+function showTG() { showView('tg'); }
+function openEvt(id) {
+  // Navigate to map and pan to event
+  showView('map');
+  if (!id) return;
+  var ev = G.events.find(function(e){return e.id===id;});
+  if (ev && ev.latitude && ev.longitude && window._mapL) {
+    window._mapL.setView([ev.latitude, ev.longitude], 6);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   MAP
+   ════════════════════════════════════════════════════════════════ */
+var _mapL = null, _mapLayer = null, _mapCat = 'all', _mapInited = false;
+
+function initMap() {
+  if (_mapInited) { if (_mapL) _mapL.invalidateSize(); return; }
+  var el = document.getElementById('m-map');
+  if (!el) return;
+  _mapInited = true;
+
+  _mapL = L.map('m-map', {
+    center: [20,0], zoom: 2, zoomControl: false,
+    attributionControl: false,
+  });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {maxZoom:18}).addTo(_mapL);
+  L.control.zoom({position:'topright'}).addTo(_mapL);
+
+  _mapLayer = L.layerGroup().addTo(_mapL);
+  renderMapMarkers();
+
+  // Sheet drag
+  initSheetDrag();
+  renderSheetList();
+
+  setTimeout(function(){ _mapL.invalidateSize(); }, 300);
+}
+
+function renderMapMarkers() {
+  if (!_mapLayer || !_mapL) return;
+  _mapLayer.clearLayers();
+  var evs = G.events.filter(function(e) {
+    return e.latitude && e.longitude &&
+      (_mapCat==='all' || (e.category||'')=== _mapCat);
+  });
+  evs.forEach(function(ev) {
+    var s = parseFloat(ev.severity||5);
+    var col = s>=7.5?'#ff5722':s>=5.5?'#ffc107':'#66bb6a';
+    var r = Math.max(5, Math.min(14, s*1.4));
+    var icon = L.divIcon({
+      className:'',
+      html:'<div style="width:'+r*2+'px;height:'+r*2+'px;border-radius:50%;background:'+col+';opacity:.75;border:2px solid rgba(255,255,255,.3)"></div>',
+      iconSize:[r*2,r*2], iconAnchor:[r,r],
+    });
+    L.marker([ev.latitude, ev.longitude], {icon:icon})
+      .addTo(_mapLayer)
+      .on('click', function() {
+        snapSheet('full');
+        // Scroll to event in sheet
+        setTimeout(function() {
+          var rows = document.querySelectorAll('.m-evt-row[data-id="'+ev.id+'"]');
+          if (rows.length) rows[0].scrollIntoView({behavior:'smooth',block:'center'});
+        }, 300);
+      });
+  });
+}
+
+function mChip(btn, cat) {
+  document.querySelectorAll('.m-chip').forEach(function(c){c.classList.remove('on');});
+  btn.classList.add('on');
+  _mapCat = cat;
+  renderMapMarkers();
+  renderSheetList();
+}
+
+function renderSheetList() {
+  var body = document.getElementById('m-sheet-body');
+  var cnt  = document.getElementById('m-sheet-count');
+  if (!body) return;
+  var evs = G.events.filter(function(e){
+    return _mapCat==='all'||(e.category||'')=== _mapCat;
+  }).slice().sort(function(a,b){return (b.severity||0)-(a.severity||0);}).slice(0,30);
+  if (cnt) cnt.textContent = '('+evs.length+')';
+  body.innerHTML = evs.map(function(ev) {
+    var s = parseFloat(ev.severity||5), col = sevCol(s);
+    var country = esc(ev.country_name||ev.country_code||'Global');
+    var cat = esc((ev.category||'').slice(0,8));
+    return '<div class="m-evt-row" data-id="'+esc(ev.id||'')+'">'+
+      '<div class="m-sev" style="color:'+col+'">'+s.toFixed(0)+'</div>'+
+      '<div class="m-info">'+
+      '<div class="m-ttl">'+esc(ev.title||'')+'</div>'+
+      '<div class="m-meta">'+country+(cat?' · '+cat:'')+' · '+tAgo(ev.timestamp)+'</div>'+
+      '</div></div>';
+  }).join('');
+}
+
+/* Sheet drag */
+var _sheetH = 0, _dragY0 = 0, _dragging = false;
+function initSheetDrag() {
+  var sheet = document.getElementById('m-sheet');
+  var handle = document.getElementById('m-sheet-handle');
+  var header = document.getElementById('m-sheet-head');
+  if (!sheet) return;
+  snapSheet('half');
+  [handle, header].forEach(function(el) {
+    if (!el) return;
+    el.addEventListener('touchstart',  function(e){_dragging=true;_dragY0=e.touches[0].clientY;_sheetH=sheet.offsetHeight;sheet.style.transition='none';},{passive:true});
+    el.addEventListener('touchmove',   function(e){if(!_dragging)return;var dy=_dragY0-e.touches[0].clientY;sheet.style.height=Math.max(60,Math.min(window.innerHeight*.92,_sheetH+dy))+'px';},{passive:true});
+    el.addEventListener('touchend',    function(){_dragging=false;var h=sheet.offsetHeight,vp=window.innerHeight;if(h<vp*.25)snapSheet('peek');else if(h<vp*.7)snapSheet('half');else snapSheet('full');});
+  });
+}
+function snapSheet(state) {
+  var sheet = document.getElementById('m-sheet');
+  var body  = document.getElementById('m-sheet-body');
+  if (!sheet) return;
+  var h = state==='peek'?60:state==='half'?window.innerHeight*.5:window.innerHeight*.9;
+  sheet.style.transition = 'height .3s cubic-bezier(.16,1,.3,1)';
+  sheet.style.height = h+'px';
+  if (body) body.style.overflowY = state==='full'?'auto':'hidden';
+  if (_mapL) setTimeout(function(){ _mapL.invalidateSize(); }, 350);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TRADGENTIC
+   ════════════════════════════════════════════════════════════════ */
+var TG = { bots:[], strats:[], quotes:{}, wiz:{step:0, strat:null, name:'', assets:[]} };
+var SCANNER_SYMS = ['AAPL','MSFT','NVDA','SPY','QQQ','BTC-USD','ETH-USD','GC=F','CL=F','^VIX'];
+var STRAT_META = {
+  ma_crossover:    {icon:'📈', name:'MA Crossover',    desc:'Moving average crossover signals'},
+  rsi_reversion:   {icon:'🔄', name:'RSI Reversion',   desc:'Mean reversion on RSI extremes'},
+  bollinger_bands: {icon:'📊', name:'Bollinger Bands', desc:'Volatility breakout strategy'},
+  macd_momentum:   {icon:'⚡', name:'MACD Momentum',   desc:'Momentum following with MACD'},
+};
+var CAT_COLORS = {Conflict:'#ef4444',Economics:'#f59e0b',Politics:'#8b5cf6',Energy:'#f97316',Technology:'#3b82f6',Disaster:'#10b981',Military:'#dc2626',Financial:'#eab308'};
+
+function loadTG() {
+  api('/api/tradgentic/bots').then(function(d) {
+    TG.bots = d || [];
+    renderBots();
+    updateTGStats();
+  });
+  api('/api/tradgentic/strategies').then(function(d) {
+    TG.strats = d || [];
+  });
+  loadScanner();
+}
+
+function loadScanner() {
+  api('/api/tradgentic/quotes', {method:'POST', body:{symbols:SCANNER_SYMS}}).then(function(d) {
+    TG.quotes = d || {};
+    renderScanner();
+  });
+}
+
+function updateTGStats() {
+  var active = TG.bots.filter(function(b){return b.active;}).length;
+  var totalPnl = TG.bots.reduce(function(acc, b){return acc+(b.pnl||b.total_pnl||0);}, 0);
+  var wins = TG.bots.reduce(function(acc,b){return acc+(b.winning_trades||0);},0);
+  var trades = TG.bots.reduce(function(acc,b){return acc+(b.total_trades||0);},0);
+  var wr = trades>0?Math.round(wins/trades*100):0;
+  var pnlEl = document.getElementById('tg-total-pnl');
+  var botEl = document.getElementById('tg-bot-count');
+  var wrEl  = document.getElementById('tg-win-rate');
+  if (pnlEl) { pnlEl.textContent = (totalPnl>=0?'+':'')+totalPnl.toFixed(2); pnlEl.style.color = totalPnl>=0?'#10b981':'#ef4444'; }
+  if (botEl) { botEl.textContent = active+'/'+TG.bots.length; }
+  if (wrEl)  { wrEl.textContent  = wr+'%'; wrEl.style.color = wr>=50?'#10b981':'#ef4444'; }
+}
+
+function renderScanner() {
+  var el = document.getElementById('tg-scanner');
+  if (!el) return;
+  var items = Object.entries(TG.quotes).slice(0, 10);
+  if (!items.length) { el.innerHTML = '<div class="tg-empty"><div>Nessun dato disponibile</div></div>'; return; }
+  el.innerHTML = items.map(function(kv) {
+    var sym = kv[0], d = kv[1]||{};
+    var price = d.price||d.last||0, chg = parseFloat(d.change_pct||d.changePct||0);
+    var col = chg>=0?'#10b981':'#ef4444', sign = chg>=0?'+':'';
+    var sig = d.signal||d.action||'HOLD';
+    var sigCls = sig==='BUY'||sig==='LONG'?'sig-long':sig==='SELL'||sig==='SHORT'?'sig-short':'sig-hold';
+    return '<div class="tg-scan-tile" onclick="tgRunSig(\''+esc(sym)+'\')">'
+      +'<div class="tg-scan-sym">'+esc(sym)+'</div>'
+      +'<div class="tg-scan-price">'+(price>0?(price>100?price.toFixed(0):price.toFixed(2)):'—')+'</div>'
+      +(chg?'<div class="tg-scan-chg" style="color:'+col+'">'+sign+chg.toFixed(2)+'%</div>':'')
+      +'<div class="tg-scan-sig '+sigCls+'">'+esc(sig)+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderBots() {
+  var el = document.getElementById('tg-bots');
+  if (!el) return;
+  if (!TG.bots.length) {
+    el.innerHTML = '<div class="tg-empty"><div class="tg-empty-icon">🤖</div><div>Nessun bot ancora.<br>Crea il tuo primo bot!</div></div>';
+    return;
+  }
+  el.innerHTML = TG.bots.map(function(bot) {
+    var pnl = bot.pnl||bot.total_pnl||0;
+    var pnlCol = pnl>=0?'#10b981':'#ef4444';
+    var sm = STRAT_META[bot.strategy_id||bot.strategy] || {icon:'🤖', name:bot.strategy_id||'Custom'};
+    var borderCol = bot.active?'var(--amber)':'rgba(255,255,255,.15)';
+    return '<div class="tg-bot-card" style="border-left-color:'+borderCol+'">'
+      +'<div class="tg-bot-head">'
+      +'<div><div class="tg-bot-name">'+sm.icon+' '+esc(bot.name||bot.bot_id||'Bot')+'</div>'
+      +'<div class="tg-bot-strat">'+esc(sm.name)+'</div></div>'
+      +'<div style="text-align:right"><div class="tg-bot-pnl" style="color:'+pnlCol+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+'</div>'
+      +'<div class="tg-bot-pnl-lbl">P&L</div></div>'
+      +'</div>'
+      +'<div class="tg-bot-meta">'
+      +'<div class="tg-bot-meta-item">Trades: <span>'+(bot.total_trades||0)+'</span></div>'
+      +'<div class="tg-bot-meta-item">Win: <span>'+(bot.winning_trades||0)+'</span></div>'
+      +'<div class="tg-bot-meta-item">Stato: <span style="color:'+(bot.active?'var(--green)':'var(--t3)')+'">'+(bot.active?'ATTIVO':'PAUSA')+'</span></div>'
+      +'</div>'
+      +'<div class="tg-bot-actions">'
+      +'<button class="tg-bot-btn primary" onclick="tgRun(\''+esc(bot.bot_id||bot.id||'')+'\')">▶ Run</button>'
+      +'<button class="tg-bot-btn" onclick="tgToggle(\''+esc(bot.bot_id||bot.id||'')+'\','+(!bot.active)+')">⏸</button>'
+      +'<button class="tg-bot-btn" onclick="tgDelete(\''+esc(bot.bot_id||bot.id||'')+'\')">✕</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+function tgRun(id) {
+  api('/api/tradgentic/bots/'+id+'/run', {method:'POST'}).then(function(d) {
+    loadTG();
+  });
+}
+function tgToggle(id, active) {
+  api('/api/tradgentic/bots/'+id, {method:'PATCH', body:{active:active?1:0}}).then(function(){loadTG();});
+}
+function tgDelete(id) {
+  if (!confirm('Eliminare questo bot?')) return;
+  api('/api/tradgentic/bots/'+id, {method:'DELETE'}).then(function(){loadTG();});
+}
+function tgRunSig(sym) {
+  var bot = TG.bots.find(function(b){return (b.assets||[]).includes(sym);});
+  if (bot) tgRun(bot.bot_id||bot.id);
+}
+
+/* ── Wizard ── */
+var WIZ_STEPS = [
+  {
+    title: 'Scegli Strategia', sub: 'Seleziona l\'algoritmo di trading.',
+    render: function() {
+      return Object.entries(STRAT_META).map(function(kv) {
+        var s = kv[0], m = kv[1];
+        var sel = TG.wiz.strat === s;
+        return '<div class="wiz-option'+(sel?' sel':'')+'" onclick="wizSelStrat(\''+esc(s)+'\')">'
+          +'<div class="wiz-option-icon">'+m.icon+'</div>'
+          +'<div><div class="wiz-option-name">'+esc(m.name)+'</div><div class="wiz-option-desc">'+esc(m.desc)+'</div></div>'
+          +'</div>';
+      }).join('');
+    }
+  },
+  {
+    title: 'Scegli Asset', sub: 'Seleziona su quali asset operare.',
+    render: function() {
+      var syms = ['AAPL','MSFT','NVDA','SPY','QQQ','BTC-USD','ETH-USD','GC=F','CL=F'];
+      return syms.map(function(s) {
+        var sel = TG.wiz.assets.includes(s);
+        return '<div class="wiz-option'+(sel?' sel':'')+'" onclick="wizToggleAsset(\''+esc(s)+'\')">'
+          +'<div class="wiz-option-icon" style="font-size:16px;width:24px">'+( sel?'✓':'○')+'</div>'
+          +'<div><div class="wiz-option-name">'+esc(s)+'</div></div>'
+          +'</div>';
+      }).join('');
+    }
+  },
+  {
+    title: 'Nome Bot', sub: 'Dai un nome al tuo bot.',
+    render: function() {
+      return '<div><div class="wiz-label">Nome Bot</div><input id="wiz-name-inp" placeholder="es. Alpha-01" value="'+esc(TG.wiz.name)+'"></div>';
+    }
+  },
+];
+
+function openWiz() {
+  TG.wiz = {step:0, strat:null, name:'Bot-'+Date.now().toString().slice(-4), assets:[]};
+  document.getElementById('tg-wizard').classList.add('open');
+  renderWizStep();
+}
+function closeWiz() { document.getElementById('tg-wizard').classList.remove('open'); }
+
+function renderWizStep() {
+  var s = WIZ_STEPS[TG.wiz.step];
+  document.getElementById('wiz-title').textContent = s.title;
+  document.getElementById('wiz-sub').textContent   = s.sub;
+  document.getElementById('wiz-body').innerHTML    = s.render();
+  document.querySelectorAll('.wiz-dot').forEach(function(d,i){ d.classList.toggle('on', i===TG.wiz.step); });
+  var back = document.getElementById('wiz-back');
+  var next = document.getElementById('wiz-next');
+  if (back) back.style.display = TG.wiz.step>0 ? 'inline-flex' : 'none';
+  if (next) next.textContent = TG.wiz.step===WIZ_STEPS.length-1 ? '🚀 Lancia Bot' : 'Avanti →';
+}
+
+function wizSelStrat(id) {
+  TG.wiz.strat = id;
+  document.querySelectorAll('.wiz-option').forEach(function(o){ o.classList.remove('sel'); });
+  event && event.currentTarget && event.currentTarget.classList.add('sel');
+  renderWizStep();
+}
+function wizToggleAsset(sym) {
+  var idx = TG.wiz.assets.indexOf(sym);
+  if (idx>=0) TG.wiz.assets.splice(idx,1); else TG.wiz.assets.push(sym);
+  renderWizStep();
+}
+
+function wizNext() {
+  if (TG.wiz.step===WIZ_STEPS.length-1) {
+    var ninp = document.getElementById('wiz-name-inp');
+    if (ninp) TG.wiz.name = ninp.value.trim() || TG.wiz.name;
+    if (!TG.wiz.strat) { alert('Seleziona una strategia'); return; }
+    if (!TG.wiz.assets.length) { alert('Seleziona almeno un asset'); return; }
+    api('/api/tradgentic/bots', {method:'POST', body:{
+      name: TG.wiz.name, strategy_id: TG.wiz.strat, assets: TG.wiz.assets
+    }}).then(function(){ closeWiz(); loadTG(); });
+    return;
+  }
+  TG.wiz.step++;
+  renderWizStep();
+}
+function wizBack() {
+  if (TG.wiz.step>0) { TG.wiz.step--; renderWizStep(); }
+}
+</script>
+</body>
+</html>
