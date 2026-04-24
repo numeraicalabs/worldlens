@@ -93,12 +93,15 @@ async def ai_available_async() -> bool:
 # ── Central dispatch ──────────────────────────────────
 
 async def _call_claude(prompt: str, system: str = "", max_tokens: int = 400,
-                       user_api_key: str = "", user_provider: str = "") -> Optional[str]:
-    """Unified AI call. Routes to Gemini by default; Claude if admin sets provider."""
-    await _ensure_ai_settings()  # self-heal: reload key from DB if empty
-    provider, api_key = _resolve_provider()
-    if user_provider and user_api_key and user_provider == settings.global_ai_provider:
-        provider, api_key = user_provider, user_api_key
+                       user_api_key: str = "", user_provider: str = "",
+                       user_gemini_key: str = "", user_anthropic_key: str = "") -> Optional[str]:
+    """Unified AI call. User personal keys take priority over admin keys."""
+    await _ensure_ai_settings()
+    # Resolve: user personal > admin global
+    provider, api_key = _resolve_provider(
+        user_gemini_key or (user_api_key if user_provider == "gemini" else ""),
+        user_anthropic_key or (user_api_key if user_provider in ("claude","anthropic") else ""),
+    )
     if provider == "none" or not api_key:
         return None
     if provider == "gemini":
@@ -179,25 +182,62 @@ async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) 
     logger.warning("All Gemini models exhausted without a successful response")
     return None
 
+# Anthropic model strings — updated April 2026
+_ANTHROPIC_MODELS = [
+    "claude-haiku-4-5-20251001",  # primary: latest Haiku (fast, cheap)
+    "claude-haiku-4-5",            # fallback alias
+]
+
 async def _call_anthropic(prompt: str, system: str, max_tokens: int, api_key: str) -> Optional[str]:
-    """Call Claude Haiku via Anthropic API. Only active when admin enables it."""
-    try:
-        body: dict = {"model": "claude-haiku-4-5", "max_tokens": max_tokens,
-                      "messages": [{"role": "user", "content": prompt}]}
-        if system:
-            body["system"] = system
-        async with httpx.AsyncClient(timeout=20) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                         "content-type": "application/json"},
-                json=body
-            )
-            resp.raise_for_status()
-            return resp.json()["content"][0]["text"].strip()
-    except Exception as e:
-        logger.debug("Claude error: %s", e)
-        return None
+    """Call Claude Haiku via Anthropic API."""
+    body: dict = {
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if system:
+        body["system"] = system
+
+    async with httpx.AsyncClient(timeout=25) as client:
+        for model in _ANTHROPIC_MODELS:
+            try:
+                body["model"] = model
+                resp = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json=body,
+                )
+                if resp.status_code in (400, 404):
+                    logger.warning("Anthropic model '%s' unavailable (HTTP %d) — trying next", model, resp.status_code)
+                    continue
+                if resp.status_code in (401, 403):
+                    logger.warning("Anthropic API key error (HTTP %d) — check key in Admin → Settings", resp.status_code)
+                    return None
+                if resp.status_code == 429:
+                    logger.warning("Anthropic rate limit (HTTP 429)")
+                    return None
+                if resp.status_code != 200:
+                    logger.warning("Anthropic HTTP %d: %s", resp.status_code, resp.text[:200])
+                    return None
+                data = resp.json()
+                content = data.get("content", [])
+                if not content:
+                    logger.warning("Anthropic returned empty content")
+                    return None
+                return content[0]["text"].strip()
+            except httpx.TimeoutException:
+                logger.warning("Anthropic timeout after 25s (model: %s)", model)
+                return None
+            except Exception as e:
+                logger.warning("Anthropic error (model: %s): %s", model, e)
+                if "model" in str(e).lower():
+                    continue
+                return None
+
+    return None
 
 def _parse_json(text: str) -> Optional[Dict]:
     """Safely parse JSON from AI response, stripping markdown fences."""
