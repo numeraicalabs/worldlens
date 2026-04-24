@@ -776,19 +776,35 @@ async def ai_analyst_answer(payload: dict = Body(...), user=Depends(require_user
 @router.get("/macro-brief")
 async def macro_brief_endpoint(user=Depends(require_user)):
     """Dashboard macro briefing text for the Risk Index quote."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
-            "ORDER BY severity DESC LIMIT 5"
-        ) as cur:
-            events = [dict(r) for r in await cur.fetchall()]
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT id,title,severity,country_name,category,timestamp FROM events "
+                "WHERE datetime(timestamp) > datetime('now','-72 hours') "
+                "ORDER BY severity DESC LIMIT 8"
+            ) as cur:
+                events = [dict(r) for r in await cur.fetchall()]
 
-    if not await ai_available_async() or not events:
-        return {"brief": "Configure a Gemini key in Admin → Settings for live AI briefings."}
+        if not events:
+            return {"brief": "No recent events found. Waiting for data refresh."}
 
-    brief = await ai_macro_briefing([], events)
-    return {"brief": brief or ""}
+        if not await ai_available_async():
+            # Return a data-driven brief without AI
+            top = events[0]
+            count_high = sum(1 for e in events if float(e.get("severity") or 0) >= 7)
+            return {"brief": (
+                f"Monitoring {len(events)} events in the last 72 hours. "
+                f"Lead story: {top.get('title','—')}. "
+                f"{count_high} high-severity events detected. "
+                f"Configure an AI key in Admin → Settings for full analysis."
+            )}
+
+        brief = await ai_macro_briefing([], events)
+        return {"brief": brief or "Analysis unavailable — check AI provider in Admin → Settings."}
+    except Exception as e:
+        logger.warning("macro-brief error: %s", e)
+        return {"brief": "Intelligence briefing temporarily unavailable."}
 
 
 @router.get("/watchlist-digest")
