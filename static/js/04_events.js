@@ -1791,3 +1791,50 @@ var _mobileXpEvents = {
     }
   };
 })();
+
+/* ── Save user's personal AI key from profile page ────────────────────── */
+window.saveUserAIKey = async function() {
+  var inp = document.getElementById('prof-ai-key');
+  var status = document.getElementById('prof-ai-key-status');
+  if (!inp || !inp.value.trim()) return;
+
+  if (status) {
+    status.style.display = 'block';
+    status.textContent = 'Salvataggio…';
+    status.style.color = 'var(--t3)';
+  }
+
+  try {
+    var r = await rq('/api/admin/settings/ai', {
+      method: 'POST',
+      body: { provider: 'gemini', api_key: inp.value.trim() }
+    });
+
+    if (r && r.status === 'ok') {
+      // Auto-test
+      var testR = await rq('/api/admin/test-ai');
+      if (status) {
+        var isOK = testR && testR.status === 'OK';
+        status.textContent = isOK
+          ? '✓ Chiave salvata e verificata — AI attiva!'
+          : '⚠ Chiave salvata ma test fallito: ' + (testR ? testR.message : 'errore');
+        status.style.color = isOK ? 'var(--gr,#10b981)' : 'var(--re,#ef4444)';
+        status.style.background = isOK ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+        status.style.padding = '8px 12px';
+        status.style.borderRadius = '8px';
+      }
+      inp.value = '';
+    } else {
+      if (status) {
+        status.textContent = '✗ Errore: ' + ((r && r.detail) || 'sconosciuto');
+        status.style.color = 'var(--re,#ef4444)';
+      }
+    }
+  } catch(e) {
+    if (status) {
+      status.textContent = '✗ Errore di rete';
+      status.style.color = 'var(--re,#ef4444)';
+    }
+  }
+};
+

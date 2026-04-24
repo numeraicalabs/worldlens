@@ -127,14 +127,14 @@ function _syncCard0() {
     var full = (srcBrief.textContent || srcBrief.innerText || '').trim();
     if (full && full.length > 10 && !full.includes('Caricamento')) {
       var sents = full.match(/[^.!?]+[.!?]+/g) || [full];
-      dstBrief.textContent = sents.slice(0, 2).join(' ').trim();
+      dstBrief.textContent = sents.slice(0, 4).join(' ').trim();
     }
   }
 
   // Top 3 events
   var evs = (window.G && G.events) ? G.events.slice().sort(function(a, b) {
     return (b.severity || 0) - (a.severity || 0);
-  }).slice(0, 3) : [];
+  }).slice(0, 5) : [];
 
   var container = _el('msc-top-events');
   if (container) {
@@ -191,6 +191,36 @@ function _syncCard1() {
     }
   });
 
+  // Market movers — top gainers/losers from G.finance
+  var moversEl = _el('msc-movers');
+  if (moversEl && window.G && G.finance) {
+    var fin = G.finance;
+    var allAssets = Object.entries(fin).map(function(kv) {
+      var tick = kv[0], d = kv[1] || {};
+      var chg = parseFloat(d.change_pct || d.changePct || d.change || 0);
+      return { ticker: tick, price: d.price || d.last || 0, change: chg, name: d.name || tick };
+    }).filter(function(a){ return a.price > 0 && !isNaN(a.change); });
+
+    // Sort by absolute change, pick top 3 gainers and losers
+    allAssets.sort(function(a,b){ return Math.abs(b.change) - Math.abs(a.change); });
+    var top = allAssets.slice(0, 6);
+
+    if (top.length) {
+      moversEl.innerHTML = top.map(function(a) {
+        var col = a.change >= 0 ? '#10B981' : '#EF4444';
+        var arrow = a.change >= 0 ? '▲' : '▼';
+        var sign = a.change >= 0 ? '+' : '';
+        return [
+          '<div class="msc-mover-row">',
+          '  <div class="msc-mover-ticker">' + _esc(a.ticker.slice(0,10)) + '</div>',
+          '  <div class="msc-mover-price">' + (a.price > 100 ? a.price.toFixed(0) : a.price.toFixed(2)) + '</div>',
+          '  <div class="msc-mover-chg" style="color:' + col + '">' + arrow + ' ' + sign + a.change.toFixed(2) + '%</div>',
+          '</div>',
+        ].join('');
+      }).join('');
+    }
+  }
+
   // Category bars — rebuild from G.stats
   var catEl = _el('msc-catbars');
   if (!catEl) return;
@@ -232,7 +262,7 @@ function _syncCard1() {
 function _syncCard2() {
   var evs = (window.G && G.events) ? G.events.slice().sort(function(a, b) {
     return (b.severity || 0) - (a.severity || 0);
-  }).slice(0, 12) : [];
+  }).slice(0, 15) : [];
 
   var container = _el('msc-events');
   if (!container) return;
@@ -294,17 +324,17 @@ function _syncCard3() {
     var text;
     if (paras.length) {
       // Join first 2 paragraphs with a space, preserving word boundaries
-      text = Array.from(paras).slice(0, 2).map(function(p) {
+      text = Array.from(paras).slice(0, 3).map(function(p) {
         return (p.textContent || '').trim();
       }).filter(Boolean).join(' ');
     } else {
       text = (srcAssess.textContent || srcAssess.innerText || '').replace(/\s+/g, ' ').trim();
     }
     // Show first 200 chars max, cut at sentence boundary
-    if (text.length > 200) {
-      var cut = text.slice(0, 200);
+    if (text.length > 420) {
+      var cut = text.slice(0, 420);
       var lastDot = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('!'), cut.lastIndexOf('?'));
-      text = lastDot > 80 ? cut.slice(0, lastDot + 1) : cut + '…';
+      text = lastDot > 120 ? cut.slice(0, lastDot + 1) : cut + '…';
     }
     dstAssess.textContent = text || 'Analisi in corso…';
   }
@@ -371,8 +401,8 @@ function _syncCard3() {
       '<div class="msc-signal-row" style="border-left-color:' + col + '">',
       icon !== '⚠️' ? '  <span class="msc-sig-icon">' + icon + '</span>' : '',
       '  <div style="flex:1;min-width:0">',
-      '    <span class="msc-sig-label" style="color:' + col + '">' + _esc(label.slice(0, 30)) + '</span>',
-      meta ? '    <div style="font-size:10px;color:var(--fire-text-dim);margin-top:2px">' + _esc(meta) + '</div>' : '',
+      '    <span class="msc-sig-label" style="color:' + col + '">' + _esc(label.slice(0, 40)) + '</span>',
+      meta ? '    <div style="font-size:10px;color:var(--fire-text-dim);margin-top:2px">' + _esc(meta.slice(0, 90)) + '</div>' : '',
       '  </div>',
       '  <span class="msc-sig-sev" style="color:' + col + '">' + _esc(val.slice(0, 6)) + '</span>',
       '</div>',
@@ -411,8 +441,8 @@ function _syncCard4() {
     var countEl  = card.querySelector('.ag-ev-count');
 
     var name     = nameEl     ? nameEl.textContent.trim()     : '—';
-    var headline = headlineEl ? headlineEl.textContent.trim().slice(0, 80) : '';
-    var brief    = briefEl    ? briefEl.textContent.trim().slice(0, 140)   : 'Brief in arrivo…';
+    var headline = headlineEl ? headlineEl.textContent.trim().slice(0, 120) : '';
+    var brief    = briefEl    ? briefEl.textContent.trim().slice(0, 280)   : 'Brief in arrivo…';
     var signal   = signalEl   ? signalEl.textContent.trim()   : '';
     var count    = countEl    ? countEl.textContent.trim()    : '';
 
@@ -559,13 +589,53 @@ function _fetchEWDirect() {
         '  <span class="msc-sig-icon">' + (sig.icon || '⚠️') + '</span>',
         '  <div style="flex:1;min-width:0">',
         '    <span class="msc-sig-label" style="color:' + col + '">' + _esc(label.toUpperCase().slice(0,28)) + '</span>',
-        meta ? '    <div style="font-size:10px;color:var(--fire-text-dim);margin-top:2px">' + _esc(meta) + '</div>' : '',
+        meta ? '    <div style="font-size:10px;color:var(--fire-text-dim);margin-top:2px">' + _esc(meta.slice(0, 90)) + '</div>' : '',
         '  </div>',
         '  <span class="msc-sig-sev" style="color:' + col + '">' + _esc(String(val).slice(0,6)) + '</span>',
         '</div>',
       ].join('');
     }).join('');
   }).catch(function(){});
+
+  // ── EW News: show actual event headlines with descriptions ──
+  _renderEWNews();
+}
+
+function _renderEWNews() {
+  var container = _el('msc-ew-news');
+  if (!container) return;
+
+  // Get recent high-severity events from G.events
+  var evs = (window.G && G.events) ? G.events.slice()
+    .filter(function(e){ return (e.severity||0) >= 5.5; })
+    .sort(function(a,b){ return (b.severity||0) - (a.severity||0); })
+    .slice(0, 5) : [];
+
+  if (!evs.length) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--fire-text-dim);padding:8px 0">Nessuna news critica recente</div>';
+    return;
+  }
+
+  container.innerHTML = evs.map(function(ev) {
+    var sev = parseFloat(ev.severity || 5);
+    var col = sev >= 7.5 ? '#ff5722' : sev >= 5.5 ? '#ffc107' : '#66bb6a';
+    var country = _esc(ev.country_name || ev.country_code || 'Global');
+    var cat = _esc((ev.category || '').replace(/_/g,' '));
+    var title = _esc(ev.title || '');
+    var desc  = _esc((ev.ai_summary || ev.summary || ev.description || '').slice(0, 120));
+    var ts = _tAgo(ev.timestamp);
+
+    return [
+      '<div class="msc-news-card">',
+      '  <div class="msc-news-head">',
+      '    <span class="msc-news-sev" style="color:' + col + ';background:' + col + '15">' + sev.toFixed(0) + '</span>',
+      '    <span class="msc-news-meta">' + country + (cat ? ' · ' + cat : '') + ' · ' + ts + '</span>',
+      '  </div>',
+      '  <div class="msc-news-title">' + title + '</div>',
+      desc ? '  <div class="msc-news-desc">' + desc + (desc.length >= 118 ? '…' : '') + '</div>' : '',
+      '</div>',
+    ].join('');
+  }).join('');
 }
 
 function init() {
