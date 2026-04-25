@@ -181,7 +181,19 @@ html,body{font-family:'Inter',system-ui,sans-serif;background:#061528;color:#0A2
         </div>
         <h1 class="auth-title" id="auth-title">Bentornato</h1>
         <p class="auth-sub" id="auth-sub">Accedi per gestire il tuo portafoglio ETF</p>
-        <div id="auth-fields"></div>
+        <!-- Static fields — shown/hidden by JS, no innerHTML injection -->
+        <div id="field-name" style="display:none;margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:6px">Nome completo</label>
+          <input class="form-input" id="a-name" placeholder="Mario Rossi" autocomplete="name">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:6px">Email</label>
+          <input class="form-input" type="email" id="a-email" placeholder="tu@esempio.com" autocomplete="email">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:6px">Password</label>
+          <input class="form-input" type="password" id="a-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')handleAuth()">
+        </div>
         <div class="auth-err" id="auth-err"></div>
         <button class="auth-btn" onclick="handleAuth()">Continua</button>
         <div class="auth-footer"><a onclick="setAuthMode(_authMode==='login'?'register':'login')" id="auth-toggle">Non hai un account? Registrati</a></div>
@@ -411,26 +423,22 @@ function setAuthMode(mode){
   document.getElementById('auth-title').textContent=mode==='login'?'Bentornato':'Crea account';
   document.getElementById('auth-sub').textContent=mode==='login'?'Accedi per gestire il tuo portafoglio ETF':'Registrati gratuitamente';
   document.getElementById('auth-toggle').textContent=mode==='login'?'Non hai un account? Registrati':'Hai già un account? Accedi';
-  document.getElementById('auth-fields').innerHTML=mode==='login'?`
-    <div class="auth-group"><label>Email</label><input class="form-input" type="email" id="a-email" placeholder="tu@esempio.com" autocomplete="email"></div>
-    <div class="auth-group"><label>Password</label><input class="form-input" type="password" id="a-pass" autocomplete="current-password" onkeydown="if(event.key==='Enter')handleAuth()"></div>
-  `:`
-    <div class="auth-group"><label>Nome completo</label><input class="form-input" id="a-name" placeholder="Mario Rossi"></div>
-    <div class="auth-group"><label>Email</label><input class="form-input" type="email" id="a-email" placeholder="tu@esempio.com" autocomplete="email"></div>
-    <div class="auth-group"><label>Password</label><input class="form-input" type="password" id="a-pass" autocomplete="new-password" onkeydown="if(event.key==='Enter')handleAuth()"></div>
-  `;
+  document.getElementById('field-name').style.display=mode==='register'?'block':'none';
+  const passInput=document.getElementById('a-pass');
+  if(passInput)passInput.autocomplete=mode==='login'?'current-password':'new-password';
+  document.getElementById('auth-err').textContent='';
 }
 
 async function handleAuth(){
   const email=(document.getElementById('a-email')||{}).value?.trim();
   const pass =(document.getElementById('a-pass') ||{}).value;
-  const err  = document.getElementById('auth-err');
-  err.textContent='';
-  if(!email||!pass){err.textContent='Inserisci email e password';return;}
+  const errEl = document.getElementById('auth-err');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Inserisci email e password';return;}
 
-  // Try ETF Tracker first (token field), then WorldLens (access_token)
+  const nameVal=(document.getElementById('a-name')||{}).value||email.split('@')[0];
   const body=_authMode==='register'
-    ?{email,password:pass,name:(document.getElementById('a-name')||{}).value||email.split('@')[0]}
+    ?{email,password:pass,name:nameVal,username:nameVal}
     :{email,password:pass};
 
   const r=await fetch((_authMode==='register'?'/api/auth/register':'/api/auth/login'),{
@@ -443,7 +451,7 @@ async function handleAuth(){
     try{localStorage.setItem('wl_trade_token',authToken);}catch(e){}
     bootApp();
   } else {
-    err.textContent=r?.error||r?.detail||'Credenziali non valide';
+    errEl.textContent=r?.error||r?.detail||'Credenziali non valide';
   }
 }
 
