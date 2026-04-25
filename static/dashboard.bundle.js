@@ -1810,45 +1810,54 @@ var _mobileXpEvents = {
 
 /* ── Save user's personal AI key from profile page ────────────────────── */
 window.saveUserAIKey = async function() {
-  var inp = document.getElementById('prof-ai-key');
+  var inp    = document.getElementById('prof-ai-key');
   var status = document.getElementById('prof-ai-key-status');
   if (!inp || !inp.value.trim()) return;
+  var key = inp.value.trim();
 
   if (status) {
     status.style.display = 'block';
-    status.textContent = 'Salvataggio…';
-    status.style.color = 'var(--t3)';
+    status.style.background = 'rgba(59,130,246,0.1)';
+    status.style.borderRadius = '8px';
+    status.style.padding = '8px 12px';
+    status.style.color = 'var(--t2)';
+    status.textContent = 'Salvataggio in corso…';
   }
 
   try {
-    var r = await rq('/api/admin/settings/ai', {
+    // Use per-user endpoint (not admin)
+    var r = await rq('/api/user/ai-key', {
       method: 'POST',
-      body: { provider: 'gemini', api_key: inp.value.trim() }
+      body: { provider: 'gemini', api_key: key }
     });
 
     if (r && r.status === 'ok') {
-      // Auto-test
-      var testR = await rq('/api/admin/test-ai');
+      // Quick test: call a lightweight AI endpoint with user key
+      var testR = await rq('/api/user/ai-key/test', { method: 'POST' });
+      var isOK  = testR && testR.status === 'ok';
       if (status) {
-        var isOK = testR && testR.status === 'OK';
         status.textContent = isOK
           ? '✓ Chiave salvata e verificata — AI attiva!'
-          : '⚠ Chiave salvata ma test fallito: ' + (testR ? testR.message : 'errore');
-        status.style.color = isOK ? 'var(--gr,#10b981)' : 'var(--re,#ef4444)';
-        status.style.background = isOK ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
-        status.style.padding = '8px 12px';
-        status.style.borderRadius = '8px';
+          : '⚠ Chiave salvata. ' + (testR && testR.message ? testR.message : 'Verifica in corso…');
+        status.style.background = isOK ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)';
+        status.style.color = isOK ? 'var(--gr,#10b981)' : 'var(--am,#f59e0b)';
       }
       inp.value = '';
+      // Trigger a brief reload so AI sections activate
+      setTimeout(function() {
+        if (typeof loadMacroBrief === 'function') loadMacroBrief();
+        if (typeof loadDailyInsight === 'function') loadDailyInsight();
+      }, 800);
     } else {
       if (status) {
-        status.textContent = '✗ Errore: ' + ((r && r.detail) || 'sconosciuto');
+        status.textContent = '✗ Errore: ' + ((r && (r.detail || r.message)) || 'sconosciuto');
+        status.style.background = 'rgba(239,68,68,0.1)';
         status.style.color = 'var(--re,#ef4444)';
       }
     }
   } catch(e) {
     if (status) {
-      status.textContent = '✗ Errore di rete';
+      status.textContent = '✗ Errore di rete: ' + (e && e.message || 'unknown');
       status.style.color = 'var(--re,#ef4444)';
     }
   }
