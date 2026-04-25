@@ -23,12 +23,15 @@ except Exception:
 
 try:
     from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async, _get_user_ai_keys
+    from routers.brain import brain_ingest, brain_context_for_prompt
 except ImportError:
     async def _call_claude(p, **kw): return None
     def _parse_json(t): return None
     def _ai_available(): return False
     async def ai_available_async(): return False
     async def _get_user_ai_keys(uid): return "", ""
+    async def brain_ingest(*a, **kw): return False
+    async def brain_context_for_prompt(*a, **kw): return ""
 
 try:
     from scheduler import get_finance_cache
@@ -308,6 +311,7 @@ async def _generate_brief(
     bot_id: str, config: Dict, events: List[Dict],
     previous: Optional[Dict] = None, watchlist: Optional[List[Dict]] = None,
     user_gemini_key: str = "", user_anthropic_key: str = "",
+    user_id: int = 0,
 ) -> Dict:
     cache_key = f"{bot_id}:{config.get('focus','')}:{config.get('tone','')}:{len(events)}"
     cached = _brief_cache.get(cache_key)
@@ -403,6 +407,18 @@ async def _generate_brief(
     ]
 
     prompt = "\n".join(sections)
+
+    # ── Brain: search user knowledge before calling AI ──────────────────────
+    brain_ctx = ""
+    if user_id:
+        focus = config.get("focus", bot_id)
+        brain_ctx = await brain_context_for_prompt(user_id, focus + " " + " ".join(
+            e.get("title", "") for e in events[:3]
+        ), top_k=4)
+        if brain_ctx:
+            prompt = brain_ctx + "\n\n" + prompt
+    # ────────────────────────────────────────────────────────────────────────
+
     raw    = await _call_claude(
         prompt, system=bot["persona"], max_tokens=520,
         user_gemini_key=user_gemini_key, user_anthropic_key=user_anthropic_key
@@ -432,6 +448,21 @@ async def _generate_brief(
 
     parsed["threshold_alerts"] = threshold_alerts
     parsed.setdefault("confidence", confidence_hint)
+
+    # ── Brain: save this analysis result for future context ─────────────────
+    if user_id and parsed.get("headline"):
+        brain_text = (
+            f"{bot_id} analysis: {parsed.get('headline','')}. "
+            f"Signal: {parsed.get('signal_label','Monitor')}. "
+            f"{parsed.get('brief','')[:200]}"
+        )
+        await brain_ingest(
+            user_id, brain_text,
+            source="analysis",
+            weight=1.5,
+            context={"bot_id": bot_id, "signal": parsed.get("signal", "neutral")}
+        )
+    # ────────────────────────────────────────────────────────────────────────
 
     _brief_cache[cache_key] = {"ts": time.time(), "data": parsed}
     return parsed
@@ -538,7 +569,8 @@ async def get_all_briefs(user=Depends(require_user)):
             previous = await _load_previous_brief(user["id"], bot_id)
             brief    = await _generate_brief(
                 bot_id, config, events, previous, watchlist,
-                user_gemini_key=ug, user_anthropic_key=ua
+                user_gemini_key=ug, user_anthropic_key=ua,
+                user_id=user["id"]
             )
             await _save_brief_history(user["id"], bot_id, brief, len(events))
             return bot_id, {
