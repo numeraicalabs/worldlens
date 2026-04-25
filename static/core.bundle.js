@@ -103,7 +103,11 @@ function rq(url, opts) {
   if (G.token) headers['Authorization'] = 'Bearer ' + G.token;
   return new Promise(function(resolve) {
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    var tid = setTimeout(function() { if (ctrl) ctrl.abort(); resolve({}); }, 12000);
+    var tid = setTimeout(function() {
+      if (ctrl) ctrl.abort();
+      console.warn('[rq] timeout:', url);
+      resolve({ _timeout: true, detail: 'Request timeout' });
+    }, 12000);
     fetch(url, {
       method:  opts.method || 'GET',
       headers: headers,
@@ -111,10 +115,27 @@ function rq(url, opts) {
       signal:  ctrl ? ctrl.signal : undefined
     }).then(function(r) {
       clearTimeout(tid);
-      if (r.status === 401) { G.token = null; localStorage.removeItem('wl_tok'); resolve({detail: 'Unauthorized'}); return; }
-      return r.json();
-    }).then(function(data) { resolve(data || {}); })
-      .catch(function(e)  { clearTimeout(tid); resolve({}); });
+      if (r.status === 401) {
+        G.token = null;
+        localStorage.removeItem('wl_tok');
+        resolve({ _status: 401, detail: 'Unauthorized' });
+        return;
+      }
+      var status = r.status;
+      return r.json().then(function(data) {
+        if (!data || typeof data !== 'object') data = {};
+        data._status = status;
+        return data;
+      }).catch(function() {
+        return { _status: status, _parseError: true, detail: 'Invalid response (HTTP ' + status + ')' };
+      });
+    }).then(function(data) {
+      resolve(data || {});
+    }).catch(function(e) {
+      clearTimeout(tid);
+      console.error('[rq] network error:', url, e);
+      resolve({ _network: true, detail: 'Network error: ' + (e && e.message || 'unknown') });
+    });
   });
 }
 
@@ -242,11 +263,28 @@ function doLogin() {
   var e = el('le').value, p = el('lp').value;
   el('ler').textContent = '';
   if (!e||!p) { el('ler').textContent = 'Fill all fields'; return; }
+
+  var btn = document.querySelector('#lif button[type=submit], #lif .btn');
+  if (btn) { btn._origText = btn.textContent; btn.textContent = '…'; btn.disabled = true; }
+
   rq('/api/auth/login',{method:'POST',body:{email:e,password:p}}).then(function(r) {
-    if (!r || r.detail) { el('ler').textContent = r&&r.detail?r.detail:'Login failed'; return; }
+    if (btn) { btn.textContent = btn._origText || 'Sign in'; btn.disabled = false; }
+
+    // Detect timeout / network failure (rq returns {} on those)
+    if (!r || (Object.keys(r).length === 0)) {
+      el('ler').textContent = 'Network error or timeout — check connection';
+      return;
+    }
+    if (r.detail) { el('ler').textContent = r.detail; return; }
+    if (!r.access_token) {
+      el('ler').textContent = r.error || r.message || 'Login failed — invalid response';
+      console.error('Login: missing access_token in response', r);
+      return;
+    }
+
     G.token = r.access_token; G.user = r.user;
     localStorage.setItem('wl_tok', r.access_token);
-    track('login', 'auth', r.user.email || '');
+    track('login', 'auth', r.user && r.user.email || '');
     closeAuth(); enterApp();
   });
 }
@@ -257,18 +295,34 @@ function doReg() {
   var code = (el('ric') && el('ric').value || '').trim();
   el('rer').textContent = '';
   if (!n||!e||!p) { el('rer').textContent = 'Please fill all fields'; return; }
+  if (p.length < 8) { el('rer').textContent = 'Password must be at least 8 characters'; return; }
+
+  var btn = document.querySelector('#rgf button[type=submit], #rgf .btn');
+  if (btn) { btn._origText = btn.textContent; btn.textContent = '…'; btn.disabled = true; }
+
   var body = { username: n, email: e, password: p };
   if (code) body.invite_code = code;
   rq('/api/auth/register', { method:'POST', body: body }).then(function(r) {
-    if (!r || r.detail) {
-      el('rer').textContent = r && r.detail ? r.detail : 'Registration failed';
+    if (btn) { btn.textContent = btn._origText || 'Sign up'; btn.disabled = false; }
+
+    if (!r || Object.keys(r).length === 0) {
+      el('rer').textContent = 'Network error or timeout';
+      return;
+    }
+    if (r.detail) {
+      el('rer').textContent = r.detail;
+      return;
+    }
+    if (!r.access_token) {
+      el('rer').textContent = r.error || r.message || 'Registration failed';
+      console.error('Register: missing access_token', r);
       return;
     }
     G.token = r.access_token;
     G.user  = r.user;
     G.isNewUser = true;
     localStorage.setItem('wl_tok', r.access_token);
-    track('register', 'auth', r.user.email || '');
+    track('register', 'auth', r.user && r.user.email || '');
     closeAuth();
     enterApp();
   });

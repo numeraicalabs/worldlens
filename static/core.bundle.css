@@ -9120,3 +9120,122 @@ body {
     border-bottom: 2px solid var(--b4, #3b82f6) !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   v21 — FINAL OVERRIDES (must be last in file)
+   Beats legacy 768px rules that hide #nav and expect #wl-mobile-nav
+   ════════════════════════════════════════════════════════════════ */
+
+/* Mobile (≤ 900px): make MY #nav the bottom bar — never hide it */
+@media (max-width: 900px) {
+  body { padding-left: 0 !important; padding-bottom: 64px !important; }
+
+  /* Keep the new sidebar visible as bottom bar */
+  html body #nav,
+  html body nav#nav {
+    display: flex !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 64px !important;
+    flex-direction: row !important;
+    border-top: 1px solid rgba(255,255,255,.08) !important;
+    border-bottom: none !important;
+    border-right: none !important;
+    padding: 0 !important;
+    background: rgba(14,17,23,.98) !important;
+    z-index: 9000 !important;
+    overflow: visible !important;
+    box-shadow: 0 -2px 12px rgba(0,0,0,.3) !important;
+  }
+
+  html body #nav .nlogo { display: none !important; }
+  html body #nav #navr  { display: none !important; }
+
+  html body #nav .nav-groups {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    width: 100% !important;
+    height: 64px !important;
+    gap: 0 !important;
+    padding: 0 4px !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+  html body #nav .nav-groups::-webkit-scrollbar { display: none !important; }
+
+  html body #nav > .nav-groups > .ni {
+    flex: 0 0 auto !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 70px !important;
+    height: 64px !important;
+    padding: 6px 8px !important;
+    font-size: 9px !important;
+    font-weight: 500 !important;
+    gap: 3px !important;
+    border-radius: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    color: rgba(255,255,255,.45) !important;
+    text-align: center !important;
+  }
+  html body #nav > .nav-groups > .ni svg {
+    width: 22px !important;
+    height: 22px !important;
+    margin: 0 !important;
+    opacity: 1 !important;
+  }
+  html body #nav > .nav-groups > .ni.on {
+    color: #ffc107 !important;
+    background: transparent !important;
+    border: none !important;
+  }
+  html body #nav > .nav-groups > .ni.on::before {
+    content: '' !important;
+    position: absolute !important;
+    bottom: 2px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 20px !important;
+    height: 3px !important;
+    border-radius: 2px !important;
+    background: #ffc107 !important;
+  }
+  html body #nav > .nav-groups > .ni.on svg {
+    stroke: #ffc107 !important;
+  }
+
+  /* Kill legacy mobile nav stub if present */
+  #wl-mobile-nav { display: none !important; }
+}
+
+/* Desktop (≥ 901px) — sidebar verticale a sinistra */
+@media (min-width: 901px) {
+  body { padding-left: 200px !important; padding-bottom: 0 !important; }
+  html body #nav,
+  html body nav#nav {
+    display: flex !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 200px !important;
+    height: 100vh !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 16px 12px !important;
+    gap: 0 !important;
+    border-bottom: none !important;
+    border-right: 1px solid rgba(255,255,255,.06) !important;
+    overflow-y: auto !important;
+    z-index: 100 !important;
+  }
+}

@@ -172,7 +172,18 @@ function sv(name, btn) {
     if (typeof initTradgentic === 'function') initTradgentic();
   }
   if (name==='earlywarning') {
-    if (typeof loadEarlyWarning === 'function') loadEarlyWarning();
+    var attempt = 0;
+    var tryLoad = function() {
+      if (typeof loadEarlyWarning === 'function') {
+        try { loadEarlyWarning(); }
+        catch (e) { console.error('[EW] loadEarlyWarning failed:', e); }
+      } else if (attempt++ < 10) {
+        setTimeout(tryLoad, 200);
+      } else {
+        console.warn('[EW] loadEarlyWarning function never appeared');
+      }
+    };
+    tryLoad();
   }
   if (name==='ai') {
     // Load AI analyst fresh data when navigating to AI page
