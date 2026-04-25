@@ -186,6 +186,12 @@ app.include_router(globe_router)
 app.include_router(agents_router)
 app.include_router(tradgentic_router)
 app.include_router(etf_tracker_router)
+
+from routers.brain import router as brain_router
+app.include_router(brain_router)
+
+from routers.brain_agent import router as brain_agent_router
+app.include_router(brain_agent_router)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
