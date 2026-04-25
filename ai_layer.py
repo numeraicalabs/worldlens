@@ -63,8 +63,20 @@ async def _ensure_ai_settings() -> None:
 
 # ── Provider resolution ───────────────────────────────
 
-def _resolve_provider() -> Tuple[str, str]:
-    """Return (provider_name, api_key) based on global admin setting."""
+def _resolve_provider(
+    user_gemini_key: str = "",
+    user_anthropic_key: str = "",
+) -> Tuple[str, str]:
+    """Return (provider_name, api_key). User personal keys take priority over admin global keys."""
+    # 1. User personal keys always win
+    ug = (user_gemini_key or "").strip()
+    ua = (user_anthropic_key or "").strip()
+    if ug:
+        return "gemini", ug
+    if ua:
+        return "claude", ua
+
+    # 2. Admin global keys
     provider = settings.global_ai_provider  # "gemini" | "claude" | "none"
     gkey = (settings.gemini_api_key or "").strip()
     ckey = (settings.anthropic_api_key or "").strip()
@@ -89,6 +101,25 @@ async def ai_available_async() -> bool:
     """Async check — reloads key from DB if missing, then checks."""
     await _ensure_ai_settings()
     return _ai_available()
+
+
+async def _get_user_ai_keys(user_id: int) -> Tuple[str, str]:
+    """Load (gemini_key, anthropic_key) for a user from DB.
+    Returns empty strings if not set. Used so per-user AI calls
+    work even when no admin key is configured."""
+    try:
+        async with _aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = _aiosqlite.Row
+            async with db.execute(
+                "SELECT user_gemini_key, user_anthropic_key FROM users WHERE id=?",
+                (user_id,)
+            ) as cur:
+                row = await cur.fetchone()
+        if row:
+            return (row["user_gemini_key"] or "").strip(), (row["user_anthropic_key"] or "").strip()
+    except Exception as e:
+        logger.debug("_get_user_ai_keys: %s", e)
+    return "", ""
 
 # ── Central dispatch ──────────────────────────────────
 
