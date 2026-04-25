@@ -1877,14 +1877,28 @@ var _SIGNAL_MAP = {
 // ── Boot ────────────────────────────────────────────────────────────────────
 window.initAgentDash = function() {
   if (!G.token) return;
-  rq('/api/agents/config').then(function(data) {
-    if (!data || data.detail) return;
-    AGENTS = data;
-    renderAgentCards();
-    loadAllBriefs();
-    loadStreak();
-    injectDebateSection();
-  });
+
+  // Retry until agents-grid is in DOM (can be called before fire dashboard renders)
+  var attempts = 0;
+  function tryInit() {
+    var grid = document.getElementById('agents-grid');
+    if (!grid && attempts++ < 15) { setTimeout(tryInit, 300); return; }
+
+    rq('/api/agents/config').then(function(data) {
+      if (!data || data.detail) {
+        if (grid) grid.innerHTML = '<div style="padding:24px;text-align:center;color:var(--fire-text-dim);font-size:12px">Agent configuration unavailable.</div>';
+        return;
+      }
+      AGENTS = data;
+      renderAgentCards();
+      loadAllBriefs();
+      loadStreak();
+      injectDebateSection();
+    }).catch(function(e) {
+      console.warn('[agents] initAgentDash error:', e);
+    });
+  }
+  tryInit();
 };
 
 // ── Load briefs ─────────────────────────────────────────────────────────────

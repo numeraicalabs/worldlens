@@ -2025,13 +2025,36 @@ function renderMacro() {
 }
 
 function getMacroBrief() {
+  // Fire dashboard element
+  var fireTxt = document.getElementById('d-brief-txt');
+  var timeEl  = document.getElementById('db-brief-time');
+  // Legacy element
   var box = document.getElementById('macro-brief');
-  var txt = document.getElementById('macro-brief-txt');
-  if (!box || !txt) return;
-  box.style.display = 'block';
-  txt.innerHTML = '<span class="aiload"><span class="ald"></span><span class="ald"></span><span class="ald"></span> Generating...</span>';
+  var legacyTxt = document.getElementById('macro-brief-txt');
+
+  var loadingHTML = '<span style="opacity:.5">Generating intelligence briefing…</span>';
+
+  if (fireTxt) fireTxt.innerHTML = loadingHTML;
+  if (legacyTxt) { legacyTxt.innerHTML = loadingHTML; if (box) box.style.display = 'block'; }
+
   rq('/api/intelligence/macro-brief').then(function(r) {
-    txt.textContent = (r && (r.brief || r.content)) || 'Macro briefing unavailable.';
+    var text = (r && (r.brief || r.content)) || '';
+    if (!text || text.length < 10) {
+      text = 'Global intelligence monitoring active. Configure an AI provider in Admin → Settings for full analysis.';
+    }
+
+    // Populate fire dashboard quote
+    if (fireTxt) {
+      if (typeof renderExtendedBrief === 'function') {
+        renderExtendedBrief(text);
+      } else {
+        fireTxt.textContent = text;
+      }
+    }
+    if (timeEl) timeEl.textContent = new Date().toTimeString().slice(0, 5) + ' UTC';
+
+    // Populate legacy element
+    if (legacyTxt) legacyTxt.textContent = text;
   });
   track('macro_brief_requested', 'macro', '');
 }
