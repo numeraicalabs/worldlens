@@ -409,12 +409,8 @@ async def migrate_admin_columns():
             FOREIGN KEY (used_by)    REFERENCES users(id)
         );
         CREATE INDEX IF NOT EXISTS idx_invite_code ON invites(code);
-        """)
-        await db.commit()
-        logger.info("Admin migration done")
 
-    # ── ETF Tracker tables ────────────────────────────────────────────────────
-    await db.executescript("""
+        -- ── ETF Tracker tables ──────────────────────────────────────────────
         CREATE TABLE IF NOT EXISTS etf_portfolios (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id     INTEGER NOT NULL,
@@ -487,6 +483,6 @@ async def migrate_admin_columns():
         CREATE INDEX IF NOT EXISTS idx_etf_hold_port  ON etf_holdings(portfolio_id);
         CREATE INDEX IF NOT EXISTS idx_etf_alert_user ON etf_alerts(user_id);
         CREATE INDEX IF NOT EXISTS idx_etf_post_date  ON etf_community_posts(created_at DESC);
-    """)
-    await db.commit()
-    logger.info("ETF Tracker tables ready")
+        """)
+        await db.commit()
+        logger.info("Admin migration + ETF Tracker tables done")
