@@ -13,14 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/css/worldlens.css?v=20260421">
-<link rel="stylesheet" href="/static/css/worldlens_neo.css?v=20260421">
-  <link rel="stylesheet" href="/static/css/tradgentic.css?v=20260421">
-  <link rel="stylesheet" href="/static/css/backtest.css?v=20260421">
-  <link rel="stylesheet" href="/static/css/onboarding.css?v=20260421">
-<link rel="stylesheet" href="/static/css/worldlens_mobile.css?v=20260421">
-<link rel="stylesheet" href="/static/css/worldlens_fire.css?v=20260421">
-<link rel="stylesheet" href="/static/css/globe_widget.css?v=20260421">
+<link rel="stylesheet" href="/static/core.bundle.css?v21">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v21">
+<link rel="stylesheet" href="/static/finance.bundle.css?v21">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -138,126 +133,85 @@
 <!-- SHELL -->
 <div id="shell">
 <nav id="nav">
-
   <!-- Logo -->
   <div class="nlogo" onclick="sv('dash',document.querySelector('[data-v=dash]'))" style="cursor:pointer">
     <span class="nlogo-wl">World</span><span class="nlogo-lens">Lens</span>
   </div>
 
-  <!-- ── PRIMARY NAV GROUPS ── -->
+  <!-- ── FLAT SIDEBAR — all views visible ── -->
   <div class="nav-groups" id="nav-groups">
 
-    <!-- 1. Intelligence (with dropdown) -->
-    <div class="nav-group" id="ng-intelligence">
-      <button class="ni nav-group-btn" data-v="dash" onclick="sv('dash',this);navGroupActivate('intelligence')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v4l2.5 1.5"/></svg>
-        Intelligence
-        <svg class="nav-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
-      </button>
-      <div class="nav-dropdown" id="nd-intelligence">
-        <div class="nd-section-label">Live Data</div>
-        <button class="nd-item active" data-v="dash" onclick="sv('dash',document.querySelector('[data-v=dash]'));closeAllDropdowns()">
-          <span class="nd-icon">🏠</span><span class="nd-label">Dashboard</span>
-          <span class="nd-badge nd-badge-live">LIVE</span>
-        </button>
-        <button class="nd-item" data-v="map" onclick="sv('map',document.querySelector('[data-v=map]'));closeAllDropdowns()">
-          <span class="nd-icon">🗺</span><span class="nd-label">Global Map</span>
-          <span class="nd-desc">Live event pins</span>
-        </button>
-        <button class="nd-item" data-v="feed" onclick="sv('feed',document.querySelector('[data-v=feed]'));closeAllDropdowns()">
-          <span class="nd-icon">📋</span><span class="nd-label">Event Feed</span>
-          <span class="nd-desc">Filter + search</span>
-        </button>
-        <div class="nd-section-label">Early Intelligence</div>
-        <button class="nd-item" data-v="earlywarning" onclick="sv('earlywarning',document.querySelector('[data-v=earlywarning]'));closeAllDropdowns()">
-          <span class="nd-icon">📡</span><span class="nd-label">Early Warning</span>
-          <span class="nd-desc">Crisis signals</span>
-        </button>
-        <button class="nd-item" data-v="supplychain" onclick="sv('supplychain',document.querySelector('[data-v=supplychain]'));closeAllDropdowns()">
-          <span class="nd-icon">🏭</span><span class="nd-label">Supply Chain</span>
-          <span class="nd-desc">Trade disruptions</span>
-        </button>
-        <div class="nd-section-label">Trading</div>
-        <button class="nd-item" data-v="tradgentic" onclick="sv('tradgentic',document.querySelector('[data-v=tradgentic]'));closeAllDropdowns()">
-          <span class="nd-icon">🤖</span><span class="nd-label">Tradgentic</span>
-          <span class="nd-desc">AI Paper Trading Lab</span>
-        </button>
-      </div>
-    </div>
+    <!-- DASHBOARD & MAP — top tier -->
+    <button class="ni" data-v="dash" onclick="sv('dash',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v4l2.5 1.5"/></svg>
+      Dashboard
+    </button>
 
-    <!-- 2. Analysis (with dropdown + sub-tabs) -->
-    <div class="nav-group" id="ng-analysis">
-      <button class="ni nav-group-btn" data-v="graph" onclick="sv('graph',this);navGroupActivate('analysis')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><line x1="8" y1="6" x2="3" y2="10"/><line x1="8" y1="6" x2="13" y2="10"/></svg>
-        Analysis
-        <svg class="nav-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
-      </button>
-      <div class="nav-dropdown" id="nd-analysis">
-        <div class="nd-section-label">Graph Suite</div>
-        <button class="nd-item" data-graph-mode="graph" onclick="svGraph('graph')">
-          <span class="nd-icon">🕸</span><span class="nd-label">News Graph</span>
-          <span class="nd-desc">Entity relationships</span>
-        </button>
-        <button class="nd-item" data-graph-mode="explorer" onclick="svGraph('explorer')">
-          <span class="nd-icon">🔍</span><span class="nd-label">Knowledge Explorer</span>
-          <span class="nd-desc">Radial / force layout</span>
-        </button>
-        <button class="nd-item" data-graph-mode="timeline" onclick="svGraph('timeline')">
-          <span class="nd-icon">📅</span><span class="nd-label">Timeline Graph</span>
-          <span class="nd-desc">Narrative arcs</span>
-        </button>
-        <button class="nd-item" data-graph-mode="cascade" onclick="svGraph('cascade')">
-          <span class="nd-icon">⚡</span><span class="nd-label">Cascade Simulator</span>
-          <span class="nd-desc nd-desc-highlight">Shock propagation</span>
-        </button>
-        <div class="nd-section-label">Intelligence</div>
-        <button class="nd-item" data-v="macro" onclick="sv('macro',document.querySelector('[data-v=macro]'));closeAllDropdowns()">
-          <span class="nd-icon">📊</span><span class="nd-label">Macro Indicators</span>
-          <span class="nd-desc">FRED · ECB · World Bank</span>
-        </button>
-        <button class="nd-item" data-v="ai" onclick="sv('ai',document.querySelector('[data-v=ai]'));closeAllDropdowns()">
-          <span class="nd-icon">🤖</span><span class="nd-label">AI Analyst</span>
-          <span class="nd-desc">Ask anything</span>
-        </button>
-      </div>
-    </div>
+    <button class="ni" data-v="map" onclick="sv('map',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4l4-2 4 2 4-2v10l-4 2-4-2-4 2z"/><line x1="6" y1="2" x2="6" y2="12"/><line x1="10" y1="4" x2="10" y2="14"/></svg>
+      Global Map
+    </button>
 
-    <!-- 3. Markets (with dropdown) -->
-    <div class="nav-group" id="ng-markets">
-      <button class="ni nav-group-btn" data-v="markets" onclick="sv('markets',this);navGroupActivate('markets')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,11 5,7 8,9 11,4 15,2"/><line x1="1" y1="14" x2="15" y2="14"/></svg>
-        Markets
-        <svg class="nav-chevron" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
-      </button>
-      <div class="nav-dropdown" id="nd-markets">
-        <div class="nd-section-label">Financial Data</div>
-        <button class="nd-item" data-v="markets" onclick="sv('markets',document.querySelector('[data-v=markets]'));closeAllDropdowns()">
-          <span class="nd-icon">📈</span><span class="nd-label">Markets</span>
-          <span class="nd-desc">114 assets · Quant suite</span>
-        </button>
-        <button class="nd-item" data-v="insiders" onclick="sv('insiders',document.querySelector('[data-v=insiders]'));closeAllDropdowns()">
-          <span class="nd-icon">🕵</span><span class="nd-label">Insider Trades</span>
-          <span class="nd-desc">Congress · Billionaires</span>
-        </button>
-        <button class="nd-item" data-v="portfolio" onclick="sv('portfolio',document.querySelector('[data-v=portfolio]'));closeAllDropdowns()">
-          <span class="nd-icon">💼</span><span class="nd-label">Portfolio</span>
-          <span class="nd-desc">Risk · Forecast · PCA</span>
-        </button>
-      </div>
-    </div>
+    <!-- INTELLIGENCE -->
+    <button class="ni" data-v="feed" onclick="sv('feed',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="4" x2="13" y2="4"/><line x1="3" y1="8" x2="13" y2="8"/><line x1="3" y1="12" x2="13" y2="12"/></svg>
+      Event Feed
+    </button>
 
-    <!-- 4. Direct items (no dropdown) -->
+    <button class="ni" data-v="earlywarning" onclick="sv('earlywarning',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M3 8a5 5 0 0 1 10 0M1 8a7 7 0 0 1 14 0"/></svg>
+      Early Warning
+    </button>
+
+    <button class="ni" data-v="supplychain" onclick="sv('supplychain',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="4" height="6"/><rect x="10" y="6" width="4" height="6"/><line x1="6" y1="9" x2="10" y2="9"/></svg>
+      Supply Chain
+    </button>
+
+    <!-- ANALYSIS -->
+    <button class="ni" data-v="graph" onclick="sv('graph',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><line x1="8" y1="6" x2="3" y2="10"/><line x1="8" y1="6" x2="13" y2="10"/></svg>
+      Graph Suite
+    </button>
+
+    <button class="ni" data-v="macro" onclick="sv('macro',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,12 5,9 8,11 11,5 14,7"/></svg>
+      Macro
+    </button>
+
     <button class="ni" data-v="ai" onclick="sv('ai',this)">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3.5"/><path d="M8 9.5v3M5 14h6"/></svg>
-      AI
+      AI Analyst
     </button>
 
+    <!-- FINANCE -->
+    <button class="ni" data-v="markets" onclick="sv('markets',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,11 5,7 8,9 11,4 15,2"/><line x1="1" y1="14" x2="15" y2="14"/></svg>
+      Markets
+    </button>
+
+    <button class="ni" data-v="portfolio" onclick="sv('portfolio',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="12" height="9" rx="1"/><path d="M11 14V4a1.5 1.5 0 0 0-1.5-1.5h-3A1.5 1.5 0 0 0 5 4v10"/></svg>
+      Portfolio
+    </button>
+
+    <button class="ni" data-v="tradgentic" onclick="sv('tradgentic',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="12" height="7" rx="1"/><circle cx="8" cy="3" r="1.5"/><path d="M8 4.5v2.5"/></svg>
+      Tradgentic
+    </button>
+
+    <button class="ni" data-v="insiders" onclick="sv('insiders',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14a5 5 0 0 1 10 0"/></svg>
+      Insiders
+    </button>
+
+    <!-- USER -->
     <button class="ni" data-v="alerts" onclick="sv('alerts',this)">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 4 1.5 5 1.5 5h-13s1.5-1 1.5-5a5 5 0 0 1 5-5z"/><path d="M6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>
-      Alerts<span id="al-badge" style="display:none;background:var(--or);color:#fff;font-size:8px;padding:1px 5px;border-radius:100px;margin-left:2px">0</span>
+      Alerts<span id="al-badge" style="display:none;background:var(--or,#f59e0b);color:#fff;font-size:8px;padding:1px 5px;border-radius:100px;margin-left:2px">0</span>
     </button>
 
-  </div><!-- nav-groups -->
+  </div><!-- /nav-groups -->
 
   <!-- ── RIGHT SIDE ── -->
   <div id="navr">
@@ -266,15 +220,13 @@
       <div class="uav" id="uav">U</div>
       <span id="un">User</span>
     </div>
-    <!-- Gamification XP pill -->
     <div id="nav-xp-pill" style="display:none;align-items:center;gap:4px;padding:3px 10px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.2);border-radius:100px;cursor:pointer" onclick="sv('gamification',document.querySelector('[data-v=gamification]'))">
       <span style="font-size:10px">⭐</span>
-      <span id="nav-xp-val" style="font-family:var(--fm);font-size:10px;font-weight:700;color:#A78BFA">0 XP</span>
+      <span id="nav-xp-val" style="font-family:var(--fm,monospace);font-size:10px;font-weight:700;color:#A78BFA">0 XP</span>
     </div>
     <button class="btn btn-g btn-sm" onclick="openRiskRadar()">Risk Radar</button>
     <button class="btn btn-g btn-sm" onclick="logout()">Sign Out</button>
   </div>
-
 </nav>
 <div id="content">
 
@@ -3075,41 +3027,12 @@
 </div>
 
 <!-- WorldLens Application Scripts (load order matters) -->
-<script src="/static/js/01_globals.js?v=20260421"></script>
-<script src="/static/js/02_core.js?v=20260421"></script>
-<script src="/static/js/03_map.js?v=20260421"></script>
-<script src="/static/js/04_events.js?v=20260421"></script>
-<script src="/static/js/05_markets.js?v=20260421"></script>
-<script src="/static/js/06_supply_admin.js?v=20260421"></script>
-<script src="/static/js/07_map_advanced.js?v=20260421"></script>
-<script src="/static/js/08_knowledge_graph.js?v=20260421"></script>
-<script src="/static/js/09_historical_events.js?v=20260421"></script>
-<script src="/static/js/10_stubs.js?v=20260421"></script>
-<script src="/static/js/11_insiders.js?v=20260421"></script>
-<script src="/static/js/12_graph.js?v=20260421"></script>
-<script src="/static/js/13_portfolio.js?v=20260421"></script>
+<!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/js/14_graph3d.js?v=20260421"></script>
-<script src="/static/js/15_knowledge_explorer.js?v=20260421"></script>
-<script src="/static/js/16_timeline_graph.js?v=20260421"></script>
-<script src="/static/js/17_cascade.js?v=20260421"></script>
-<script src="/static/js/18_network_hub.js?v=20260421"></script>
-<script src="/static/js/19_continent_streams.js?v=20260421"></script>
-<script src="/static/js/20_nav_ux.js?v=20260421"></script>
-<script src="/static/js/21_agents_dash.js?v=20260421"></script>
-<script src="/static/js/22_graph_engine.js?v=20260421"></script>
-<script src="/static/js/23_dash_globe.js?v=20260421"></script>
-<script src="/static/js/24_tradgentic.js?v=20260421"></script>
-<script src="/static/js/25_backtest.js?v=20260421"></script>
-<script src="/static/js/26_features.js?v=20260421"></script>
-<script src="/static/js/27_onboarding.js?v=20260421"></script>
-<script src="/static/js/28_ml_bots.js?v=20260421"></script>
-<script src="/static/js/29_sprint_c.js?v=20260421"></script>
-<script src="/static/js/30_theme.js?v=20260421"></script>
-<script src="/static/js/31_dash_v2.js?v=20260421"></script>
-<script src="/static/js/32_dash_ew.js?v=20260421"></script>
-<script src="/static/js/33_mobile_ux.js?v=20260421"></script>
-<script src="/static/js/34_swipe_dash.js?v=20260421"></script>
+<script src="/static/core.bundle.js?v21"></script>
+<script src="/static/dashboard.bundle.js?v21"></script>
+<script src="/static/map.bundle.js?v21"></script>
+<script src="/static/finance.bundle.js?v21"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
