@@ -412,3 +412,81 @@ async def migrate_admin_columns():
         """)
         await db.commit()
         logger.info("Admin migration done")
+
+    # ── ETF Tracker tables ────────────────────────────────────────────────────
+    await db.executescript("""
+        CREATE TABLE IF NOT EXISTS etf_portfolios (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            name        TEXT NOT NULL DEFAULT 'Portafoglio Principale',
+            strategy    TEXT DEFAULT 'custom',
+            created_at  TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS etf_holdings (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            portfolio_id INTEGER NOT NULL,
+            isin        TEXT NOT NULL,
+            ticker      TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            shares      REAL NOT NULL DEFAULT 0,
+            avg_price   REAL NOT NULL DEFAULT 0,
+            current_price REAL,
+            created_at  TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (portfolio_id) REFERENCES etf_portfolios(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS etf_alerts (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            etf_isin    TEXT NOT NULL,
+            etf_ticker  TEXT NOT NULL,
+            alert_type  TEXT NOT NULL DEFAULT 'below',
+            threshold   REAL NOT NULL,
+            current_price REAL,
+            channels    TEXT DEFAULT '["email","push"]',
+            active      INTEGER DEFAULT 1,
+            created_at  TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS etf_settings (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            key         TEXT NOT NULL,
+            value       TEXT,
+            UNIQUE(user_id, key),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS etf_reports (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            format      TEXT NOT NULL DEFAULT 'pdf',
+            type        TEXT NOT NULL DEFAULT 'portfolio_summary',
+            filepath    TEXT,
+            created_at  TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS etf_community_posts (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            user_name   TEXT NOT NULL,
+            avatar      TEXT NOT NULL DEFAULT 'U',
+            content     TEXT NOT NULL,
+            likes       INTEGER DEFAULT 0,
+            comments    INTEGER DEFAULT 0,
+            portfolio_snapshot TEXT,
+            created_at  TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_etf_port_user  ON etf_portfolios(user_id);
+        CREATE INDEX IF NOT EXISTS idx_etf_hold_port  ON etf_holdings(portfolio_id);
+        CREATE INDEX IF NOT EXISTS idx_etf_alert_user ON etf_alerts(user_id);
+        CREATE INDEX IF NOT EXISTS idx_etf_post_date  ON etf_community_posts(created_at DESC);
+    """)
+    await db.commit()
+    logger.info("ETF Tracker tables ready")

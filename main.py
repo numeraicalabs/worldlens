@@ -28,6 +28,7 @@ from routers.ml    import router as ml_router
 from routers.globe import router as globe_router
 from routers.agents import router as agents_router
 from routers.tradgentic.router import router as tradgentic_router
+from routers.etf_tracker import router as etf_tracker_router
 from datetime import datetime
 from config import settings
 
@@ -184,6 +185,7 @@ app.include_router(ml_router)
 app.include_router(globe_router)
 app.include_router(agents_router)
 app.include_router(tradgentic_router)
+app.include_router(etf_tracker_router)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
