@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
 from ai_layer import _call_claude, _parse_json, ai_available_async, _get_user_ai_keys
+from routers.brain import brain_ingest
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,17 @@ async def get_daily_insight(user=Depends(require_user)):
                 await db.commit()
         except Exception as e:
             logger.warning("daily_insight: cache write failed: %s", e)
+
+        # Feed insight into brain
+        try:
+            await brain_ingest(
+                user["id"], text,
+                source="analysis",
+                weight=1.2,
+                context={"type": "daily_insight", "date": today}
+            )
+        except Exception:
+            pass
 
         return {"user_id": user["id"], "date": today, "insight": text}
     except Exception as e:

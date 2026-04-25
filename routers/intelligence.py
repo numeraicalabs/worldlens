@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Body, Query
 from auth import require_user
 from config import settings
 from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async, _get_user_ai_keys
+from routers.brain import brain_ingest, brain_context_for_prompt
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 logger = logging.getLogger(__name__)
@@ -408,6 +409,23 @@ async def get_early_warning(user=Depends(require_user)):
              json.dumps(top_risks))
         )
         await db.commit()
+
+    # Feed EW result into brain
+    try:
+        ew_brain_text = (
+            f"Early Warning score {result['global_ew_score']}/10. "
+            f"Macro stress {result.get('macro_stress',5)}/10. "
+            f"{len(events)} events analyzed. "
+            f"{result.get('ai_assessment','')[:300]}"
+        )
+        await brain_ingest(
+            user["id"], ew_brain_text,
+            source="ew",
+            weight=1.3,
+            context={"score": result["global_ew_score"], "date": today}
+        )
+    except Exception:
+        pass
 
     return result
 
