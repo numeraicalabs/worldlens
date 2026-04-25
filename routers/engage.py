@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import hashlib
+import logging
 import aiosqlite
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict
@@ -9,6 +10,8 @@ from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
 from ai_layer import _call_claude, _parse_json, ai_available_async
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/engage", tags=["engage"])
 
@@ -106,87 +109,109 @@ INSIGHT_SYSTEM = (
 @router.get("/insight/today")
 async def get_daily_insight(user=Depends(require_user)):
     today = date.today().isoformat()
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
-        await _ensure_tables(db)
-        # Return cached insight if exists
-        async with db.execute(
-            "SELECT * FROM daily_insights WHERE user_id=? AND date=?", (user["id"], today)
-        ) as c:
-            cached = await c.fetchone()
-        if cached:
-            return dict(cached)
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            await _ensure_tables(db)
+            # Return cached insight if exists
+            async with db.execute(
+                "SELECT * FROM daily_insights WHERE user_id=? AND date=?", (user["id"], today)
+            ) as c:
+                cached = await c.fetchone()
+            if cached:
+                return dict(cached)
 
-        # Fetch user context
-        async with db.execute(
-            "SELECT interests, regions, market_prefs FROM users WHERE id=?", (user["id"],)
-        ) as c:
-            row = await c.fetchone()
-        u = dict(row) if row else {}
-        interests = []
-        regions = []
-        try: interests = json.loads(u.get("interests") or "[]")
-        except Exception: pass
-        try: regions = json.loads(u.get("regions") or "[]")
-        except Exception: pass
+            # Fetch user context
+            async with db.execute(
+                "SELECT interests, regions, market_prefs FROM users WHERE id=?", (user["id"],)
+            ) as c:
+                row = await c.fetchone()
+            u = dict(row) if row else {}
+            interests = []
+            regions = []
+            try: interests = json.loads(u.get("interests") or "[]")
+            except Exception: pass
+            try: regions = json.loads(u.get("regions") or "[]")
+            except Exception: pass
 
-        # Recent high events
-        async with db.execute(
-            "SELECT title, category, country_name, severity FROM events "
-            "WHERE datetime(timestamp) > datetime('now','-48 hours') "
-            "ORDER BY severity DESC LIMIT 10"
-        ) as c:
-            events = [dict(r) for r in await c.fetchall()]
+            # Recent high events
+            async with db.execute(
+                "SELECT title, category, country_name, severity FROM events "
+                "WHERE datetime(timestamp) > datetime('now','-48 hours') "
+                "ORDER BY severity DESC LIMIT 10"
+            ) as c:
+                events = [dict(r) for r in await c.fetchall()]
 
-        # Recent watchlist
-        async with db.execute(
-            "SELECT label, type FROM watchlist WHERE user_id=? LIMIT 8", (user["id"],)
-        ) as c:
-            wl = [dict(r) for r in await c.fetchall()]
+            # Recent watchlist
+            async with db.execute(
+                "SELECT label, type FROM watchlist WHERE user_id=? LIMIT 8", (user["id"],)
+            ) as c:
+                wl = [dict(r) for r in await c.fetchall()]
 
-    # Build prompt
-    ev_text = "\n".join([
-        "- " + e["title"] + " [" + e["category"] + ", " + (e["country_name"] or "Global") + ", severity " + str(round(e["severity"],1)) + "]"
-        for e in events[:6]
-    ]) or "No major events in the last 48h"
+        # Build prompt — sanitize None/missing fields
+        ev_text = "\n".join([
+            "- " + (e.get("title") or "") + " [" + (e.get("category") or "general") + ", " +
+            (e.get("country_name") or "Global") + ", severity " + str(round(e.get("severity") or 0, 1)) + "]"
+            for e in events[:6]
+        ]) or "No major events in the last 48h"
 
-    wl_text = ", ".join([w["label"] for w in wl]) if wl else "nothing yet"
-    region_text = ", ".join(regions) if regions else "all regions"
-    interest_text = ", ".join(interests) if interests else "general topics"
+        wl_text = ", ".join([w.get("label") or "" for w in wl]) if wl else "nothing yet"
+        region_text = ", ".join(regions) if regions else "all regions"
+        interest_text = ", ".join(interests) if interests else "general topics"
 
-    prompt = (
-        "User profile:\n"
-        "- Follows: " + region_text + "\n"
-        "- Interests: " + interest_text + "\n"
-        "- Watching: " + wl_text + "\n\n"
-        "Recent global events (last 48h):\n" + ev_text + "\n\n"
-        "Write a personalized 'Insight for You Today' — 2-3 sentences connecting "
-        "what the user follows to what's happening globally. Be specific and actionable."
-    )
-
-    text = await _call_claude(prompt, system=INSIGHT_SYSTEM, max_tokens=200)
-    if not text:
-        # Smart fallback based on data
-        if events:
-            top = events[0]
-            text = (
-                "Today's top event is a " + top["category"].lower() + " development in " +
-                (top["country_name"] or "a key region") + " (severity " + str(round(top["severity"],1)) + "/10). " +
-                "This is relevant to " + (region_text if regions else "global markets") + ". " +
-                "Check the feed for analysis."
-            )
-        else:
-            text = "Global markets are relatively stable today. A good moment to review your watchlist and explore emerging stories before they become headlines."
-
-    # Cache it
-    async with aiosqlite.connect(settings.db_path) as db:
-        await db.execute(
-            "INSERT OR REPLACE INTO daily_insights (user_id, date, insight) VALUES (?,?,?)",
-            (user["id"], today, text)
+        prompt = (
+            "User profile:\n"
+            "- Follows: " + region_text + "\n"
+            "- Interests: " + interest_text + "\n"
+            "- Watching: " + wl_text + "\n\n"
+            "Recent global events (last 48h):\n" + ev_text + "\n\n"
+            "Write a personalized 'Insight for You Today' — 2-3 sentences connecting "
+            "what the user follows to what's happening globally. Be specific and actionable."
         )
-        await db.commit()
 
-    return {"user_id": user["id"], "date": today, "insight": text}
+        text = None
+        try:
+            text = await _call_claude(prompt, system=INSIGHT_SYSTEM, max_tokens=200)
+        except Exception as e:
+            logger.warning("daily_insight: _call_claude failed: %s", e)
+
+        if not text:
+            # Smart fallback based on data — handles None categories safely
+            if events:
+                top = events[0]
+                cat = (top.get("category") or "general").lower()
+                country = top.get("country_name") or "a key region"
+                sev = round(top.get("severity") or 0, 1)
+                text = (
+                    "Today's top event is a " + cat + " development in " + country +
+                    " (severity " + str(sev) + "/10). " +
+                    "This is relevant to " + (region_text if regions else "global markets") + ". " +
+                    "Check the feed for analysis."
+                )
+            else:
+                text = "Global markets are relatively stable today. A good moment to review your watchlist and explore emerging stories before they become headlines."
+
+        # Cache it (best effort)
+        try:
+            async with aiosqlite.connect(settings.db_path) as db:
+                await db.execute(
+                    "INSERT OR REPLACE INTO daily_insights (user_id, date, insight) VALUES (?,?,?)",
+                    (user["id"], today, text)
+                )
+                await db.commit()
+        except Exception as e:
+            logger.warning("daily_insight: cache write failed: %s", e)
+
+        return {"user_id": user["id"], "date": today, "insight": text}
+    except Exception as e:
+        logger.error("daily_insight: unexpected error: %s", e, exc_info=True)
+        # Never return 500 — fallback message
+        return {
+            "user_id": user["id"],
+            "date": today,
+            "insight": "Welcome back. Check the feed for the latest events.",
+            "_fallback": True,
+        }
 
 
 # ── Daily Missions ────────────────────────────────────
