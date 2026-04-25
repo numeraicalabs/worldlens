@@ -207,7 +207,7 @@ async def get_critical_nodes(
 @router.get("/neighbours/{node_id:path}")
 async def get_neighbours(
     node_id:   str,
-    direction: str = Query("both", regex="^(in|out|both)$"),
+    direction: str = Query("both", pattern="^(in|out|both)$"),
     max_n:     int = Query(30, ge=1, le=100),
     _user = Depends(require_user),
 ):
