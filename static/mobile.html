@@ -91,6 +91,8 @@ html, body {
 }
 .nav-btn svg { width: 22px; height: 22px; stroke-width: 1.5; }
 .nav-btn.active { color: var(--amber); }
+#nb-trading { color: rgba(59,130,246,.6); }
+#nb-trading:active { color: #3B82F6; }
 .nav-btn.active::before {
   content: ''; position: absolute; top: 0; left: 50%;
   transform: translateX(-50%);
@@ -806,6 +808,10 @@ input:focus, select:focus {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       TradGentic
     </button>
+    <button class="nav-btn" id="nb-trading" onclick="openTradingHub()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+      Trading
+    </button>
   </nav>
 </div>
 
@@ -1136,6 +1142,16 @@ var _curCard = 0;
 })();
 
 /* ── View navigation ── */
+/* ── Trading Hub bridge ── */
+function openTradingHub() {
+  // Share the auth token with trading.html via localStorage
+  // trading.html reads 'wl_trade_token' on init
+  if (G.token) {
+    try { localStorage.setItem('wl_trade_token', G.token); } catch(e) {}
+  }
+  window.location.href = '/static/trading.html';
+}
+
 function showView(name) {
   var map = {dash:'view-dash', map:'view-map', tg:'view-tg'};
   var nb  = {dash:'nb-dash', map:'nb-map', tg:'nb-tg'};

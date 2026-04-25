@@ -430,28 +430,56 @@ function setAuthMode(mode){
 }
 
 async function handleAuth(){
-  const email=(document.getElementById('a-email')||{}).value?.trim();
-  const pass =(document.getElementById('a-pass') ||{}).value;
-  const errEl = document.getElementById('auth-err');
-  errEl.textContent='';
-  if(!email||!pass){errEl.textContent='Inserisci email e password';return;}
+  const emailEl = document.getElementById('a-email');
+  const passEl  = document.getElementById('a-pass');
+  const nameEl  = document.getElementById('a-name');
+  const errEl   = document.getElementById('auth-err');
+  const btn     = document.querySelector('.auth-btn');
 
-  const nameVal=(document.getElementById('a-name')||{}).value||email.split('@')[0];
+  const email = (emailEl||{}).value?.trim()||'';
+  const pass  = (passEl ||{}).value||'';
+  errEl.textContent='';
+
+  if(!email){errEl.textContent='Inserisci la tua email';return;}
+  if(!pass) {errEl.textContent='Inserisci la password';return;}
+  if(_authMode==='login'&&pass.length<1){errEl.textContent='Password obbligatoria';return;}
+  if(_authMode==='register'&&pass.length<8){errEl.textContent='Password minimo 8 caratteri';return;}
+
+  // Loading state
+  if(btn){btn.textContent='…';btn.disabled=true;}
+
+  const username=(nameEl||{}).value?.trim()||email.split('@')[0];
+  const endpoint=_authMode==='register'?'/api/auth/register':'/api/auth/login';
   const body=_authMode==='register'
-    ?{email,password:pass,name:nameVal,username:nameVal}
+    ?{email,password:pass,username}
     :{email,password:pass};
 
-  const r=await fetch((_authMode==='register'?'/api/auth/register':'/api/auth/login'),{
-    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
-  }).then(r=>r.json()).catch(()=>null);
+  let r=null, httpStatus=0;
+  try{
+    const resp=await fetch(endpoint,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    httpStatus=resp.status;
+    r=await resp.json();
+  }catch(e){
+    if(btn){btn.textContent='Continua';btn.disabled=false;}
+    errEl.textContent='Errore di rete — riprova';
+    return;
+  }
 
-  if(r&&(r.token||r.access_token)){
-    authToken=r.token||r.access_token;
-    currentUser=r.user||{email,name:email.split('@')[0]};
+  if(btn){btn.textContent='Continua';btn.disabled=false;}
+
+  if(r&&r.access_token){
+    authToken=r.access_token;
+    currentUser=r.user||{email,username};
     try{localStorage.setItem('wl_trade_token',authToken);}catch(e){}
     bootApp();
   } else {
-    errEl.textContent=r?.error||r?.detail||'Credenziali non valide';
+    // Show the actual server error
+    const msg=r?.detail||r?.error||r?.message||(httpStatus===401?'Credenziali non valide':httpStatus===400?'Dati non validi — controlla i campi':'Errore '+httpStatus);
+    errEl.textContent=msg;
   }
 }
 
@@ -1613,7 +1641,8 @@ const CHAPTER_SUMMARIES = {
 (function init(){
   setAuthMode('login');
   try{
-    const t=localStorage.getItem('wl_trade_token');
+    // Accept token from both trading.html login and mobile.html nav bridge
+    const t=localStorage.getItem('wl_trade_token')||localStorage.getItem('wl_m_token');
     if(t){
       authToken=t;
       fetch('/api/auth/me',{headers:{Authorization:'Bearer '+t}})
