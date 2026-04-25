@@ -22,12 +22,13 @@ except Exception:
     async def require_user(): return {"id": 1, "username": "demo"}
 
 try:
-    from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async
+    from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async, _get_user_ai_keys
 except ImportError:
     async def _call_claude(p, **kw): return None
     def _parse_json(t): return None
     def _ai_available(): return False
     async def ai_available_async(): return False
+    async def _get_user_ai_keys(uid): return "", ""
 
 try:
     from scheduler import get_finance_cache
@@ -306,6 +307,7 @@ def _watchlist_context(watchlist: List[Dict]) -> str:
 async def _generate_brief(
     bot_id: str, config: Dict, events: List[Dict],
     previous: Optional[Dict] = None, watchlist: Optional[List[Dict]] = None,
+    user_gemini_key: str = "", user_anthropic_key: str = "",
 ) -> Dict:
     cache_key = f"{bot_id}:{config.get('focus','')}:{config.get('tone','')}:{len(events)}"
     cached = _brief_cache.get(cache_key)
@@ -401,7 +403,10 @@ async def _generate_brief(
     ]
 
     prompt = "\n".join(sections)
-    raw    = await _call_claude(prompt, system=bot["persona"], max_tokens=520)
+    raw    = await _call_claude(
+        prompt, system=bot["persona"], max_tokens=520,
+        user_gemini_key=user_gemini_key, user_anthropic_key=user_anthropic_key
+    )
     parsed = _parse_json(raw) if raw else None
 
     if not parsed:
@@ -522,6 +527,7 @@ async def get_bot_brief(bot_id: str, user=Depends(require_user)):
 async def get_all_briefs(user=Depends(require_user)):
     import asyncio
     watchlist = await _load_user_watchlist(user["id"])
+    ug, ua    = await _get_user_ai_keys(user["id"])
 
     async def _one_bot(bot_id: str):
         try:
@@ -530,7 +536,10 @@ async def get_all_briefs(user=Depends(require_user)):
                 return bot_id, None
             events   = await _get_bot_events(bot_id, config)
             previous = await _load_previous_brief(user["id"], bot_id)
-            brief    = await _generate_brief(bot_id, config, events, previous, watchlist)
+            brief    = await _generate_brief(
+                bot_id, config, events, previous, watchlist,
+                user_gemini_key=ug, user_anthropic_key=ua
+            )
             await _save_brief_history(user["id"], bot_id, brief, len(events))
             return bot_id, {
                 "bot_id": bot_id, "event_count": len(events),

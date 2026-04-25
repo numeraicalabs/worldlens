@@ -9,7 +9,7 @@ from typing import Optional, List, Dict
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
-from ai_layer import _call_claude, _parse_json, ai_available_async
+from ai_layer import _call_claude, _parse_json, ai_available_async, _get_user_ai_keys
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +109,8 @@ INSIGHT_SYSTEM = (
 @router.get("/insight/today")
 async def get_daily_insight(user=Depends(require_user)):
     today = date.today().isoformat()
+    # Load user's personal AI key first
+    _ug, _ua = await _get_user_ai_keys(user["id"])
     try:
         async with aiosqlite.connect(settings.db_path) as db:
             db.row_factory = aiosqlite.Row
@@ -171,7 +173,10 @@ async def get_daily_insight(user=Depends(require_user)):
 
         text = None
         try:
-            text = await _call_claude(prompt, system=INSIGHT_SYSTEM, max_tokens=200)
+            text = await _call_claude(
+                prompt, system=INSIGHT_SYSTEM, max_tokens=200,
+                user_gemini_key=_ug, user_anthropic_key=_ua
+            )
         except Exception as e:
             logger.warning("daily_insight: _call_claude failed: %s", e)
 

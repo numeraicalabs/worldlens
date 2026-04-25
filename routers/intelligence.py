@@ -9,7 +9,7 @@ from typing import List, Dict, Optional
 from fastapi import APIRouter, Depends, Body, Query
 from auth import require_user
 from config import settings
-from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async
+from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async, _get_user_ai_keys
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 logger = logging.getLogger(__name__)
@@ -262,11 +262,13 @@ def _compute_ew_score_rule_based(events: List[Dict], indicators: List[Dict]) -> 
 # ── CRISIS EARLY WARNING ──────────────────────────────
 
 @router.get("/early-warning")
-async def get_early_warning():
+async def get_early_warning(user=Depends(require_user)):
     """
     Crisis Early Warning dashboard — aggregates sentiment, macro,
     market stress and event velocity into a unified threat score.
     """
+    # Load user's personal AI key (takes priority over admin key)
+    _ug, _ua = await _get_user_ai_keys(user["id"])
     async with aiosqlite.connect(settings.db_path) as db:
         db.row_factory = aiosqlite.Row
         await _ensure_tables(db)
@@ -332,7 +334,7 @@ async def get_early_warning():
 
     # AI assessment — deep structured reasoning
     ai_assessment = ""
-    if await ai_available_async() and events:
+    if (await ai_available_async() or _ug or _ua) and events:
         ev_summary = "\n".join([
             f"[{e.get('category','?')}][sev={e.get('severity',5):.0f}][{e.get('country_name','Global')}] "
             f"{e.get('title','')} — {(e.get('ai_summary') or e.get('summary',''))[:120]}"
@@ -375,7 +377,10 @@ async def get_early_warning():
             f"signals that would confirm or deny escalation.\n"
             f"No headers, no bullets, direct prose only."
         )
-        ai_assessment = await _call_claude(prompt, system=system, max_tokens=700) or ""
+        ai_assessment = await _call_claude(
+            prompt, system=system, max_tokens=700,
+            user_gemini_key=_ug, user_anthropic_key=_ua
+        ) or ""
 
     result = {
         **scores,
@@ -777,6 +782,8 @@ async def ai_analyst_answer(payload: dict = Body(...), user=Depends(require_user
 async def macro_brief_endpoint(user=Depends(require_user)):
     """Dashboard macro briefing text for the Risk Index quote."""
     try:
+        ug, ua = await _get_user_ai_keys(user["id"])
+
         async with aiosqlite.connect(settings.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
@@ -789,19 +796,33 @@ async def macro_brief_endpoint(user=Depends(require_user)):
         if not events:
             return {"brief": "No recent events found. Waiting for data refresh."}
 
-        if not await ai_available_async():
-            # Return a data-driven brief without AI
+        has_ai = ug or ua or await ai_available_async()
+        if not has_ai:
             top = events[0]
             count_high = sum(1 for e in events if float(e.get("severity") or 0) >= 7)
             return {"brief": (
                 f"Monitoring {len(events)} events in the last 72 hours. "
                 f"Lead story: {top.get('title','—')}. "
                 f"{count_high} high-severity events detected. "
-                f"Configure an AI key in Admin → Settings for full analysis."
+                f"Add your Gemini API key in Profile → La tua chiave AI for full analysis."
             )}
 
-        brief = await ai_macro_briefing([], events)
-        return {"brief": brief or "Analysis unavailable — check AI provider in Admin → Settings."}
+        # Build brief using user key or admin key
+        ev_text = "\n".join([
+            f"- [{e.get('category','?')}] {e.get('title','')} "
+            f"({e.get('country_name','Global')}, sev={float(e.get('severity') or 5):.0f})"
+            for e in events[:8]
+        ])
+        prompt = (
+            "You are a senior geopolitical analyst. Write a 2-sentence macro intelligence "
+            "briefing based on these recent events. Be direct and specific.\n\n"
+            f"Events:\n{ev_text}"
+        )
+        brief = await _call_claude(
+            prompt, max_tokens=150,
+            user_gemini_key=ug, user_anthropic_key=ua
+        )
+        return {"brief": brief or "Intelligence briefing temporarily unavailable."}
     except Exception as e:
         logger.warning("macro-brief error: %s", e)
         return {"brief": "Intelligence briefing temporarily unavailable."}

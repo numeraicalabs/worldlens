@@ -8,7 +8,7 @@ from auth import require_user
 from scheduler import get_finance_cache
 from models import WatchlistItem, AlertCreate
 from config import settings
-from ai_layer import ai_watchlist_digest, ai_available_async
+from ai_layer import ai_watchlist_digest, ai_available_async, _get_user_ai_keys, _call_claude
 
 finance_router = APIRouter(prefix="/api/finance", tags=["finance"])
 user_router = APIRouter(prefix="/api/user", tags=["user"])
@@ -285,3 +285,24 @@ async def get_user_ai_key_status(user=Depends(require_user)):
         "gemini": {"configured": bool(gkey), "preview": ("***" + gkey[-4:]) if len(gkey) >= 4 else None},
         "claude": {"configured": bool(ckey), "preview": ("***" + ckey[-4:]) if len(ckey) >= 4 else None},
     }
+
+
+@user_router.post("/ai-key/test")
+async def test_user_ai_key(user=Depends(require_user)):
+    """Quick test of the user's personal AI key."""
+    try:
+        ug, ua = await _get_user_ai_keys(user["id"])
+        if not ug and not ua:
+            return {"status": "error", "message": "Nessuna chiave configurata"}
+        result = await _call_claude(
+            "Reply with exactly: OK",
+            system="You are a test. Reply with exactly: OK",
+            max_tokens=10,
+            user_gemini_key=ug,
+            user_anthropic_key=ua,
+        )
+        if result:
+            return {"status": "ok", "message": "Chiave verificata con successo"}
+        return {"status": "error", "message": "Chiave non valida o quota esaurita"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
