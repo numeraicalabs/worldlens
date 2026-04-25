@@ -9330,3 +9330,275 @@ selectMktAsset = async function(symbol, name) {
   return await _selectMktAsset_orig(symbol, name);
 };
 
+
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — Brain Manager panel
+   ══════════════════════════════════════════════════════════════ */
+
+// Register brain loader in admNav
+(function() {
+  var _origAdmNav = typeof admNav === 'function' ? admNav : null;
+  if (!_origAdmNav) return;
+  window.admNav = function(panel, btn) {
+    _origAdmNav(panel, btn);
+    if (panel === 'brain') loadAdmBrain();
+  };
+})();
+
+var _admBrainChart = null;
+
+function loadAdmBrain() {
+  var kpis   = document.getElementById('adm-brain-kpis');
+  var body   = document.getElementById('adm-brain-users-body');
+  if (kpis) kpis.innerHTML = '<div style="color:var(--t3);font-size:11px">Loading…</div>';
+
+  rq('/api/brain/admin/stats').then(function(r) {
+    if (!r || r.detail) {
+      if (kpis) kpis.innerHTML = '<div style="color:var(--re)">Failed to load brain stats</div>';
+      return;
+    }
+
+    // KPIs
+    var levels = function(n) {
+      if (n < 20)   return '🌱 Seed';
+      if (n < 100)  return '🌿 Growing';
+      if (n < 500)  return '🧠 Active';
+      if (n < 2000) return '⚡ Advanced';
+      return '🔥 Expert';
+    };
+    if (kpis) {
+      kpis.innerHTML = [
+        { label: 'Total Brain Entries', val: (r.total_entries || 0).toLocaleString() },
+        { label: 'Users with Brain',    val: (r.by_user || []).length },
+        { label: 'Most active user',    val: (r.by_user[0] && r.by_user[0].username) || '—' },
+        { label: 'Brain level (global)',val: levels(r.total_entries || 0) },
+      ].map(function(k) {
+        return '<div class="adm-kpi"><div class="adm-kpi-val">' + k.val +
+               '</div><div class="adm-kpi-lbl">' + k.label + '</div></div>';
+      }).join('');
+    }
+
+    // Growth chart
+    var growth = r.growth || [];
+    if (growth.length && document.getElementById('adm-brain-chart')) {
+      if (_admBrainChart) { _admBrainChart.destroy(); _admBrainChart = null; }
+      var ctx = document.getElementById('adm-brain-chart').getContext('2d');
+      _admBrainChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: growth.map(function(d) { return d.day.slice(5); }),
+          datasets: [{ data: growth.map(function(d) { return d.n; }),
+            backgroundColor: 'rgba(139,92,246,.35)', borderColor: '#7C3AED',
+            borderWidth: 1, borderRadius: 3 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false }, ticks: { font: { size: 9 }, color: 'var(--t3)' } },
+                    y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { font: { size: 9 }, color: 'var(--t3)' } } }
+        }
+      });
+    }
+
+    // Sources
+    var srcEl = document.getElementById('adm-brain-sources');
+    if (srcEl) {
+      var srcColors = { event: '#F59E0B', analysis: '#7C3AED', ew: '#EF4444',
+        interaction: '#3B82F6', market: '#10B981', watchlist: '#06B6D4',
+        alert: '#EC4899', question: '#8B5CF6', admin_inject: '#F97316' };
+      var total = (r.by_source || []).reduce(function(s, x) { return s + x.n; }, 0) || 1;
+      srcEl.innerHTML = (r.by_source || []).slice(0, 7).map(function(s) {
+        var pct = Math.round(s.n / total * 100);
+        var col = srcColors[s.source] || '#8A94A6';
+        return '<div style="font-size:10px"><div style="display:flex;justify-content:space-between;margin-bottom:2px">' +
+          '<span style="color:var(--t2)">' + s.source + '</span>' +
+          '<span style="color:var(--t3)">' + s.n + '</span></div>' +
+          '<div style="height:4px;background:var(--bg3);border-radius:2px"><div style="height:100%;width:' + pct + '%;background:' + col + ';border-radius:2px"></div></div></div>';
+      }).join('');
+    }
+
+    // Topics
+    var topEl = document.getElementById('adm-brain-topics');
+    if (topEl) {
+      var topColors = { finance: '#10B981', macro: '#3B82F6', security: '#EF4444',
+        tech: '#8B5CF6', energy: '#F59E0B', politics: '#EC4899', geopolitics: '#F97316', trade: '#06B6D4' };
+      var totalT = (r.by_topic || []).reduce(function(s, x) { return s + x.n; }, 0) || 1;
+      topEl.innerHTML = (r.by_topic || []).slice(0, 7).map(function(t) {
+        var pct = Math.round(t.n / totalT * 100);
+        var col = topColors[t.topic] || '#8A94A6';
+        return '<div style="font-size:10px"><div style="display:flex;justify-content:space-between;margin-bottom:2px">' +
+          '<span style="color:var(--t2)">' + t.topic + '</span>' +
+          '<span style="color:var(--t3)">' + t.n + '</span></div>' +
+          '<div style="height:4px;background:var(--bg3);border-radius:2px"><div style="height:100%;width:' + pct + '%;background:' + col + ';border-radius:2px"></div></div></div>';
+      }).join('');
+    }
+
+    // Users table
+    if (body) {
+      body.innerHTML = (r.by_user || []).map(function(u) {
+        var lvl = u.entries < 20 ? '🌱' : u.entries < 100 ? '🌿' : u.entries < 500 ? '🧠' : u.entries < 2000 ? '⚡' : '🔥';
+        var last = (u.last_active || '').slice(0, 10);
+        return '<tr style="border-bottom:1px solid rgba(255,255,255,.05)">' +
+          '<td style="padding:7px 8px"><div style="font-weight:600;color:var(--t1)">' + (u.username || '?') + '</div>' +
+          '<div style="font-size:10px;color:var(--t3)">' + (u.email || '') + '</div></td>' +
+          '<td style="padding:7px 8px;text-align:right;color:var(--t2)">' + u.entries + '</td>' +
+          '<td style="padding:7px 8px;text-align:right">' + lvl + '</td>' +
+          '<td style="padding:7px 8px;text-align:right;color:var(--t3);font-size:10px">' + last + '</td>' +
+          '<td style="padding:7px 8px">' +
+          '<button class="adm-btn" onclick="admBrainViewUser(' + u.user_id + ',\'' + (u.username || '?') + '\')" style="font-size:10px;padding:3px 8px">View</button> ' +
+          '<button class="adm-btn adm-btn-danger" onclick="admBrainResetUser(' + u.user_id + ',\'' + (u.username || '?') + '\')" style="font-size:10px;padding:3px 8px">Reset</button>' +
+          '</td></tr>';
+      }).join('') || '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--t3)">No brain data yet</td></tr>';
+    }
+  });
+}
+
+function admBrainInjectModal() {
+  var mc = document.getElementById('modal-container');
+  if (!mc) mc = document.body;
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-ov';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:520px">' +
+    '<div class="modal-hd"><h3 style="font-size:15px;font-weight:700;color:var(--t1)">🧠 Inject Global Knowledge</h3>' +
+    '<button onclick="this.closest(\'.modal-ov\').remove()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer">✕</button></div>' +
+    '<div class="modal-bd">' +
+    '<p style="font-size:12px;color:var(--t3);margin-bottom:12px">This text will be added to ALL active users\' brains with high weight (2.0). Use for global market context, crisis briefings, or institutional knowledge.</p>' +
+    '<div class="form-group"><label class="form-label">Content</label>' +
+    '<textarea id="brain-inject-content" class="form-input light" placeholder="e.g. Fed raised rates 25bps in March 2025, signaling end of hiking cycle. Markets expect 2 cuts in 2026." style="min-height:120px;resize:vertical"></textarea></div>' +
+    '<div class="form-group"><label class="form-label">Source label</label>' +
+    '<input id="brain-inject-source" class="form-input light" value="admin_inject" placeholder="admin_inject"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:4px">' +
+    '<button class="btn btn-s btn-bl" onclick="this.closest(\'.modal-ov\').remove()">Annulla</button>' +
+    '<button class="btn btn-p btn-bl" onclick="admBrainDoInject(this)">Inject a tutti gli utenti</button>' +
+    '</div></div></div>';
+  document.body.appendChild(overlay);
+}
+
+function admBrainDoInject(btn) {
+  var content = (document.getElementById('brain-inject-content') || {}).value || '';
+  var source  = (document.getElementById('brain-inject-source') || {}).value || 'admin_inject';
+  if (!content.trim()) return;
+  if (btn) { btn.textContent = 'Injecting…'; btn.disabled = true; }
+  rq('/api/brain/admin/inject', { method: 'POST', body: { content: content.trim(), source: source } })
+    .then(function(r) {
+      btn.closest('.modal-ov').remove();
+      if (r && r.ok) {
+        toast('Knowledge injected in ' + r.injected_to + ' users', 'i');
+        loadAdmBrain();
+      } else {
+        toast('Injection failed', 'e');
+      }
+    });
+}
+
+function admBrainViewUser(uid, name) {
+  rq('/api/brain/admin/user/' + uid + '/entries').then(function(r) {
+    var entries = (r && r.entries) || [];
+    var mc = document.createElement('div');
+    mc.className = 'modal-ov';
+    mc.onclick = function(e) { if (e.target === mc) mc.remove(); };
+    mc.innerHTML = '<div class="modal modal-lg" onclick="event.stopPropagation()" style="max-width:600px">' +
+      '<div class="modal-hd"><h3 style="font-size:15px;font-weight:700;color:var(--t1)">🧠 Brain: ' + name + ' (' + entries.length + ' entries)</h3>' +
+      '<button onclick="this.closest(\'.modal-ov\').remove()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer">✕</button></div>' +
+      '<div class="modal-bd" style="max-height:70vh;overflow-y:auto">' +
+      (entries.length ? entries.map(function(e) {
+        return '<div style="padding:8px;background:var(--bg2);border-radius:8px;margin-bottom:6px">' +
+          '<div style="display:flex;gap:6px;margin-bottom:4px">' +
+          '<span style="font-size:10px;padding:1px 6px;border-radius:20px;background:rgba(59,130,246,.15);color:#60A5FA">' + e.source + '</span>' +
+          '<span style="font-size:10px;padding:1px 6px;border-radius:20px;background:rgba(16,185,129,.15);color:#34D399">' + e.topic + '</span>' +
+          '<span style="font-size:9px;color:var(--t3);margin-left:auto">' + (e.timestamp || '').slice(0, 16) + '</span></div>' +
+          '<div style="font-size:12px;color:var(--t2);line-height:1.5">' + e.content.slice(0, 300) + '</div></div>';
+      }).join('') : '<div style="text-align:center;padding:32px;color:var(--t3)">No entries yet</div>') +
+      '</div></div>';
+    document.body.appendChild(mc);
+  });
+}
+
+function admBrainResetUser(uid, name) {
+  if (!confirm('Reset brain for ' + name + '? This cannot be undone.')) return;
+  rq('/api/brain/admin/user/' + uid, { method: 'DELETE' }).then(function(r) {
+    if (r && r.ok) { toast('Brain reset for ' + name, 'i'); loadAdmBrain(); }
+    else toast('Reset failed', 'e');
+  });
+}
+
+/* Profile page — brain search modal */
+window.openBrainSearch = function() {
+  var mc = document.createElement('div');
+  mc.className = 'modal-ov';
+  mc.onclick = function(e) { if (e.target === mc) mc.remove(); };
+  mc.innerHTML = '<div class="modal" onclick="event.stopPropagation()" style="max-width:500px">' +
+    '<div class="modal-hd"><h3 style="font-size:15px;font-weight:700">🔍 Cerca nel tuo Cervello AI</h3>' +
+    '<button onclick="this.closest(\'.modal-ov\').remove()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer">✕</button></div>' +
+    '<div class="modal-bd">' +
+    '<div style="display:flex;gap:8px;margin-bottom:14px">' +
+    '<input id="brain-search-q" class="form-input light" placeholder="es. fed rate, conflict ukraine, nasdaq..." style="flex:1" onkeydown="if(event.key===\'Enter\')doBrainSearch()">' +
+    '<button class="btn btn-p btn-sm" onclick="doBrainSearch()">Cerca</button></div>' +
+    '<div id="brain-search-results" style="max-height:380px;overflow-y:auto"></div>' +
+    '</div></div>';
+  document.body.appendChild(mc);
+  setTimeout(function() { var i = document.getElementById('brain-search-q'); if (i) i.focus(); }, 100);
+};
+
+window.doBrainSearch = function() {
+  var q = (document.getElementById('brain-search-q') || {}).value || '';
+  var out = document.getElementById('brain-search-results');
+  if (!q.trim() || !out) return;
+  out.innerHTML = '<div style="color:var(--t3);font-size:11px;padding:8px">Cercando…</div>';
+  rq('/api/brain/search?q=' + encodeURIComponent(q) + '&top_k=10').then(function(r) {
+    var res = (r && r.results) || [];
+    if (!res.length) { out.innerHTML = '<div style="color:var(--t3);padding:16px;text-align:center">Nessun risultato trovato</div>'; return; }
+    out.innerHTML = res.map(function(e) {
+      var srcColors = { event: '#F59E0B', analysis: '#7C3AED', ew: '#EF4444',
+        interaction: '#3B82F6', market: '#10B981', question: '#8B5CF6' };
+      var col = srcColors[e.source] || '#8A94A6';
+      return '<div style="padding:10px;background:var(--bg2,rgba(255,255,255,.04));border-radius:8px;margin-bottom:6px;border-left:3px solid ' + col + '">' +
+        '<div style="display:flex;gap:5px;margin-bottom:5px">' +
+        '<span style="font-size:9px;padding:1px 6px;border-radius:20px;background:' + col + '22;color:' + col + '">' + e.source + '</span>' +
+        '<span style="font-size:9px;color:var(--t3)">' + (e.timestamp || '').slice(0, 10) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--t1);line-height:1.5">' + e.content.slice(0, 250) + '</div></div>';
+    }).join('');
+  });
+};
+
+window.confirmResetBrain = function() {
+  if (!confirm('Cancellare tutto il tuo cervello AI? Non può essere annullato.')) return;
+  rq('/api/brain/reset', { method: 'DELETE' }).then(function(r) {
+    if (r && r.ok) {
+      toast('Cervello resettato', 'i');
+      if (typeof loadBrainStats === 'function') loadBrainStats();
+    }
+  });
+};
+
+/* Update loadBrainStats to also update topic pills */
+var _origLoadBrainStats = window.loadBrainStats;
+window.loadBrainStats = function() {
+  rq('/api/brain/stats').then(function(r) {
+    if (!r || r.total_entries === undefined) return;
+    G.brainStats = r;
+    var el = document.getElementById('brain-level-badge');
+    var el2 = document.getElementById('brain-entry-count');
+    var el3 = document.getElementById('brain-level-bar');
+    var el4 = document.getElementById('brain-topics');
+    var levels = { seed: 0, growing: 20, active: 100, advanced: 500, expert: 2000 };
+    var icons  = { seed: '🌱', growing: '🌿', active: '🧠', advanced: '⚡', expert: '🔥' };
+    var colors = { finance: '#10B981', macro: '#3B82F6', security: '#EF4444', tech: '#8B5CF6',
+                   energy: '#F59E0B', politics: '#EC4899', geopolitics: '#F97316', trade: '#06B6D4' };
+    var level  = r.brain_level || 'seed';
+    var count  = r.total_entries || 0;
+    if (el) el.textContent = icons[level] + ' ' + level.toUpperCase();
+    if (el2) el2.textContent = count + ' entries';
+    if (el3) {
+      var next = { seed: 20, growing: 100, active: 500, advanced: 2000, expert: 9999 };
+      var pct = Math.min(100, Math.round(count / (next[level] || 100) * 100));
+      el3.style.width = pct + '%';
+    }
+    if (el4 && r.by_topic && r.by_topic.length) {
+      el4.innerHTML = r.by_topic.slice(0, 6).map(function(t) {
+        var col = colors[t.topic] || '#8A94A6';
+        return '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:' + col + '22;color:' + col + '">' + t.topic + ' ' + t.n + '</span>';
+      }).join('');
+    }
+  });
+};

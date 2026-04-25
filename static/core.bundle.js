@@ -376,6 +376,7 @@ function enterApp() {
     if (typeof initDashGlobe  === 'function') setTimeout(initDashGlobe, 400);
     if (typeof loadSavedIds    === 'function') loadSavedIds();
     if (typeof refreshAffinity === 'function') refreshAffinity();
+    if (typeof loadBrainStats  === 'function') setTimeout(loadBrainStats, 2000);
     renderMkts();
     renderMacro();
     renderAlerts();
@@ -2924,3 +2925,583 @@ function _ewLoadTimeline() {
     });
   });
 }
+
+/* ══════════════════════════════════════════════════════════════
+   WORLDLENS BRAIN CLIENT
+   Auto-feeds knowledge on every user interaction.
+   More usage = smarter AI responses.
+   ══════════════════════════════════════════════════════════════ */
+var _brain = {
+  queue: [],
+  flushing: false,
+  minLen: 20,
+  _feedTimeout: null,
+};
+
+/* Public API — call from anywhere */
+window.brainFeed = function(content, source, weight, context) {
+  if (!G.token) return;
+  if (!content || content.length < _brain.minLen) return;
+  _brain.queue.push({ content: String(content).slice(0, 800), source: source || 'interaction', weight: weight || 1.0, context: context || {} });
+  // Debounce flush — batch up interactions for 3s
+  clearTimeout(_brain._feedTimeout);
+  _brain._feedTimeout = setTimeout(_brainFlush, 3000);
+};
+
+function _brainFlush() {
+  if (!G.token || _brain.flushing || !_brain.queue.length) return;
+  _brain.flushing = true;
+  var entries = _brain.queue.splice(0, 20); // max 20 per flush
+  rq('/api/brain/feed/batch', { method: 'POST', body: { entries: entries } })
+    .then(function(r) {
+      _brain.flushing = false;
+      if (_brain.queue.length) _brainFlush(); // flush remainder
+    })
+    .catch(function() { _brain.flushing = false; });
+}
+
+/* Auto-hook: sv() — every view navigation */
+(function() {
+  var _origSvForBrain = window.sv;
+  if (typeof _origSvForBrain !== 'function') return;
+  window.sv = function(name, btn) {
+    _origSvForBrain(name, btn);
+    var viewLabels = {
+      dash: 'Viewed Dashboard intelligence overview',
+      map: 'Explored Global Map and geopolitical events',
+      feed: 'Browsed Event Feed news stream',
+      earlywarning: 'Consulted Early Warning system',
+      macro: 'Reviewed Macro economic indicators',
+      markets: 'Analyzed financial markets data',
+      portfolio: 'Reviewed investment portfolio',
+      tradgentic: 'Used TradGentic algorithmic trading',
+      insiders: 'Checked insider trading signals',
+      ai: 'Consulted AI Analyst',
+      supplychain: 'Analyzed Supply Chain risks',
+      alerts: 'Managed price and event alerts',
+    };
+    var label = viewLabels[name];
+    if (label) brainFeed(label, 'interaction', 0.3);
+  };
+})();
+
+/* Auto-hook: openEP() — every event opened */
+(function() {
+  var _maxWait = 0;
+  function tryHook() {
+    if (typeof openEP !== 'function') {
+      if (_maxWait++ < 20) setTimeout(tryHook, 500);
+      return;
+    }
+    var _origOpenEPBrain = openEP;
+    openEP = function(id) {
+      _origOpenEPBrain(id);
+      // Feed event details into brain
+      var ev = G.events && G.events.find(function(e) { return e.id === id || e.id === parseInt(id); });
+      if (ev) {
+        var txt = (ev.title || '') + '. ' + (ev.summary || ev.ai_summary || '').slice(0, 300);
+        if (txt.length > 20) {
+          brainFeed(txt, 'event', 1.5, {
+            category: ev.category, country: ev.country_code,
+            severity: ev.severity, event_id: id
+          });
+        }
+      }
+    };
+  }
+  tryHook();
+})();
+
+/* Auto-hook: watchlist adds */
+window._brainFeedWatchlist = function(label, type) {
+  brainFeed('Added to watchlist: ' + label + ' (' + type + ')', 'watchlist', 1.2, { label: label, type: type });
+};
+
+/* Auto-hook: alert creation */
+window._brainFeedAlert = function(query) {
+  if (query) brainFeed('Set price/event alert: ' + query, 'alert', 1.0);
+};
+
+/* Auto-hook: market views */
+window._brainFeedMarket = function(ticker, price, change) {
+  if (ticker) {
+    brainFeed('Monitored market: ' + ticker + (price ? ' at ' + price : '') + (change ? ', change ' + change + '%' : ''), 'market', 0.8, { ticker: ticker });
+  }
+};
+
+/* Auto-hook: EW viewed */
+window._brainFeedEW = function(score, label) {
+  brainFeed('Early Warning: Global risk score ' + score + '/10 — ' + label, 'ew', 1.0, { score: score });
+};
+
+/* Feed question when user asks AI */
+window._brainFeedQuestion = function(question, answer) {
+  if (question && question.length > 15) {
+    brainFeed('Q: ' + question.slice(0, 400), 'question', 1.8, {});
+    if (answer && answer.length > 30) {
+      brainFeed('A: ' + answer.slice(0, 500), 'analysis', 1.5, {});
+    }
+  }
+};
+
+/* Load brain stats on app boot — shows brain level in profile */
+window.loadBrainStats = function() {
+  rq('/api/brain/stats').then(function(r) {
+    if (!r || r.total_entries === undefined) return;
+    G.brainStats = r;
+    var el = document.getElementById('brain-level-badge');
+    var el2 = document.getElementById('brain-entry-count');
+    var el3 = document.getElementById('brain-level-bar');
+    var levels = { seed: 0, growing: 20, active: 100, advanced: 500, expert: 2000 };
+    var icons  = { seed: '🌱', growing: '🌿', active: '🧠', advanced: '⚡', expert: '🔥' };
+    var level  = r.brain_level || 'seed';
+    var count  = r.total_entries || 0;
+    if (el) el.textContent = icons[level] + ' ' + level.toUpperCase();
+    if (el2) el2.textContent = count + ' entries';
+    if (el3) {
+      var next = { seed: 20, growing: 100, active: 500, advanced: 2000, expert: 9999 };
+      var pct = Math.min(100, Math.round(count / (next[level] || 100) * 100));
+      el3.style.width = pct + '%';
+      el3.title = pct + '% to next level';
+    }
+  });
+};
+
+
+/* ══════════════════════════════════════════════════════════════
+   BRAIN AGENT — Modal chat controller
+   Multi-turn · Template buttons · Feedback loop · Session memory
+   ══════════════════════════════════════════════════════════════ */
+(function() {
+'use strict';
+
+/* ── State ── */
+var BA = {
+  sessionId:    null,
+  messages:     [],
+  typing:       false,
+  templates:    [],
+  selectedTmpl: null,
+  dwellStart:   null,
+  lastMsgId:    null,
+  brainCount:   0,
+  sessionsOpen: false,
+};
+
+/* ── Helpers ── */
+function $ba(id)  { return document.getElementById(id); }
+function rqBA(url, opts) {
+  opts = opts || {};
+  var h = {'Content-Type':'application/json'};
+  if (G.token) h['Authorization'] = 'Bearer ' + G.token;
+  return fetch(url, { method: opts.method||'GET', headers: h,
+    body: opts.body ? JSON.stringify(opts.body) : undefined })
+    .then(function(r){ return r.ok ? r.json() : r.json().then(function(e){ throw e; }); })
+    .catch(function(e){ console.warn('[BA]', e.message||e.detail||e); return null; });
+}
+
+var TMPL_COLORS = {
+  market_brief:  '#10B981', risk_summary: '#EF4444',
+  geo_digest:    '#F97316', compare:      '#3B82F6',
+  deep_dive:     '#7C3AED', action_plan:  '#F59E0B',
+};
+
+/* ── Public API ── */
+window.brainAgent = {
+  open:  function() { open(); },
+  close: function() { close(); },
+  toggle: function() {
+    var ov = $ba('brain-agent-overlay');
+    if (ov) ov.style.display === 'none' ? open() : close();
+  },
+  send: function() { send(); },
+  newSession: function() { newSession(); },
+  toggleSessions: function() { toggleSessions(); },
+};
+
+function open() {
+  var ov = $ba('brain-agent-overlay');
+  if (!ov) return;
+  ov.style.display = 'flex';
+  loadTemplates();
+  loadBrainCount();
+  if (!BA.sessionId) newSession();
+  setTimeout(function() { var inp = $ba('ba-input'); if (inp) inp.focus(); }, 200);
+}
+
+function close() {
+  var ov = $ba('brain-agent-overlay');
+  if (ov) ov.style.display = 'none';
+  // Send dwell time for last message
+  sendDwell();
+}
+
+function newSession() {
+  BA.sessionId = null;
+  BA.messages  = [];
+  BA.lastMsgId = null;
+  BA.selectedTmpl = null;
+  var msgs = $ba('ba-messages');
+  if (msgs) msgs.innerHTML = '<div id="ba-empty" style="margin:auto;text-align:center;padding:32px 16px"><div style="font-size:36px;margin-bottom:12px">🧠</div><div style="font-size:15px;font-weight:600;color:var(--t1,#F0F2FF);margin-bottom:8px">Brain Agent</div><div style="font-size:12px;color:var(--t3,#5A6070);line-height:1.7;max-width:280px">Fai domande, richiedi analisi, confronta scenari. Il cervello usa tutto quello che hai letto e salvato.</div></div>';
+  deselectTemplate();
+  setStatus('pronto');
+}
+
+/* ── Templates ── */
+function loadTemplates() {
+  rqBA('/api/brain-agent/templates').then(function(tmpls) {
+    if (!tmpls) return;
+    BA.templates = tmpls;
+    var el = $ba('ba-template-btns');
+    if (!el) return;
+    el.innerHTML = tmpls.map(function(t) {
+      var col = TMPL_COLORS[t.id] || '#7C3AED';
+      var wr  = t.win_rate ? t.win_rate + '% ✓' : '';
+      return '<button class="ba-tmpl-btn" data-id="' + t.id + '" onclick="brainAgentSelectTmpl(\'' + t.id + '\')" style="padding:5px 10px;border-radius:20px;border:1px solid ' + col + '33;background:transparent;color:' + col + ';font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;display:flex;align-items:center;gap:4px">' +
+        t.icon + ' ' + t.label.split(' ').slice(1).join(' ') +
+        (wr ? '<span style="font-size:9px;opacity:.6">' + wr + '</span>' : '') +
+        '</button>';
+    }).join('');
+  });
+}
+
+window.brainAgentSelectTmpl = function(id) {
+  if (BA.selectedTmpl === id) {
+    deselectTemplate(); return;
+  }
+  BA.selectedTmpl = id;
+  document.querySelectorAll('.ba-tmpl-btn').forEach(function(b) {
+    var active = b.dataset.id === id;
+    var col = TMPL_COLORS[b.dataset.id] || '#7C3AED';
+    b.style.background = active ? col + '22' : 'transparent';
+    b.style.borderColor = active ? col : col + '33';
+    b.style.fontWeight  = active ? '700' : '400';
+  });
+  var inp = $ba('ba-input');
+  if (inp && !inp.value.trim()) {
+    var tmpl = BA.templates.find(function(t){ return t.id===id; });
+    if (tmpl) inp.placeholder = 'Template: ' + tmpl.label + ' — digita la tua domanda…';
+  }
+};
+
+function deselectTemplate() {
+  BA.selectedTmpl = null;
+  document.querySelectorAll('.ba-tmpl-btn').forEach(function(b) {
+    var col = TMPL_COLORS[b.dataset.id] || '#7C3AED';
+    b.style.background = 'transparent';
+    b.style.borderColor = col + '33';
+    b.style.fontWeight  = '400';
+  });
+  var inp = $ba('ba-input');
+  if (inp) inp.placeholder = 'Chiedi qualcosa al tuo cervello AI…';
+}
+
+/* ── Brain count ── */
+function loadBrainCount() {
+  if (!G.token) return;
+  rqBA('/api/brain/stats').then(function(r) {
+    if (!r) return;
+    BA.brainCount = r.total_entries || 0;
+    var el = $ba('ba-brain-count');
+    if (el) el.textContent = BA.brainCount + ' entries nel cervello';
+  });
+}
+
+/* ── Sessions list ── */
+function toggleSessions() {
+  BA.sessionsOpen = !BA.sessionsOpen;
+  var panel = $ba('ba-sessions-panel');
+  if (!panel) return;
+  if (BA.sessionsOpen) {
+    panel.style.display = 'block';
+    loadSessionsList();
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+function loadSessionsList() {
+  rqBA('/api/brain-agent/sessions').then(function(sessions) {
+    var el = $ba('ba-sessions-list');
+    if (!el || !sessions) return;
+    if (!sessions.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--t3);padding:8px">Nessuna sessione precedente</div>';
+      return;
+    }
+    el.innerHTML = sessions.map(function(s) {
+      var active = s.id === BA.sessionId;
+      return '<div onclick="brainAgentLoadSession(\'' + s.id + '\')" style="padding:8px 10px;border-radius:7px;cursor:pointer;border:1px solid ' + (active?'rgba(124,58,237,.4)':'transparent') + ';background:' + (active?'rgba(124,58,237,.1)':'transparent') + ';margin-bottom:4px">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--t1)">' + (s.title||'Conversazione').slice(0,50) + '</div>' +
+        '<div style="font-size:10px;color:var(--t3)">' + (s.message_count||0) + ' messaggi · ' + (s.updated_at||'').slice(0,10) + '</div>' +
+        '</div>';
+    }).join('');
+  });
+}
+
+window.brainAgentLoadSession = function(id) {
+  BA.sessionId = id;
+  BA.sessionsOpen = false;
+  var panel = $ba('ba-sessions-panel');
+  if (panel) panel.style.display = 'none';
+  rqBA('/api/brain-agent/sessions/' + id + '/messages').then(function(msgs) {
+    if (!msgs) return;
+    var el = $ba('ba-messages');
+    if (!el) return;
+    el.innerHTML = '';
+    BA.messages = [];
+    msgs.forEach(function(m) {
+      renderMessage(m.role, m.content, m.template, m.id, m.rating);
+      BA.messages.push(m);
+    });
+    scrollToBottom();
+  });
+};
+
+/* ── Send message ── */
+function send() {
+  var inp = $ba('ba-input');
+  if (!inp) return;
+  var query = inp.value.trim();
+  if (!query || BA.typing) return;
+
+  // Send dwell for previous message
+  sendDwell();
+
+  inp.value = '';
+  inp.style.height = '44px';
+
+  // Render user message immediately
+  renderMessage('user', query);
+  BA.messages.push({ role:'user', content: query });
+
+  // Show typing indicator
+  BA.typing = true;
+  setStatus('elaboro…');
+  renderTyping();
+
+  var btn = $ba('ba-send-btn');
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+
+  var emptyEl = $ba('ba-empty');
+  if (emptyEl) emptyEl.remove();
+
+  // Build payload
+  var payload = {
+    query:         query,
+    session_id:    BA.sessionId,
+    template_hint: BA.selectedTmpl || undefined,
+  };
+
+  rqBA('/api/brain-agent/ask', { method:'POST', body: payload })
+    .then(function(r) {
+      removeTyping();
+      BA.typing = false;
+      if (btn) { btn.textContent = '↑'; btn.disabled = false; }
+
+      if (!r) {
+        renderMessage('assistant', '⚠ Errore di rete — riprova.');
+        setStatus('errore');
+        return;
+      }
+
+      // Update session id
+      BA.sessionId = r.session_id;
+      BA.lastMsgId = r.message_id;
+
+      // Render response
+      renderMessage('assistant', r.response, r.template, r.message_id);
+      BA.messages.push({ role:'assistant', content: r.response, template: r.template, id: r.message_id });
+
+      // Start dwell tracking
+      BA.dwellStart = Date.now();
+
+      // Update brain count
+      var cnt = $ba('ba-brain-count');
+      if (cnt) { BA.brainCount += (r.brain_hits || 0); cnt.textContent = BA.brainCount + ' entries nel cervello'; }
+
+      // Status
+      var hits = r.brain_hits || 0;
+      setStatus(hits + ' entries brain · ' + (r.template || 'auto'));
+
+      // Deselect template after use
+      deselectTemplate();
+    })
+    .catch(function(e) {
+      removeTyping();
+      BA.typing = false;
+      if (btn) { btn.textContent = '↑'; btn.disabled = false; }
+      renderMessage('assistant', '⚠ Errore: ' + (e.detail || e.message || 'sconosciuto'));
+      setStatus('errore');
+    });
+}
+
+/* ── Dwell tracking ── */
+function sendDwell() {
+  if (!BA.lastMsgId || !BA.dwellStart) return;
+  var dwell = Date.now() - BA.dwellStart;
+  BA.dwellStart = null;
+  if (dwell < 1000) return;
+  rqBA('/api/brain-agent/implicit-feedback', {
+    method: 'POST',
+    body: { message_id: BA.lastMsgId, dwell_ms: dwell }
+  });
+}
+
+/* ── Render ── */
+function renderMessage(role, content, template, msgId, existingRating) {
+  var msgs = $ba('ba-messages');
+  if (!msgs) return;
+
+  var isUser = role === 'user';
+  var col = template ? (TMPL_COLORS[template] || '#7C3AED') : '#7C3AED';
+  var id = msgId ? 'ba-msg-' + msgId.replace(/-/g,'') : '';
+
+  var html = '<div ' + (id?'id="'+id+'"':'') + ' style="display:flex;flex-direction:column;' + (isUser?'align-items:flex-end':'align-items:flex-start') + '">';
+
+  if (!isUser && template) {
+    var tmpl = BA.templates.find(function(t){ return t.id===template; });
+    html += '<div style="font-size:9px;font-family:monospace;letter-spacing:.1em;color:' + col + ';margin-bottom:4px;opacity:.8">' +
+            (tmpl ? tmpl.icon + ' ' + tmpl.label : template.toUpperCase()) + '</div>';
+  }
+
+  html += '<div style="max-width:90%;padding:' + (isUser?'10px 14px':'12px 16px') + ';border-radius:' + (isUser?'14px 14px 4px 14px':'4px 14px 14px 14px') + ';' +
+    (isUser
+      ? 'background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;'
+      : 'background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:var(--t1,#F0F2FF);') +
+    'font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-word">' +
+    mdToHtml(content) +
+    '</div>';
+
+  // Feedback buttons for assistant messages
+  if (!isUser && msgId) {
+    var rated = existingRating;
+    html += '<div class="ba-feedback" data-msg="' + msgId + '" style="display:flex;gap:6px;margin-top:6px;align-items:center">' +
+      '<button onclick="brainAgentFeedback(\'' + msgId + '\',1,this)" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(16,185,129,' + (rated===1?'0.6':'0.2') + ');background:rgba(16,185,129,' + (rated===1?'0.15':'0') + ');color:#10B981;font-size:12px;cursor:pointer;transition:all .2s">👍</button>' +
+      '<button onclick="brainAgentFeedback(\'' + msgId + '\',-1,this)" style="padding:4px 10px;border-radius:20px;border:1px solid rgba(239,68,68,' + (rated===-1?'0.6':'0.2') + ');background:rgba(239,68,68,' + (rated===-1?'0.15':'0') + ');color:#EF4444;font-size:12px;cursor:pointer;transition:all .2s">👎</button>' +
+      '<span style="font-size:10px;color:var(--t3);font-family:monospace" id="ba-fb-' + msgId.replace(/-/g,'') + '"></span>' +
+      '</div>';
+  }
+
+  html += '</div>';
+  msgs.insertAdjacentHTML('beforeend', html);
+  scrollToBottom();
+}
+
+function renderTyping() {
+  var msgs = $ba('ba-messages');
+  if (!msgs) return;
+  msgs.insertAdjacentHTML('beforeend',
+    '<div id="ba-typing" style="display:flex;align-items:flex-start">' +
+    '<div style="padding:12px 16px;border-radius:4px 14px 14px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)">' +
+    '<div style="display:flex;gap:4px;align-items:center">' +
+    '<div style="width:6px;height:6px;border-radius:50%;background:#7C3AED;animation:baPulse .8s ease-in-out infinite"></div>' +
+    '<div style="width:6px;height:6px;border-radius:50%;background:#7C3AED;animation:baPulse .8s ease-in-out .2s infinite"></div>' +
+    '<div style="width:6px;height:6px;border-radius:50%;background:#7C3AED;animation:baPulse .8s ease-in-out .4s infinite"></div>' +
+    '</div></div></div>'
+  );
+  if (!document.getElementById('ba-pulse-style')) {
+    var s = document.createElement('style');
+    s.id = 'ba-pulse-style';
+    s.textContent = '@keyframes baPulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}';
+    document.head.appendChild(s);
+  }
+  scrollToBottom();
+}
+
+function removeTyping() {
+  var t = document.getElementById('ba-typing');
+  if (t) t.remove();
+}
+
+function scrollToBottom() {
+  var msgs = $ba('ba-messages');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+function setStatus(txt) {
+  var el = $ba('ba-status-txt');
+  if (el) el.textContent = txt;
+}
+
+/* ── Feedback ── */
+window.brainAgentFeedback = function(msgId, rating, btn) {
+  rqBA('/api/brain-agent/feedback', { method:'POST', body: { message_id: msgId, rating: rating } })
+    .then(function(r) {
+      if (!r || !r.ok) return;
+      // Visually update buttons
+      var container = btn.closest('.ba-feedback');
+      if (container) {
+        container.querySelectorAll('button').forEach(function(b) {
+          var isPos = b.textContent.includes('👍');
+          var active = (isPos && rating===1) || (!isPos && rating===-1);
+          var col = isPos ? '#10B981' : '#EF4444';
+          b.style.background = active ? 'rgba(' + (isPos?'16,185,129':'239,68,68') + ',.18)' : 'transparent';
+          b.style.borderColor = active ? col : col + '33';
+        });
+      }
+      var fbEl = document.getElementById('ba-fb-' + msgId.replace(/-/g,''));
+      if (fbEl) fbEl.textContent = rating===1 ? 'brain +0.3' : 'brain -0.2';
+    });
+};
+
+/* ── Markdown → HTML ── */
+function mdToHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g,'<em>$1</em>')
+    .replace(/`([^`]+)`/g,'<code style="background:rgba(124,58,237,.2);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:11px">$1</code>')
+    .replace(/\|(.+)\|/g, function(m, row) {
+      if (row.replace(/[-| ]/g,'').trim()==='') return '<tr style="border-bottom:1px solid rgba(255,255,255,.06)"></tr>';
+      var cells = row.split('|').map(function(c){ return c.trim(); }).filter(function(c){ return c; });
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,.05)">' + cells.map(function(c,i){ return i===0 ? '<td style="padding:5px 10px;color:var(--t2);font-size:12px;font-weight:600;white-space:nowrap">' + c + '</td>' : '<td style="padding:5px 10px;color:var(--t1);font-size:12px">' + c + '</td>'; }).join('') + '</tr>';
+    })
+    .replace(/(<tr[^>]*>.*?<\/tr>)/gms, function(m) {
+      if (m.includes('<td')) return '<table style="width:100%;border-collapse:collapse;margin:8px 0;border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden">' + m + '</table>';
+      return m;
+    })
+    .replace(/^#{1,3} (.+)$/gm,'<div style="font-weight:700;font-size:14px;color:var(--t1);margin:10px 0 5px">$1</div>')
+    .replace(/^• (.+)$/gm,'<div style="padding-left:14px;position:relative;margin:3px 0;color:var(--t2)"><span style="position:absolute;left:2px;color:#7C3AED">•</span>$1</div>')
+    .replace(/^\d+\. (.+)$/gm,'<div style="padding-left:18px;position:relative;margin:3px 0;color:var(--t2)">$1</div>')
+    .replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
+}
+
+/* ── Keyboard shortcut ── */
+document.addEventListener('keydown', function(e) {
+  if (e.key==='k' && (e.metaKey||e.ctrlKey)) {
+    e.preventDefault();
+    brainAgent.toggle();
+  }
+});
+
+/* ── Floating trigger button (shows after login) ── */
+function injectTriggerBtn() {
+  if (document.getElementById('ba-float-btn')) return;
+  var btn = document.createElement('button');
+  btn.id = 'ba-float-btn';
+  btn.title = 'Brain Agent (⌘K)';
+  btn.innerHTML = '🧠';
+  btn.onclick = function() { brainAgent.toggle(); };
+  btn.style.cssText = 'position:fixed;bottom:80px;right:16px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#6D28D9);border:none;color:#fff;font-size:22px;cursor:pointer;z-index:4000;box-shadow:0 4px 20px rgba(124,58,237,.5);display:flex;align-items:center;justify-content:center;transition:transform .2s';
+  btn.onmouseover = function(){ this.style.transform='scale(1.1)'; };
+  btn.onmouseout  = function(){ this.style.transform='scale(1)'; };
+  document.body.appendChild(btn);
+}
+
+// Inject trigger after login
+var _origEnterAppBA = window.enterApp;
+if (typeof _origEnterAppBA === 'function') {
+  window.enterApp = function() {
+    _origEnterAppBA.apply(this, arguments);
+    setTimeout(injectTriggerBtn, 500);
+  };
+} else {
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      if (G && G.token) injectTriggerBtn();
+    }, 1500);
+  });
+}
+
+})(); // end IIFE

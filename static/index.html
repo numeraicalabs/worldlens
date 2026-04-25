@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v24">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v24">
-<link rel="stylesheet" href="/static/finance.bundle.css?v24">
+<link rel="stylesheet" href="/static/core.bundle.css?v27">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v27">
+<link rel="stylesheet" href="/static/finance.bundle.css?v27">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -216,6 +216,11 @@
       Profile
     </button>
 
+    <a href="/static/brain_editor.html" target="_blank" class="ni" style="text-decoration:none">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="8" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><line x1="6" y1="7" x2="10" y2="5"/><line x1="6" y1="9" x2="10" y2="11"/></svg>
+      Brain Editor ↗
+    </a>
+
   </div><!-- /nav-groups -->
 
   <!-- ── RIGHT SIDE ── -->
@@ -230,6 +235,7 @@
       <span id="nav-xp-val" style="font-family:var(--fm,monospace);font-size:10px;font-weight:700;color:#A78BFA">0 XP</span>
     </div>
     <button class="btn btn-g btn-sm" onclick="openRiskRadar()">Risk Radar</button>
+    <button onclick="brainAgent.open()" title="Brain Agent (⌘K)" style="padding:5px 12px;border-radius:8px;border:1px solid rgba(124,58,237,.3);background:rgba(124,58,237,.1);color:#A78BFA;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">🧠 Brain</button>
     <button class="btn btn-g btn-sm" onclick="logout()">Sign Out</button>
   </div>
 </nav>
@@ -2234,6 +2240,31 @@
     </div>
   </div>
   <!-- ── Personal AI Key — any user can add their own ── -->
+  <!-- ── Brain Status Card ── -->
+  <div class="card" id="prof-brain-card" style="margin-bottom:12px">
+    <div class="card-tit" style="display:flex;align-items:center;justify-content:space-between">
+      <span>🧠 Il tuo Cervello AI</span>
+      <span id="brain-level-badge" style="font-size:10px;padding:2px 8px;border-radius:100px;background:rgba(139,92,246,.1);color:#A78BFA">🌱 SEED</span>
+    </div>
+    <div style="font-size:12px;color:var(--t3);line-height:1.6;margin:6px 0 10px">
+      Il cervello impara da ogni tua interazione — eventi aperti, analisi lette, mercati monitorati.
+      Più usi WorldLens, più le analisi AI diventano personalizzate.
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <span id="brain-entry-count" style="font-size:11px;color:var(--t3)">0 entries</span>
+      <button class="btn btn-g btn-sm" onclick="loadBrainStats()" style="font-size:10px;padding:4px 10px">↻ Aggiorna</button>
+    </div>
+    <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+      <div id="brain-level-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#7C3AED,#A78BFA);border-radius:3px;transition:width .5s"></div>
+    </div>
+    <div id="brain-topics" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"></div>
+    <div style="margin-top:10px;display:flex;gap:6px">
+      <button class="btn btn-g btn-sm" onclick="openBrainSearch()" style="flex:1;justify-content:center">🔍 Cerca</button>
+      <button class="btn btn-g btn-sm" onclick="window.open('/static/brain_editor.html','_blank')" style="flex:1;justify-content:center">🗺 Editor</button>
+      <button class="btn btn-g btn-sm" onclick="confirmResetBrain()" style="font-size:10px;padding:4px 10px;color:var(--re)">Reset</button>
+    </div>
+  </div>
+
   <div class="card" id="prof-ai-card" style="margin-bottom:12px">
     <div class="card-tit" style="display:flex;align-items:center;gap:8px">
       <span>🔑 La tua chiave AI</span>
@@ -2698,6 +2729,7 @@
       <button class="adm-nav-btn" onclick="admNav('activity',this)">Activity</button>
       <button class="adm-nav-btn" onclick="admNav('events',this)">Events</button>
       <button class="adm-nav-btn" onclick="admNav('ai',this)">AI Monitor</button>
+      <button class="adm-nav-btn" onclick="admNav('brain',this)">🧠 Brain</button>
       <button class="adm-nav-btn" onclick="admNav('settings',this)">Settings</button>
     </nav>
     <button class="adm-back" onclick="exitAdmin()">Exit Admin</button>
@@ -3028,16 +3060,67 @@
       <button class="adm-btn adm-btn-blue" onclick="admFlagEvent()">Flag</button>
       <button class="adm-btn adm-btn-ok" onclick="admSaveEvent()">Save Changes</button>
     </div>
+
+      <!-- ══ BRAIN ADMIN PANEL ══ -->
+      <div class="adm-panel" id="adm-brain" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+          <div>
+            <div style="font-family:var(--fh);font-size:18px;font-weight:700">🧠 Brain Manager</div>
+            <div style="font-size:11px;color:var(--t3)">Per-user AI knowledge base — grows with usage</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="adm-btn adm-btn-blue" onclick="loadAdmBrain()">↻ Refresh</button>
+            <button class="adm-btn" onclick="admBrainInjectModal()" style="background:rgba(139,92,246,.15);color:#A78BFA;border:1px solid rgba(139,92,246,.3)">+ Inject Global Knowledge</button>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="adm-kpis" id="adm-brain-kpis" style="margin-bottom:16px"></div>
+
+        <!-- Growth chart -->
+        <div class="adm-chart-row" style="margin-bottom:16px">
+          <div class="adm-chart-box" style="flex:2">
+            <div class="adm-chart-title">Brain Growth (30 days)</div>
+            <canvas id="adm-brain-chart" height="120"></canvas>
+          </div>
+          <div class="adm-chart-box" style="flex:1">
+            <div class="adm-chart-title">By Source</div>
+            <div id="adm-brain-sources" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+          </div>
+          <div class="adm-chart-box" style="flex:1">
+            <div class="adm-chart-title">By Topic</div>
+            <div id="adm-brain-topics" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+          </div>
+        </div>
+
+        <!-- Per-user table -->
+        <div class="adm-chart-box">
+          <div class="adm-chart-title">Users</div>
+          <div id="adm-brain-users" style="margin-top:10px;overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:11px">
+              <thead><tr style="color:var(--t3)">
+                <th style="text-align:left;padding:6px 8px">User</th>
+                <th style="text-align:right;padding:6px 8px">Entries</th>
+                <th style="text-align:right;padding:6px 8px">Level</th>
+                <th style="text-align:right;padding:6px 8px">Last active</th>
+                <th style="padding:6px 8px"></th>
+              </tr></thead>
+              <tbody id="adm-brain-users-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
   </div>
 </div>
 
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v24"></script>
-<script src="/static/finance.bundle.js?v24"></script>
-<script src="/static/map.bundle.js?v24"></script>
-<script src="/static/dashboard.bundle.js?v24"></script>
+<script src="/static/core.bundle.js?v27"></script>
+<script src="/static/finance.bundle.js?v27"></script>
+<script src="/static/map.bundle.js?v27"></script>
+<script src="/static/dashboard.bundle.js?v27"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
@@ -3513,5 +3596,58 @@
 </div><!-- #evpanel -->
 
 
+
+<!-- ════════════════════════════════════════════════════════
+     BRAIN AGENT MODAL
+     Invocabile da qualsiasi view con brainAgent.open()
+     ════════════════════════════════════════════════════════ -->
+<div id="brain-agent-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:5000;backdrop-filter:blur(6px)" onclick="if(event.target===this)brainAgent.close()">
+  <div id="brain-agent-modal" style="position:absolute;right:0;top:0;bottom:0;width:min(520px,100vw);background:var(--bg1,#0A0B0E);border-left:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;box-shadow:-20px 0 60px rgba(0,0,0,.4)">
+    
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0">
+      <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#7C3AED,#A78BFA);display:flex;align-items:center;justify-content:center;font-size:16px">🧠</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700;color:var(--t1,#F0F2FF);letter-spacing:-.01em">Brain Agent</div>
+        <div id="ba-status-txt" style="font-size:10px;color:var(--t3,#5A6070);font-family:monospace">pronto</div>
+      </div>
+      <button id="ba-sessions-btn" onclick="brainAgent.toggleSessions()" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--t2,#A0A8C0);font-size:11px;cursor:pointer;font-family:inherit">📋 Sessioni</button>
+      <button onclick="brainAgent.newSession()" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(124,58,237,.3);background:rgba(124,58,237,.1);color:#A78BFA;font-size:11px;cursor:pointer;font-family:inherit">+ Nuova</button>
+      <button onclick="brainAgent.close()" style="padding:4px 8px;border:none;background:transparent;color:var(--t3,#5A6070);font-size:18px;cursor:pointer;line-height:1">✕</button>
+    </div>
+
+    <!-- Sessions panel (hidden by default) -->
+    <div id="ba-sessions-panel" style="display:none;border-bottom:1px solid rgba(255,255,255,.07);max-height:180px;overflow-y:auto;flex-shrink:0">
+      <div id="ba-sessions-list" style="padding:8px"></div>
+    </div>
+
+    <!-- Messages -->
+    <div id="ba-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div id="ba-empty" style="margin:auto;text-align:center;padding:32px 16px">
+        <div style="font-size:36px;margin-bottom:12px">🧠</div>
+        <div style="font-size:15px;font-weight:600;color:var(--t1,#F0F2FF);margin-bottom:8px">Brain Agent</div>
+        <div style="font-size:12px;color:var(--t3,#5A6070);line-height:1.7;max-width:280px">Fai domande, richiedi analisi, confronta scenari. Il cervello usa tutto quello che hai letto e salvato.</div>
+      </div>
+    </div>
+
+    <!-- Template quick buttons -->
+    <div id="ba-templates" style="padding:10px 14px 0;border-top:1px solid rgba(255,255,255,.06);flex-shrink:0">
+      <div style="font-size:9px;font-family:monospace;letter-spacing:.1em;color:var(--t3,#5A6070);margin-bottom:7px">TEMPLATE RAPIDI</div>
+      <div id="ba-template-btns" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px"></div>
+    </div>
+
+    <!-- Input area -->
+    <div style="padding:0 14px 14px;flex-shrink:0">
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <textarea id="ba-input" placeholder="Chiedi qualcosa al tuo cervello AI…" style="flex:1;padding:11px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:var(--t1,#F0F2FF);font-size:13px;font-family:inherit;resize:none;min-height:44px;max-height:120px;outline:none;line-height:1.5;transition:border-color .15s" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();brainAgent.send()}" oninput="this.style.height='44px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button onclick="brainAgent.send()" id="ba-send-btn" style="width:44px;height:44px;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:opacity .15s">↑</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <div style="font-size:10px;color:var(--t3,#5A6070)">Enter = invia · Shift+Enter = a capo</div>
+        <div id="ba-brain-count" style="font-size:10px;color:rgba(167,139,250,.6);font-family:monospace">0 entries nel cervello</div>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
