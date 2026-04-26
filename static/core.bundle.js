@@ -105,9 +105,8 @@ function rq(url, opts) {
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     var tid = setTimeout(function() {
       if (ctrl) ctrl.abort();
-      console.warn('[rq] timeout:', url);
       resolve({ _timeout: true, detail: 'Request timeout' });
-    }, 12000);
+    }, 25000);  // 25s — covers Render cold start (~15-20s)
     fetch(url, {
       method:  opts.method || 'GET',
       headers: headers,

@@ -316,21 +316,20 @@ function initAuth(){
   if(t){
     // Validate token with a quick ping
     G.token=t;
-    fetch('/api/health').then(function(r){
-      if(r.ok){
+    // Check KG status (tells us backend + node count)
+    fetch('/api/kg/status',{headers:{'Authorization':'Bearer '+t}})
+      .then(function(r){return r.json();})
+      .then(function(ks){
         if(dot)dot.style.background='#10B981';
-        if(txt)txt.textContent='online';
+        var backend = ks.backend==='postgresql'?' · PG':' · SQLite';
+        if(txt)txt.textContent='online'+backend+' · '+(ks.nodes||0)+' nodi';
         setTimeout(function(){loadBrainStats();loadUHist();loadKGFromServer();},300);
-      } else {
-        showLoginForm();
-      }
-    }).catch(function(){
-      // Server not reachable but token present — try anyway
-      if(dot)dot.style.background='#F59E0B';
-      if(txt)txt.textContent='server offline';
-      // Still try to load cached graph
-      setTimeout(function(){loadBrainStats();loadKGFromServer();},500);
-    });
+      })
+      .catch(function(){
+        if(dot)dot.style.background='#F59E0B';
+        if(txt)txt.textContent='server non raggiungibile';
+        setTimeout(function(){loadBrainStats();loadKGFromServer();},1000);
+      });
   } else if(_authRetries < 3) {
     // Retry — token might not be written yet (race on page load)
     _authRetries++;
@@ -960,34 +959,42 @@ function jarvisPortfolioMode(){
   var ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
   ov.onclick=function(e){if(e.target===ov)ov.remove();};
-  ov.innerHTML='<div style="background:#0D0F18;border:1px solid rgba(124,58,237,.3);border-radius:14px;width:min(500px,94vw);padding:24px" onclick="event.stopPropagation()">'+
-    '<div style="font-size:15px;font-weight:700;color:#F0F2FF;margin-bottom:16px">💼 Analisi Portafoglio Jarvis</div>'+
-    '<textarea id="jv-port-inp" style="width:100%;min-height:120px;padding:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#F0F2FF;font-size:12px;font-family:Space Mono,monospace;resize:none;outline:none" placeholder="VWCE,60
-IBGL,25
-XGLD,15"></textarea>'+
-    '<div style="display:flex;gap:8px;margin-top:12px">'+
-    '<button onclick="this.closest('div').parentElement.remove()" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#A0A8C0;font-size:11px;cursor:pointer;font-family:inherit">Annulla</button>'+
-    '<button id="jv-run-btn" onclick="runJarvisPortfolio()" style="flex:2;padding:9px;border-radius:8px;border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">▶ Analizza con Jarvis</button>'+
-    '</div></div>';
+  var box=document.createElement('div');
+  box.style.cssText='background:#0D0F18;border:1px solid rgba(124,58,237,.3);border-radius:14px;width:min(500px,94vw);padding:24px';
+  box.onclick=function(e){e.stopPropagation();};
+  box.innerHTML='<div style="font-size:15px;font-weight:700;color:#F0F2FF;margin-bottom:16px">💼 Portfolio Jarvis</div>'
+    +'<textarea id="jv-port-inp" rows="5" style="width:100%;padding:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#F0F2FF;font-size:12px;font-family:Space Mono,monospace;resize:none;outline:none;display:block" placeholder="VWCE,60&#10;IBGL,25&#10;XGLD,15"></textarea>'
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +'<button id="jv-cancel" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#A0A8C0;font-size:11px;cursor:pointer;font-family:inherit">Annulla</button>'
+    +'<button id="jv-run" style="flex:2;padding:9px;border-radius:8px;border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Analizza</button>'
+    +'</div>';
+  ov.appendChild(box);
   document.body.appendChild(ov);
-  setTimeout(function(){var i=document.getElementById('jv-port-inp');if(i)i.focus();},100);
+  setTimeout(function(){
+    var ci=document.getElementById('jv-cancel');
+    var ri=document.getElementById('jv-run');
+    var ti=document.getElementById('jv-port-inp');
+    if(ci)ci.onclick=function(){ov.remove();};
+    if(ri)ri.onclick=function(){runJarvisPortfolio(ov);};
+    if(ti)ti.focus();
+  },50);
 }
-
-function runJarvisPortfolio(){
+function runJarvisPortfolio(ov){
   var raw=(document.getElementById('jv-port-inp')||{}).value||'';
   var holdings=raw.split('\n').filter(Boolean).map(function(line){
-    var p=line.split(',');return{ticker:(p[0]||'').trim().toUpperCase(),weight:parseInt(p[1]||50)};
+    var p=line.split(',');return{ticker:(p[0]||'  ').trim().toUpperCase(),weight:parseInt(p[1]||50)};
   }).filter(function(h){return h.ticker;});
   if(!holdings.length){toast('Inserisci almeno un ticker','err');return;}
-  // Close dialog
-  var dg=document.getElementById('jv-port-inp');if(dg)dg.closest('div[style*="fixed"]').remove();
-  var ov=document.getElementById('jarvis-overlay');
+  if(ov)ov.remove();
+  var jovrl=document.getElementById('jarvis-overlay');
   var loading=document.getElementById('jm-loading');
   var body=document.getElementById('jm-body');
   var content=document.getElementById('jm-content');
-  if(ov)ov.style.display='flex';if(loading)loading.style.display='block';if(body)body.style.display='none';
+  if(jovrl)jovrl.style.display='flex';
+  if(loading)loading.style.display='block';
+  if(body)body.style.display='none';
   document.getElementById('jm-title').textContent='Portfolio Analysis';
-  document.getElementById('jm-sub').textContent='KG traversal per '+holdings.length+' asset…';
+  document.getElementById('jm-sub').textContent='KG traversal per '+holdings.length+' asset...';
   var h={'Content-Type':'application/json','Authorization':'Bearer '+G.token};
   fetch('/api/jarvis/analyze-portfolio',{method:'POST',headers:h,body:JSON.stringify({holdings:holdings})})
     .then(function(r){return r.json();})
@@ -995,14 +1002,13 @@ function runJarvisPortfolio(){
       if(loading)loading.style.display='none';if(body)body.style.display='block';
       _jarvisLastAnalysis=r.analysis||'';_jarvisLastNode='portfolio';
       if(content)content.innerHTML=jarvisMarkdown(_jarvisLastAnalysis);
-      document.getElementById('jm-sub').textContent=holdings.length+' holding analizzati via KG';
+      document.getElementById('jm-sub').textContent=holdings.length+' holding analizzati';
     })
     .catch(function(e){
       if(loading)loading.style.display='none';if(body)body.style.display='block';
       if(content)content.innerHTML='<div style="color:#EF4444">Errore: '+(e.detail||e.message||'?')+'</div>';
     });
 }
-
 function jarvisMarkdown(text){
   if(!text)return'';
   return text

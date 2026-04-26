@@ -1838,6 +1838,9 @@ window.saveUserAIKey = async function() {
     show('✓ Salvata — verifica in corso…', '#F59E0B');
     inp.value = '';
 
+    // Small delay to avoid triggering rate limit with back-to-back requests
+    await new Promise(function(resolve) { setTimeout(resolve, 1500); });
+
     // Step 2: Test with diagnostics
     var testR = await rq('/api/user/ai-key/test', { method:'POST' });
     if (testR && testR.status === 'ok') {
