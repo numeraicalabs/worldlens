@@ -1152,9 +1152,26 @@ async def get_auto_pop_stats_endpoint(_=Depends(require_admin)):
 @router.post("/trigger-autopop")
 async def trigger_manual_autopop(
     background_tasks: BackgroundTasks,
+    user=Depends(require_user),
+):
+    """Trigger autonomous brain population (L1+L2+L3 fast pass). Available to all users."""
+    async def run():
+        try:
+            from brain_autopop import autonomous_brain_population
+            await autonomous_brain_population()
+        except Exception as e:
+            logger.warning("manual autopop: %s", e)
+
+    background_tasks.add_task(run)
+    return {"ok": True, "message": "Autopop triggered — nodes will appear within 30s"}
+
+
+@router.post("/trigger-deep-autopop")
+async def trigger_deep_autopop(
+    background_tasks: BackgroundTasks,
     _=Depends(require_admin),
 ):
-    """Admin: manually trigger a nightly deep extraction cycle."""
+    """Admin: trigger full nightly deep extraction (Gemini + Wikipedia)."""
     async def run():
         from brain_autopop import nightly_deep_extraction
         await nightly_deep_extraction()
