@@ -698,11 +698,14 @@ async def get_brain_context_enhanced(
     if summary:
         parts.append(summary)
 
-    # Layer 1: FTS entries
-    from routers.brain import brain_context_for_prompt
-    fts_ctx = await brain_context_for_prompt(user_id, query, top_k=top_k)
-    if fts_ctx:
-        parts.append(fts_ctx)
+    # Layer 1: FTS entries — lazy import to avoid circular dependency
+    try:
+        from routers.brain import brain_context_for_prompt  # noqa: circular-safe (lazy)
+        fts_ctx = await brain_context_for_prompt(user_id, query, top_k=top_k)
+        if fts_ctx:
+            parts.append(fts_ctx)
+    except Exception as ex:
+        logger.debug("get_brain_context_enhanced FTS: %s", ex)
 
     # Layer 3: edge explanations for query entities
     try:
