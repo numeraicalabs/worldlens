@@ -440,46 +440,65 @@ async def cross_source_synthesis() -> int:
 
 # ── Autonomous population (no user interaction needed) ────────────────────────
 async def autonomous_brain_population() -> Tuple[int, int]:
-    """Main autonomous job — reads from DB directly, no new_count dependency."""
+    """
+    Main autonomous job — reads from DB directly, no new_count dependency.
+    Always runs L2 macro seed (idempotent) so ETF/financial nodes always exist.
+    """
     logger.info("Brain autonomous: cycle start")
     tn = te = 0
 
     try:
-        # Always seed the macro knowledge graph
+        # L2: ALWAYS run macro seed — this is idempotent and fast
+        # Ensures Federal Reserve, SPY, VWCE etc. are always in KG
         n, e = await auto_populate_from_macro([])
         tn += n; te += e
 
-        # Read events from last 6h directly from DB
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute("""SELECT id, title, summary, ai_summary, category, country_name, severity, timestamp FROM events WHERE datetime(timestamp) > datetime('now','-6 hours') ORDER BY severity DESC, timestamp DESC LIMIT 80""") as c:
-                events = [dict(r) for r in await c.fetchall()]
-            async with db.execute("SELECT name, value, previous, unit, category, country, updated_at FROM macro_indicators ORDER BY updated_at DESC LIMIT 30") as c:
-                indicators = [dict(r) for r in await c.fetchall()]
+        # Read events from last 6h
+        events = []
+        indicators = []
+        try:
+            async with aiosqlite.connect(settings.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute(
+                    "SELECT id, title, summary, ai_summary, category, country_name, severity, timestamp "
+                    "FROM events WHERE datetime(timestamp) > datetime('now','-6 hours') "
+                    "ORDER BY severity DESC LIMIT 80"
+                ) as c:
+                    events = [dict(r) for r in await c.fetchall()]
+                async with db.execute(
+                    "SELECT name, value, previous, unit, category, country, updated_at "
+                    "FROM macro_indicators ORDER BY updated_at DESC LIMIT 30"
+                ) as c:
+                    indicators = [dict(r) for r in await c.fetchall()]
+        except Exception as db_e:
+            logger.debug("Brain autonomous DB read: %s", db_e)
 
+        # L1: Events → regex entities
         if events:
             n, e = await auto_populate_from_events(events)
             tn += n; te += e
 
+        # L2: Live macro indicator values (update descriptions)
         if indicators:
             n, e = await auto_populate_from_macro(indicators)
             tn += n; te += e
 
-        # Finance from cache
+        # L3: Finance/ETF from cache
         try:
             from scheduler import get_finance_cache
             fin_data = get_finance_cache()
             if fin_data:
-                # finance_cache is a list of dicts [{symbol, price, ...}]
                 tickers = fin_data[:60] if isinstance(fin_data, list) else list(fin_data.values())[:60]
                 n, e = await auto_populate_from_finance(tickers)
                 tn += n; te += e
         except Exception as fe:
             logger.debug("Brain L3 finance: %s", fe)
 
-        # Wikipedia enrichment
+        # L4: Wikipedia enrichment (5 nodes per cycle)
         await enrich_new_nodes_batch(5)
-        logger.info("Brain autonomous done: +%d nodes +%d edges", tn, te)
+
+        logger.info("Brain autonomous done: +%d nodes +%d edges (total events=%d, indicators=%d)",
+                    tn, te, len(events), len(indicators))
 
     except Exception as e:
         logger.error("Brain autonomous error: %s", e, exc_info=True)

@@ -127,6 +127,20 @@ async def lifespan(app: FastAPI):
         logger.info("Knowledge Graph schema ready")
     except Exception as e:
         logger.warning("KG schema init skipped: %s", e)
+
+    # ── Brain seed: populate KG immediately on startup ──────────────────────
+    async def _startup_brain_seed():
+        import asyncio as _aio
+        await _aio.sleep(8)  # let scheduler + DB settle
+        try:
+            from brain_autopop import auto_populate_from_macro
+            n, e = await auto_populate_from_macro([])
+            logger.info("Startup brain seed L2: +%d nodes +%d edges", n, e)
+        except Exception as _se:
+            logger.warning("Startup brain seed: %s", _se)
+
+    import asyncio as _asyncio
+    _asyncio.create_task(_startup_brain_seed())
     # Init tradgentic tables
     try:
         from routers.tradgentic.portfolio import ensure_tables as tg_init
