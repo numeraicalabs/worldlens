@@ -1,17 +1,3 @@
-
-# WorldLens Knowledge Graph — Structured Format
-#
-
-# Carica questo file in Brain Editor → tab Upload per creare nodi
-# ed edge direttamente senza AI (parsing immediato, zero quota).
-#
-# TIPI NODO: concept, entity, etf, indicator, event, policy, person, commodity
-# TIPI RELAZIONE: influences, correlates_with, causes, part_of,
-# happened_before, contradicts, tracks, issued_by, invests_in,
-# regulated_by, related
-# PESO: 0.1 – 3.0 (default 1.0, admin inject = 2.0)
-#
-
 # NODO: Federal Reserve
 TIPO: entity
 DESC: Banca centrale degli Stati Uniti, controlla la politica monetaria USA
