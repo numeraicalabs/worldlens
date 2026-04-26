@@ -3505,3 +3505,157 @@ if (typeof _origEnterAppBA === 'function') {
 }
 
 })(); // end IIFE
+
+/* ══════════════════════════════════════════════════════════════
+   FINANCIAL REPORT GENERATOR
+   Accessible via Brain Agent template or standalone call
+   ══════════════════════════════════════════════════════════════ */
+window.openReportModal = function() {
+  var overlay = document.createElement('div');
+  overlay.id = 'report-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:6000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = '<div style="background:var(--bg1,#0A0B0E);border:1px solid rgba(255,255,255,.1);border-radius:14px;width:min(560px,95vw);max-height:90vh;overflow-y:auto;padding:24px" onclick="event.stopPropagation()">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">' +
+    '<div><div style="font-size:16px;font-weight:700;color:var(--t1,#F0F2FF)">📋 Report Finanziario</div>' +
+    '<div style="font-size:11px;color:var(--t3);margin-top:2px">Knowledge Graph + Brain + dati live</div></div>' +
+    '<button onclick="this.closest(\'#report-overlay\').remove()" style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer">✕</button></div>' +
+
+    '<div style="font-size:10px;font-family:monospace;letter-spacing:.1em;color:var(--t3);margin-bottom:8px">TIPO REPORT</div>' +
+    '<div id="report-type-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px"></div>' +
+
+    '<div id="report-params" style="margin-bottom:16px"></div>' +
+
+    '<button onclick="generateFinancialReport()" id="report-gen-btn" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">▶ Genera Report</button>' +
+
+    '<div id="report-output" style="display:none;margin-top:20px;padding:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.75;white-space:pre-wrap;max-height:400px;overflow-y:auto"></div>' +
+    '<div id="report-actions" style="display:none;margin-top:10px;display:flex;gap:8px">' +
+    '<button onclick="copyReport()" style="flex:1;padding:8px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--t2);font-size:11px;cursor:pointer;font-family:inherit">📋 Copia</button>' +
+    '<button onclick="downloadReport()" style="flex:1;padding:8px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--t2);font-size:11px;cursor:pointer;font-family:inherit">↓ Download MD</button>' +
+    '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  // Load report types
+  var h = {};
+  if (G.token) h['Authorization'] = 'Bearer ' + G.token;
+  fetch('/api/reports/types', { headers: h }).then(function(r) { return r.json(); }).then(function(types) {
+    var grid = document.getElementById('report-type-grid');
+    if (!grid) return;
+    var colors = { portfolio_stress:'#10B981', macro_outlook:'#3B82F6', sector_digest:'#F97316', geo_risk:'#EF4444', weekly_brief:'#7C3AED' };
+    grid.innerHTML = types.map(function(t) {
+      var col = colors[t.id] || '#7C3AED';
+      return '<button onclick="selectReportType(\'' + t.id + '\',this)" data-id="' + t.id + '" style="padding:10px;border-radius:8px;border:1px solid ' + col + '22;background:transparent;color:var(--t2);font-size:11px;cursor:pointer;text-align:left;font-family:inherit;transition:all .15s">' +
+        '<div style="font-size:16px;margin-bottom:4px">' + t.icon + '</div>' +
+        '<div style="font-weight:600;color:var(--t1)">' + t.label.split(' — ')[0].slice(2) + '</div>' +
+        '<div style="font-size:10px;color:var(--t3);margin-top:2px;line-height:1.4">' + t.desc + '</div>' +
+        '</button>';
+    }).join('');
+    // Select weekly_brief by default
+    var defaultBtn = grid.querySelector('[data-id="weekly_brief"]');
+    if (defaultBtn) selectReportType('weekly_brief', defaultBtn);
+  });
+};
+
+var _selectedReportType = 'weekly_brief';
+window.selectReportType = function(id, btn) {
+  _selectedReportType = id;
+  var colors = { portfolio_stress:'#10B981', macro_outlook:'#3B82F6', sector_digest:'#F97316', geo_risk:'#EF4444', weekly_brief:'#7C3AED' };
+  var col = colors[id] || '#7C3AED';
+  document.querySelectorAll('[data-id]').forEach(function(b) {
+    var bc = colors[b.dataset.id] || '#7C3AED';
+    b.style.background = b === btn ? bc + '15' : 'transparent';
+    b.style.borderColor = b === btn ? bc + '60' : bc + '22';
+    b.style.color = b === btn ? 'var(--t1)' : 'var(--t2)';
+  });
+  // Show params panel
+  var params = document.getElementById('report-params');
+  if (!params) return;
+  if (id === 'portfolio_stress') {
+    params.innerHTML = '<div style="font-size:10px;font-family:monospace;letter-spacing:.1em;color:var(--t3);margin-bottom:6px">PORTAFOGLIO (ticker,peso%)</div>' +
+      '<textarea id="rp-holdings" placeholder="VWCE,60&#10;IBGL,25&#10;XGLD,15" style="width:100%;min-height:80px;padding:8px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:var(--t1,#F0F2FF);font-size:12px;font-family:monospace;resize:none;outline:none"></textarea>';
+  } else if (id === 'geo_risk' || id === 'sector_digest') {
+    var lbl = id === 'geo_risk' ? 'REGIONE (es. Middle East, Europe, Asia)' : 'SETTORE (es. Technology, Energy, Finance)';
+    var ph  = id === 'geo_risk' ? 'Middle East' : 'Technology';
+    params.innerHTML = '<div style="font-size:10px;font-family:monospace;letter-spacing:.1em;color:var(--t3);margin-bottom:6px">' + lbl + '</div>' +
+      '<input id="rp-focus" placeholder="' + ph + '" style="width:100%;padding:8px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:var(--t1,#F0F2FF);font-size:12px;outline:none">';
+  } else {
+    params.innerHTML = '';
+  }
+};
+
+var _lastReportText = '';
+window.generateFinancialReport = async function() {
+  var btn = document.getElementById('report-gen-btn');
+  var out = document.getElementById('report-output');
+  var acts = document.getElementById('report-actions');
+  if (!btn || !out) return;
+
+  btn.textContent = '⏳ Generazione in corso…'; btn.disabled = true;
+
+  var params = {};
+  if (_selectedReportType === 'portfolio_stress') {
+    var raw = (document.getElementById('rp-holdings') || {}).value || 'VWCE,60\nIBGL,25\nXGLD,15';
+    params.holdings = raw.split('\n').filter(Boolean).map(function(line) {
+      var p = line.split(','); return { ticker: (p[0]||'').trim().toUpperCase(), weight: parseInt(p[1]||50) };
+    });
+  } else if (_selectedReportType === 'geo_risk') {
+    params.region = (document.getElementById('rp-focus') || {}).value || 'Global';
+  } else if (_selectedReportType === 'sector_digest') {
+    params.sector = (document.getElementById('rp-focus') || {}).value || 'General';
+  }
+
+  try {
+    var h = { 'Content-Type': 'application/json' };
+    if (G.token) h['Authorization'] = 'Bearer ' + G.token;
+    var resp = await fetch('/api/reports/generate', {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ type: _selectedReportType, params: params })
+    });
+    var r = await resp.json();
+
+    if (resp.ok && r.report) {
+      _lastReportText = r.report;
+      out.style.display = 'block';
+      acts.style.display = 'flex';
+      // Render as simple markdown
+      out.innerHTML = r.report
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+        .replace(/^#+\s+(.+)$/gm,'<div style="font-weight:700;font-size:14px;color:var(--t1);margin:12px 0 6px">$1</div>')
+        .replace(/\|(.+)\|/g, function(m, row) {
+          var cells = row.split('|').map(function(c){return c.trim();}).filter(Boolean);
+          return '<tr>' + cells.map(function(c,i){return i===0?'<td style="padding:4px 8px;color:var(--t3);font-size:11px;white-space:nowrap">'+c+'</td>':'<td style="padding:4px 8px;color:var(--t1);font-size:11px">'+c+'</td>';}).join('') + '</tr>';
+        })
+        .replace(/(<tr>[\s\S]*?<\/tr>)/g, '<table style="width:100%;border-collapse:collapse;margin:8px 0;border:1px solid rgba(255,255,255,.08);border-radius:6px;overflow:hidden">$1</table>')
+        .replace(/^• (.+)$/gm,'<div style="padding-left:12px;position:relative;margin:2px 0"><span style="position:absolute;left:0;color:#7C3AED">•</span>$1</div>')
+        .replace(/\n/g,'<br>');
+    } else {
+      out.style.display = 'block';
+      out.textContent = 'Errore: ' + ((r && r.detail) || 'Generazione fallita');
+    }
+  } catch(e) {
+    out.style.display = 'block';
+    out.textContent = 'Errore di rete: ' + e.message;
+  }
+
+  btn.textContent = '▶ Genera Report'; btn.disabled = false;
+};
+
+window.copyReport = function() {
+  if (!_lastReportText) return;
+  navigator.clipboard.writeText(_lastReportText).then(function() {
+    if (typeof showToast === 'function') showToast('Report copiato!', 'ok');
+  });
+};
+
+window.downloadReport = function() {
+  if (!_lastReportText) return;
+  var blob = new Blob([_lastReportText], { type: 'text/markdown' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'worldlens_report_' + new Date().toISOString().slice(0,10) + '.md';
+  a.click();
+};

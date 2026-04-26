@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v30">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v30">
-<link rel="stylesheet" href="/static/finance.bundle.css?v30">
+<link rel="stylesheet" href="/static/core.bundle.css?v31">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v31">
+<link rel="stylesheet" href="/static/finance.bundle.css?v31">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -236,6 +236,7 @@
     </div>
     <button class="btn btn-g btn-sm" onclick="openRiskRadar()">Risk Radar</button>
     <button onclick="brainAgent.open()" title="Brain Agent (⌘K)" style="padding:5px 12px;border-radius:8px;border:1px solid rgba(124,58,237,.3);background:rgba(124,58,237,.1);color:#A78BFA;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">🧠 Brain</button>
+    <button onclick="openReportModal()" title="Financial Reports" style="padding:5px 12px;border-radius:8px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.1);color:#10B981;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">📋 Report</button>
     <button class="btn btn-g btn-sm" onclick="logout()">Sign Out</button>
   </div>
 </nav>
@@ -3129,10 +3130,10 @@
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v30"></script>
-<script src="/static/finance.bundle.js?v30"></script>
-<script src="/static/map.bundle.js?v30"></script>
-<script src="/static/dashboard.bundle.js?v30"></script>
+<script src="/static/core.bundle.js?v31"></script>
+<script src="/static/finance.bundle.js?v31"></script>
+<script src="/static/map.bundle.js?v31"></script>
+<script src="/static/dashboard.bundle.js?v31"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
