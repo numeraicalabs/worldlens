@@ -118,6 +118,15 @@ async def lifespan(app: FastAPI):
     await init_db()
     await _seed_admin()
     await _load_ai_settings()
+
+    # ── Supabase + Knowledge Graph schema ──────────────────────────────────────
+    try:
+        from supabase_client import get_pool, ensure_kg_schema
+        await get_pool()          # attempt connection (logs warning if fails)
+        await ensure_kg_schema()  # create tables in PG or SQLite fallback
+        logger.info("Knowledge Graph schema ready")
+    except Exception as e:
+        logger.warning("KG schema init skipped: %s", e)
     # Init tradgentic tables
     try:
         from routers.tradgentic.portfolio import ensure_tables as tg_init
@@ -195,6 +204,9 @@ app.include_router(brain_agent_router)
 
 from routers.knowledge_graph import router as kg_router
 app.include_router(kg_router)
+
+from routers.financial_reports import router as fin_reports_router
+app.include_router(fin_reports_router)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
