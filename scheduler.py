@@ -21,6 +21,21 @@ from config import settings
 from scrapers.finance import fetch_finance, get_cached
 from scrapers.macro   import fetch_all_macro
 from notifications   import send_alert_triggered
+
+# ── Brain auto-population (lazy import) ──────────────────────────────────────
+async def _get_autopop():
+    try:
+        from brain_autopop import (
+            auto_populate_from_events,
+            auto_populate_from_macro,
+            auto_populate_from_finance,
+            nightly_deep_extraction,
+        )
+        return auto_populate_from_events, auto_populate_from_macro, auto_populate_from_finance, nightly_deep_extraction
+    except Exception as e:
+        logger.debug("brain_autopop import: %s", e)
+        return None, None, None, None
+
 from analysis.ml_engine import (
     build_user_tfidf_vector, tfidf_to_json, tfidf_from_json
 )
@@ -165,6 +180,14 @@ async def _poll_events():
                     await cb({"type": "events_updated", "count": new_count, "total": total})
                 except Exception:
                     pass
+
+            # ── Brain auto-population: events → KG ──────────────────────────
+            try:
+                fn_events, _, _, _ = await _get_autopop()
+                if fn_events and events:
+                    await fn_events(events[:50])
+            except Exception as _bpe:
+                logger.debug("brain autopop events: %s", _bpe)
 
     except Exception as e:
         logger.error("Event poll error: %s", e, exc_info=True)
@@ -521,6 +544,14 @@ async def _poll_macro():
 
         logger.info("Macro poll: upserted %d indicators", updated)
 
+        # ── Brain auto-population: macro → KG ───────────────────────────────
+        try:
+            _, fn_macro, _, _ = await _get_autopop()
+            if fn_macro:
+                await fn_macro(indicators)
+        except Exception as _bpe:
+            logger.debug("brain autopop macro: %s", _bpe)
+
     except Exception as e:
         logger.error("Macro poll error: %s", e)
 
@@ -758,6 +789,22 @@ def start():
         _run_monday_verify, "cron",
         day_of_week="mon", hour=8, minute=0,    # Monday 08:00 UTC
         id="monday_verify",
+        misfire_grace_time=3600,
+    )
+
+    # ── Brain nightly deep extraction (Level 3) ──────────────────────────────
+    async def _nightly_brain_extraction():
+        try:
+            _, _, _, fn_nightly = await _get_autopop()
+            if fn_nightly:
+                await fn_nightly()
+        except Exception as e:
+            logger.warning("nightly_brain_extraction: %s", e)
+
+    _scheduler.add_job(
+        _nightly_brain_extraction, "cron",
+        hour=3, minute=0,    # 03:00 UTC — low traffic, before daily briefs
+        id="brain_extraction",
         misfire_grace_time=3600,
     )
 

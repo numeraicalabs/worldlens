@@ -192,6 +192,9 @@ app.include_router(brain_router)
 
 from routers.brain_agent import router as brain_agent_router
 app.include_router(brain_agent_router)
+
+from routers.knowledge_graph import router as kg_router
+app.include_router(kg_router)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 

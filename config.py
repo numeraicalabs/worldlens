@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     # Render Disk: set DB_PATH=/data/worldlens.db in environment vars
     db_path: str = str(BASE_DIR / "worldlens.db")
 
+    # ── Supabase PostgreSQL (shared knowledge graph) ────────────────────────
+    # Set SUPABASE_URL in Render env vars:
+    # postgresql://postgres:[password]@db.[ref].supabase.co:5432/postgres
+    supabase_url: str = ""
+
     # ── AI keys ───────────────────────────────────────────────────────
     # Set GEMINI_API_KEY on Render dashboard (Environment → Add env var)
     # Field names are lowercase; Pydantic maps UPPER_CASE env vars automatically
