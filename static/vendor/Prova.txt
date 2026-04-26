@@ -1,68 +1,1718 @@
+# WorldLens Knowledge Graph — Structured Format
+#
+# Carica questo file in Brain Editor → tab Upload per creare nodi
+# ed edge direttamente senza AI (parsing immediato, zero quota).
+#
+# TIPI NODO: concept, entity, etf, indicator, event, policy, person, commodity
+# TIPI RELAZIONE: influences, correlates_with, causes, part_of,
+# happened_before, contradicts, tracks, issued_by, invests_in,
+# regulated_by, related
+# PESO: 0.1 – 3.0 (default 1.0, admin inject = 2.0)
+#
+
 # NODO: Federal Reserve
 TIPO: entity
 DESC: Banca centrale degli Stati Uniti, controlla la politica monetaria USA
 ALIAS: Fed, FED, US Federal Reserve, FOMC
 
+# NODO: European Central Bank
+TIPO: entity
+DESC: Banca centrale dell'Eurozona, gestisce i tassi e la stabilità dei prezzi
+ALIAS: ECB, BCE
+
+# NODO: Bank of England
+TIPO: entity
+DESC: Banca centrale del Regno Unito, influenza tassi e sterlina
+ALIAS: BoE
+
+# NODO: Bank of Japan
+TIPO: entity
+DESC: Banca centrale giapponese, impatta yen e curva dei rendimenti
+ALIAS: BOJ
+
+# NODO: People’s Bank of China
+TIPO: entity
+DESC: Banca centrale cinese, gestisce liquidità e credito in Cina
+ALIAS: PBoC
+
+# NODO: FOMC
+TIPO: concept
+DESC: Comitato della Fed che decide i tassi di interesse USA
+
 # NODO: Interest Rate
 TIPO: indicator
-DESC: Tasso di interesse sui fed funds, strumento principale della politica monetaria
+DESC: Tasso di interesse di riferimento della politica monetaria
+ALIAS: fed funds rate, policy rate, benchmark rate
 
 # NODO: Inflation
 TIPO: indicator
-DESC: Tasso di variazione dei prezzi al consumo (CPI, PCE)
-ALIAS: CPI, inflazione, tasso inflazione
+DESC: Variazione generale dei prezzi al consumo e alla produzione
+ALIAS: CPI, PCE, inflation
 
-# NODO: Bond Markets
+# NODO: Core Inflation
+TIPO: indicator
+DESC: Inflazione al netto delle componenti più volatili
+ALIAS: core CPI, core PCE
+
+# NODO: GDP
+TIPO: indicator
+DESC: Prodotto interno lordo, misura dell'attività economica
+
+# NODO: Unemployment Rate
+TIPO: indicator
+DESC: Tasso di disoccupazione, misura della forza del mercato del lavoro
+
+# NODO: Payrolls
+TIPO: indicator
+DESC: Variazione occupazione non agricola negli Stati Uniti
+ALIAS: NFP, nonfarm payrolls
+
+# NODO: CPI
+TIPO: indicator
+DESC: Indice dei prezzi al consumo
+ALIAS: consumer price index
+
+# NODO: PCE
+TIPO: indicator
+DESC: Indice spese per consumi personali, misura inflazione preferita dalla Fed
+ALIAS: personal consumption expenditures
+
+# NODO: Core PCE
+TIPO: indicator
+DESC: PCE al netto di alimentari ed energia
+
+# NODO: Treasury Yield
+TIPO: indicator
+DESC: Rendimento dei titoli di Stato USA
+ALIAS: UST yield
+
+# NODO: 2Y Treasury
+TIPO: indicator
+DESC: Rendimento del Treasury a 2 anni
+ALIAS: 2Y UST
+
+# NODO: 10Y Treasury
+TIPO: indicator
+DESC: Rendimento del Treasury a 10 anni
+ALIAS: 10Y UST
+
+# NODO: Yield Curve
 TIPO: concept
-DESC: Mercati obbligazionari globali, reagiscono ai tassi e all'inflazione
+DESC: Struttura dei rendimenti obbligazionari per scadenza
 
-# NODO: Equity Markets
+# NODO: Inversion
+TIPO: event
+DESC: Inversione della curva dei rendimenti, spesso segnale recessivo
+
+# NODO: Recession
+TIPO: event
+DESC: Fase di contrazione economica generalizzata
+
+# NODO: Soft Landing
 TIPO: concept
-DESC: Mercati azionari globali, correlano con crescita economica e sentiment
+DESC: Scenario in cui l'inflazione rallenta senza recessione grave
 
-# NODO: VWCE
-TIPO: etf
-DESC: Vanguard FTSE All-World — ETF azionario globale, replica FTSE All-World
-ALIAS: Vanguard All World
+# NODO: QT
+TIPO: policy
+DESC: Riduzione del bilancio della banca centrale
+ALIAS: quantitative tightening
 
-# NODO: Oil Price
+# NODO: QE
+TIPO: policy
+DESC: Espansione del bilancio tramite acquisto di asset
+ALIAS: quantitative easing
+
+# NODO: Balance Sheet
+TIPO: concept
+DESC: Dimensione e composizione del bilancio della banca centrale
+
+# NODO: Liquidity
+TIPO: concept
+DESC: Disponibilità di capitale nei mercati finanziari
+
+# NODO: Credit Spread
+TIPO: indicator
+DESC: Differenza di rendimento tra bond rischiosi e risk-free
+
+# NODO: Corporate Bond
+TIPO: concept
+DESC: Obbligazione emessa da società
+
+# NODO: Government Bond
+TIPO: concept
+DESC: Obbligazione emessa da uno Stato
+
+# NODO: Investment Grade
+TIPO: concept
+DESC: Rating creditizio di alta qualità
+
+# NODO: High Yield
+TIPO: concept
+DESC: Bond con rating speculativo e rendimento più alto
+
+# NODO: Default Risk
+TIPO: concept
+DESC: Rischio che un emittente non rimborsi il debito
+
+# NODO: Dollar Index
+TIPO: indicator
+DESC: Forza del dollaro USA rispetto a un paniere di valute
+ALIAS: DXY, US Dollar Index
+
+# NODO: EURUSD
+TIPO: indicator
+DESC: Cambio euro/dollaro USA
+
+# NODO: USDJPY
+TIPO: indicator
+DESC: Cambio dollaro USA/yen giapponese
+
+# NODO: GBPUSD
+TIPO: indicator
+DESC: Cambio sterlina/dollaro USA
+
+# NODO: USDCNY
+TIPO: indicator
+DESC: Cambio dollaro USA/yuan cinese
+
+# NODO: EUR
+TIPO: currency
+DESC: Euro, valuta dell'Eurozona
+
+# NODO: USD
+TIPO: currency
+DESC: Dollaro statunitense
+
+# NODO: JPY
+TIPO: currency
+DESC: Yen giapponese
+
+# NODO: GBP
+TIPO: currency
+DESC: Sterlina britannica
+
+# NODO: CNY
+TIPO: currency
+DESC: Yuan cinese
+
+# NODO: Gold
 TIPO: commodity
-DESC: Prezzo del petrolio greggio (Brent, WTI), driver principale dell'inflazione energetica
+DESC: Oro, bene rifugio e riserva di valore
+ALIAS: XAU
+
+# NODO: Silver
+TIPO: commodity
+DESC: Argento, metallo prezioso e industriale
+ALIAS: XAG
+
+# NODO: Oil
+TIPO: commodity
+DESC: Petrolio greggio, driver importante di inflazione
 ALIAS: Brent, WTI, crude oil
 
-# ——— EDGE (formato freccia) ————————————————————————————————————
+# NODO: Natural Gas
+TIPO: commodity
+DESC: Gas naturale, materia prima energetica
+
+# NODO: Copper
+TIPO: commodity
+DESC: Rame, metallo ciclico legato alla crescita globale
+
+# NODO: Wheat
+TIPO: commodity
+DESC: Grano, commodity agricola sensibile a shock di offerta
+
+# NODO: Corn
+TIPO: commodity
+DESC: Mais, commodity agricola usata anche per biofuel
+
+# NODO: Soybeans
+TIPO: commodity
+DESC: Soia, commodity agricola globale
+
+# NODO: S&P 500
+TIPO: indicator
+DESC: Indice delle principali società quotate USA
+ALIAS: SPX
+
+# NODO: Nasdaq 100
+TIPO: indicator
+DESC: Indice delle maggiori società growth e tech USA
+ALIAS: NDX
+
+# NODO: Dow Jones
+TIPO: indicator
+DESC: Indice industriale delle principali blue chip USA
+ALIAS: DJI
+
+# NODO: Euro Stoxx 50
+TIPO: indicator
+DESC: Indice delle principali blue chip dell'Eurozona
+ALIAS: SX5E
+
+# NODO: Nikkei 225
+TIPO: indicator
+DESC: Indice azionario principale del Giappone
+ALIAS: NKY
+
+# NODO: Shanghai Composite
+TIPO: indicator
+DESC: Indice azionario principale della Cina
+ALIAS: SSEC
+
+# NODO: FTSE 100
+TIPO: indicator
+DESC: Indice azionario principale del Regno Unito
+ALIAS: UKX
+
+# NODO: MSCI World
+TIPO: indicator
+DESC: Indice azionario globale dei mercati sviluppati
+ALIAS: ACWI, World Index
+
+# NODO: MSCI Emerging Markets
+TIPO: indicator
+DESC: Indice azionario dei mercati emergenti
+ALIAS: EM, MSCI EM
+
+# NODO: VIX
+TIPO: indicator
+DESC: Indice della volatilità implicita sui mercati USA
+ALIAS: Fear Index
+
+# NODO: MOVE
+TIPO: indicator
+DESC: Indice della volatilità del mercato obbligazionario USA
+
+# NODO: Put Call Ratio
+TIPO: indicator
+DESC: Rapporto tra opzioni put e call, misura del sentiment
+
+# NODO: Market Breadth
+TIPO: concept
+DESC: Ampiezza del mercato, misura della partecipazione ai rialzi
+
+# NODO: Risk On
+TIPO: concept
+DESC: Regime di mercato favorevole agli asset rischiosi
+
+# NODO: Risk Off
+TIPO: concept
+DESC: Regime di mercato difensivo con avversione al rischio
+
+# NODO: Bear Market
+TIPO: event
+DESC: Fase di mercato con forte ribasso prolungato
+
+# NODO: Bull Market
+TIPO: event
+DESC: Fase di mercato con rialzo prolungato
+
+# NODO: Earnings
+TIPO: indicator
+DESC: Profitti societari riportati nei bilanci
+
+# NODO: Revenue
+TIPO: indicator
+DESC: Ricavi societari
+
+# NODO: Margins
+TIPO: indicator
+DESC: Margini operativi e netti delle imprese
+
+# NODO: P/E Ratio
+TIPO: indicator
+DESC: Rapporto prezzo/utili delle azioni
+
+# NODO: Discount Rate
+TIPO: concept
+DESC: Tasso usato per attualizzare i flussi futuri
+
+# NODO: Growth Stocks
+TIPO: concept
+DESC: Titoli con forte crescita attesa degli utili
+
+# NODO: Value Stocks
+TIPO: concept
+DESC: Titoli con valutazioni più contenute e profilo difensivo
+
+# NODO: Financials
+TIPO: concept
+DESC: Settore finanziario quotato
+
+# NODO: Technology
+TIPO: concept
+DESC: Settore tecnologico quotato
+
+# NODO: Energy
+TIPO: concept
+DESC: Settore energia quotato
+
+# NODO: Utilities
+TIPO: concept
+DESC: Settore utilities, tipicamente difensivo
+
+# NODO: Consumer Staples
+TIPO: concept
+DESC: Settore beni di consumo primari, difensivo
+
+# NODO: Consumer Discretionary
+TIPO: concept
+DESC: Settore beni discrezionali, ciclico
+
+# NODO: Healthcare
+TIPO: concept
+DESC: Settore sanitario, relativamente difensivo
+
+# NODO: Industrials
+TIPO: concept
+DESC: Settore industriale, sensibile al ciclo economico
+
+# NODO: Real Estate
+TIPO: concept
+DESC: Settore immobiliare quotato, sensibile ai tassi
+
+# NODO: Materials
+TIPO: concept
+DESC: Settore materiali, legato a commodity e ciclo
+
+# NODO: Communication Services
+TIPO: concept
+DESC: Settore comunicazioni e media
+
+# NODO: ETF
+TIPO: concept
+DESC: Fondo quotato che replica un indice o una strategia
+
+# NODO: SPY
+TIPO: etf
+DESC: ETF che replica l'S&P 500
+ALIAS: SPDR S&P 500
+
+# NODO: QQQ
+TIPO: etf
+DESC: ETF che replica il Nasdaq 100
+ALIAS: Invesco QQQ
+
+# NODO: IWM
+TIPO: etf
+DESC: ETF sulle small cap USA
+ALIAS: iShares Russell 2000
+
+# NODO: EFA
+TIPO: etf
+DESC: ETF sui mercati sviluppati ex-USA
+ALIAS: iShares MSCI EAFE
+
+# NODO: EEM
+TIPO: etf
+DESC: ETF sui mercati emergenti
+ALIAS: iShares MSCI Emerging Markets
+
+# NODO: TLT
+TIPO: etf
+DESC: ETF sui Treasury USA a lunga durata
+ALIAS: iShares 20+ Year Treasury Bond
+
+# NODO: IEF
+TIPO: etf
+DESC: ETF sui Treasury USA a media durata
+ALIAS: iShares 7-10 Year Treasury Bond
+
+# NODO: HYG
+TIPO: etf
+DESC: ETF sulle obbligazioni high yield USA
+ALIAS: iShares iBoxx High Yield Corporate Bond
+
+# NODO: LQD
+TIPO: etf
+DESC: ETF sulle obbligazioni corporate investment grade USA
+ALIAS: iShares iBoxx Investment Grade Corporate Bond
+
+# NODO: GLD
+TIPO: etf
+DESC: ETF che replica il prezzo dell'oro
+ALIAS: SPDR Gold Shares
+
+# NODO: SLV
+TIPO: etf
+DESC: ETF che replica il prezzo dell'argento
+ALIAS: iShares Silver Trust
+
+# NODO: XLE
+TIPO: etf
+DESC: ETF del settore energia USA
+ALIAS: Energy Select Sector SPDR
+
+# NODO: XLF
+TIPO: etf
+DESC: ETF del settore finanziario USA
+ALIAS: Financial Select Sector SPDR
+
+# NODO: XLK
+TIPO: etf
+DESC: ETF del settore tecnologia USA
+ALIAS: Technology Select Sector SPDR
+
+# NODO: XLV
+TIPO: etf
+DESC: ETF del settore healthcare USA
+ALIAS: Health Care Select Sector SPDR
+
+# NODO: XLY
+TIPO: etf
+DESC: ETF del settore consumer discretionary USA
+ALIAS: Consumer Discretionary Select Sector SPDR
+
+# NODO: XLP
+TIPO: etf
+DESC: ETF del settore consumer staples USA
+ALIAS: Consumer Staples Select Sector SPDR
+
+# NODO: XLI
+TIPO: etf
+DESC: ETF del settore industriale USA
+ALIAS: Industrial Select Sector SPDR
+
+# NODO: XLRE
+TIPO: etf
+DESC: ETF del settore real estate USA
+ALIAS: Real Estate Select Sector SPDR
+
+# NODO: XLB
+TIPO: etf
+DESC: ETF del settore materials USA
+ALIAS: Materials Select Sector SPDR
+
+# NODO: XLC
+TIPO: etf
+DESC: ETF del settore communication services USA
+ALIAS: Communication Services Select Sector SPDR
+
+# NODO: Small Caps
+TIPO: concept
+DESC: Società a bassa capitalizzazione, più sensibili ai tassi
+
+# NODO: Large Caps
+TIPO: concept
+DESC: Società a grande capitalizzazione
+
+# NODO: Banks
+TIPO: concept
+DESC: Banche commerciali e d'investimento
+
+# NODO: Insurers
+TIPO: concept
+DESC: Compagnie assicurative
+
+# NODO: REITs
+TIPO: concept
+DESC: Real estate investment trust quotati
+
+# NODO: Semiconductors
+TIPO: concept
+DESC: Settore semiconduttori, ciclico e strategico
+
+# NODO: AI Stocks
+TIPO: concept
+DESC: Titoli legati all'intelligenza artificiale
+
+# NODO: Mag7
+TIPO: concept
+DESC: Mega-cap tecnologiche leader del mercato USA
+
+# NODO: Apple
+TIPO: person
+DESC: Azienda tecnologica leader in hardware e servizi
+ALIAS: AAPL
+
+# NODO: Microsoft
+TIPO: person
+DESC: Azienda software e cloud leader
+ALIAS: MSFT
+
+# NODO: Nvidia
+TIPO: person
+DESC: Azienda leader nei chip per AI e data center
+ALIAS: NVDA
+
+# NODO: Amazon
+TIPO: person
+DESC: Azienda leader in e-commerce e cloud
+ALIAS: AMZN
+
+# NODO: Alphabet
+TIPO: person
+DESC: Azienda leader in search e advertising
+ALIAS: GOOGL
+
+# NODO: Meta
+TIPO: person
+DESC: Azienda leader in social media e advertising
+ALIAS: META
+
+# NODO: Tesla
+TIPO: person
+DESC: Azienda leader in auto elettriche e tecnologia
+ALIAS: TSLA
+
+# NODO: Berkshire Hathaway
+TIPO: person
+DESC: Conglomerato d'investimento guidato da Warren Buffett
+ALIAS: BRK
+
+# NODO: Warren Buffett
+TIPO: person
+DESC: Investitore e imprenditore statunitense, noto per value investing
+
+# NODO: Jamie Dimon
+TIPO: person
+DESC: CEO di JPMorgan Chase
+
+# NODO: Jerome Powell
+TIPO: person
+DESC: Presidente della Federal Reserve
+
+# NODO: Christine Lagarde
+TIPO: person
+DESC: Presidente della BCE
+
+# NODO: Janet Yellen
+TIPO: person
+DESC: Economista e figura istituzionale USA
+
+# NODO: Elon Musk
+TIPO: person
+DESC: Imprenditore tecnologico e CEO di Tesla e SpaceX
+
+# NODO: IPO
+TIPO: event
+DESC: Quotazione iniziale in borsa di una società
+
+# NODO: M&A
+TIPO: event
+DESC: Fusioni e acquisizioni tra società
+ALIAS: mergers and acquisitions
+
+# NODO: Earnings Season
+TIPO: event
+DESC: Periodo di pubblicazione dei risultati trimestrali
+
+# NODO: Guidance
+TIPO: concept
+DESC: Indicazioni future fornite dal management
+
+# NODO: Buyback
+TIPO: policy
+DESC: Riacquisto di azioni proprie da parte della società
+
+# NODO: Dividend
+TIPO: concept
+DESC: Distribuzione di utili agli azionisti
+
+# NODO: Leverage
+TIPO: concept
+DESC: Uso della leva finanziaria
+
+# NODO: Margin Call
+TIPO: event
+DESC: Richiesta di capitale aggiuntivo da parte del broker
+
+# NODO: Volatility
+TIPO: concept
+DESC: Variabilità dei prezzi di mercato
+
+# NODO: Correlation
+TIPO: concept
+DESC: Relazione statistica tra due asset o variabili
+
+# NODO: Beta
+TIPO: indicator
+DESC: Sensibilità di un titolo rispetto al mercato
+
+# NODO: Alpha
+TIPO: indicator
+DESC: Rendimento extra rispetto al benchmark
+
+# NODO: Sharpe Ratio
+TIPO: indicator
+DESC: Rendimento corretto per il rischio
+
+# NODO: Drawdown
+TIPO: indicator
+DESC: Calo massimo dal picco al minimo
+
+# NODO: Portfolio
+TIPO: concept
+DESC: Insieme di asset detenuti da un investitore
+
+# NODO: Asset Allocation
+TIPO: concept
+DESC: Distribuzione del capitale tra asset class
+
+# NODO: Rebalancing
+TIPO: concept
+DESC: Ribilanciamento periodico del portafoglio
+
+# NODO: Retirement
+TIPO: concept
+DESC: Obiettivo di pianificazione finanziaria di lungo termine
+
+# NODO: Inflation Expectations
+TIPO: indicator
+DESC: Aspettative future di inflazione implicite nei mercati
+
+# NODO: Credit Cycle
+TIPO: concept
+DESC: Ciclo di allentamento e irrigidimento del credito
+
+# NODO: Banking Crisis
+TIPO: event
+DESC: Crisi del settore bancario e fiducia nel credito
+
+# NODO: Stress Test
+TIPO: concept
+DESC: Verifica della resilienza di banche e istituzioni
+
+# NODO: Basel III
+TIPO: policy
+DESC: Regole internazionali su capitale e liquidità delle banche
+
+# NODO: SEC
+TIPO: entity
+DESC: Autorità di vigilanza dei mercati finanziari USA
+ALIAS: Securities and Exchange Commission
+
+# NODO: ESMA
+TIPO: entity
+DESC: Autorità europea di vigilanza sui mercati finanziari
+
+# NODO: FINRA
+TIPO: entity
+DESC: Autorità di autoregolamentazione del settore finanziario USA
+
+# NODO: NASDAQ
+TIPO: entity
+DESC: Mercato azionario tecnologico e growth USA
+
+# NODO: NYSE
+TIPO: entity
+DESC: Borsa di New York
+
+# NODO: LSE
+TIPO: entity
+DESC: London Stock Exchange
+
+# NODO: TSE
+TIPO: entity
+DESC: Borsa di Tokyo
+
+# NODO: SSE
+TIPO: entity
+DESC: Shanghai Stock Exchange
+
+# NODO: Bond ETF
+TIPO: etf
+DESC: ETF focalizzati sul mercato obbligazionario
+
+# NODO: Equity ETF
+TIPO: etf
+DESC: ETF focalizzati sul mercato azionario
+
+# NODO: Sector Rotation
+TIPO: concept
+DESC: Rotazione degli investimenti tra settori in base al ciclo
+
+# NODO: Market Sentiment
+TIPO: concept
+DESC: Umore complessivo degli investitori
+
+# NODO: Central Bank Forward Guidance
+TIPO: policy
+DESC: Comunicazione futura sulla traiettoria dei tassi
+
+# NODO: Real Rates
+TIPO: indicator
+DESC: Tassi nominali meno inflazione attesa
+
+# NODO: Nominal Rates
+TIPO: indicator
+DESC: Tassi osservati senza correzione per inflazione
+
+# NODO: Term Premium
+TIPO: indicator
+DESC: Premio per detenere titoli a lunga scadenza
+
+# NODO: Fiscal Deficit
+TIPO: indicator
+DESC: Differenza tra spese pubbliche e entrate
+
+# NODO: Government Debt
+TIPO: indicator
+DESC: Debito complessivo emesso dallo Stato
+
+# NODO: Treasury Supply
+TIPO: concept
+DESC: Ammontare di titoli di Stato emessi sul mercato
+
+# NODO: Deflation
+TIPO: indicator
+DESC: Diminuzione generale e persistente dei prezzi
+
+# NODO: Stagflation
+TIPO: concept
+DESC: Crescita debole con inflazione elevata
+
+# NODO: Geopolitical Risk
+TIPO: concept
+DESC: Rischio derivante da eventi geopolitici globali
+
+# NODO: Supply Shock
+TIPO: event
+DESC: Shock di offerta che altera prezzi e produzione
+
+# NODO: Demand Shock
+TIPO: event
+DESC: Shock della domanda che altera consumi e investimenti
+
+# NODO: Financial Conditions
+TIPO: concept
+DESC: Facile o difficile accesso al credito e alla liquidità
+
+# NODO: Consumer Confidence
+TIPO: indicator
+DESC: Fiducia dei consumatori nell'economia
+
+# NODO: PMI
+TIPO: indicator
+DESC: Indice dei manager degli acquisti
+
+# NODO: ISM
+TIPO: indicator
+DESC: Indice manifatturiero e dei servizi USA
+
+# NODO: Services Sector
+TIPO: concept
+DESC: Settore servizi, componente dominante del PIL nelle economie avanzate
+
+# NODO: Manufacturing Sector
+TIPO: concept
+DESC: Settore manifatturiero, sensibile al ciclo e al commercio globale
+
+# NODO: Trade Balance
+TIPO: indicator
+DESC: Saldo tra export e import
+
+# NODO: Current Account
+TIPO: indicator
+DESC: Saldo delle transazioni correnti di un paese
+
+# NODO: Capital Flows
+TIPO: concept
+DESC: Flussi di capitale tra paesi e mercati
+
+# NODO: Reserve Currency
+TIPO: concept
+DESC: Valuta usata come riserva internazionale
+
+# NODO: Dollar Funding
+TIPO: concept
+DESC: Accesso alla liquidità in dollari per banche e investitori
+
+# NODO: Repo Market
+TIPO: concept
+DESC: Mercato di pronti contro termine, cruciale per la liquidità
+
+# NODO: SOFR
+TIPO: indicator
+DESC: Tasso di riferimento garantito overnight in USD
+
+# NODO: LIBOR
+TIPO: indicator
+DESC: Tasso interbancario storico di riferimento
+
+# NODO: CDS
+TIPO: indicator
+DESC: Credit default swap, misura del rischio di credito
+
+# NODO: Treasury Bills
+TIPO: concept
+DESC: Titoli di Stato USA a breve scadenza
+
+# NODO: Treasury Bonds
+TIPO: concept
+DESC: Titoli di Stato USA a lunga scadenza
+
+# NODO: Municipal Bonds
+TIPO: concept
+DESC: Obbligazioni emesse da enti locali e municipalità
+
+# NODO: Preferred Stocks
+TIPO: concept
+DESC: Strumenti ibridi tra azioni e obbligazioni
+
+# NODO: Private Equity
+TIPO: concept
+DESC: Investimenti in società non quotate
+
+# NODO: Venture Capital
+TIPO: concept
+DESC: Finanziamento a imprese startup e early stage
+
+# NODO: Hedge Funds
+TIPO: concept
+DESC: Fondi con strategie flessibili e spesso leveraged
+
+# NODO: Mutual Funds
+TIPO: concept
+DESC: Fondi comuni di investimento tradizionali
 
 # EDGE: Federal Reserve -> Interest Rate
-RELAZIONE: influences
-EVIDENZA: La Fed alza o abbassa i tassi attraverso le decisioni del FOMC
-PESO: 2.0
+RELAZIONE: issued_by
+EVIDENZA: La Fed decide il tasso ufficiale sui fed funds
+PESO: 3.0
+
+# EDGE: ECB -> Interest Rate
+RELAZIONE: issued_by
+EVIDENZA: La BCE determina il tasso di rifinanziamento principale
+PESO: 3.0
+
+# EDGE: Bank of England -> Interest Rate
+RELAZIONE: issued_by
+EVIDENZA: La BoE decide il Bank Rate
+PESO: 2.4
+
+# EDGE: Bank of Japan -> Interest Rate
+RELAZIONE: issued_by
+EVIDENZA: La BOJ influenza il costo del denaro in Giappone
+PESO: 2.3
+
+# EDGE: PBoC -> Interest Rate
+RELAZIONE: issued_by
+EVIDENZA: La banca centrale cinese guida le condizioni monetarie interne
+PESO: 2.2
 
 # EDGE: Interest Rate -> Inflation
+RELAZIONE: influences
+EVIDENZA: Tassi più alti raffreddano domanda e prezzi
+PESO: 2.7
+
+# EDGE: Inflation -> Real Rates
+RELAZIONE: influences
+EVIDENZA: Un'inflazione più alta riduce i tassi reali
+PESO: 2.0
+
+# EDGE: Interest Rate -> Treasury Yield
+RELAZIONE: influences
+EVIDENZA: I rendimenti obbligazionari si adeguano alla politica monetaria
+PESO: 2.5
+
+# EDGE: Interest Rate -> 2Y Treasury
+RELAZIONE: influences
+EVIDENZA: Il tratto breve della curva reagisce rapidamente alle attese sui tassi
+PESO: 2.6
+
+# EDGE: 10Y Treasury -> Mortgage Rates
+RELAZIONE: related
+EVIDENZA: Il rendimento decennale influenza i tassi ipotecari
+PESO: 1.4
+
+# EDGE: Yield Curve -> Recession
+RELAZIONE: correlates_with
+EVIDENZA: L'inversione della curva spesso precede recessioni
+PESO: 2.4
+
+# EDGE: Inversion -> Recession
 RELAZIONE: causes
-EVIDENZA: Tassi alti aumentano il costo del credito, frenano consumi e inflazione
-PESO: 1.8
+EVIDENZA: L'inversione segnala aspettative di rallentamento economico
+PESO: 2.5
 
-# EDGE: Inflation -> Bond Markets
+# EDGE: GDP -> Earnings
 RELAZIONE: influences
-EVIDENZA: L'inflazione erode il rendimento reale delle obbligazioni
-PESO: 1.5
-
-# EDGE: Federal Reserve -> Bond Markets
-RELAZIONE: influences
-EVIDENZA: QE e QT della Fed acquistano/vendono Treasury, muovendo i prezzi
-PESO: 1.8
-
-# EDGE: Interest Rate -> Equity Markets
-RELAZIONE: influences
-EVIDENZA: Tassi alti aumentano il costo del capitale e il discount rate dei DCF
-PESO: 1.6
-
-# EDGE: Oil Price -> Inflation
-RELAZIONE: causes
-EVIDENZA: Aumenti del costo dell'energia si riflettono direttamente sull'inflazione
+EVIDENZA: La crescita economica sostiene i profitti aziendali
 PESO: 2.1
 
-# EDGE: Equity Markets -> VWCE
-RELAZIONE: part_of
-EVIDENZA: VWCE è composto da titoli azionari globali presenti negli Equity Markets
+# EDGE: Recession -> Earnings
+RELAZIONE: influences
+EVIDENZA: In recessione i profitti tendono a scendere
+PESO: 2.6
+
+# EDGE: Earnings -> P/E Ratio
+RELAZIONE: influences
+EVIDENZA: Utile più alto può comprimere il multiplo o sostenerlo
+PESO: 1.8
+
+# EDGE: Inflation -> P/E Ratio
+RELAZIONE: influences
+EVIDENZA: Inflazione e tassi alti riducono multipli di mercato
+PESO: 2.0
+
+# EDGE: Discount Rate -> P/E Ratio
+RELAZIONE: influences
+EVIDENZA: Un discount rate più alto abbassa i valori attuali
+PESO: 2.3
+
+# EDGE: QT -> Liquidity
+RELAZIONE: causes
+EVIDENZA: La riduzione del bilancio sottrae liquidità al sistema
+PESO: 2.2
+
+# EDGE: QE -> Liquidity
+RELAZIONE: causes
+EVIDENZA: Gli acquisti di asset aumentano la liquidità
+PESO: 2.4
+
+# EDGE: Liquidity -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Più liquidità favorisce i mercati azionari
+PESO: 2.1
+
+# EDGE: Liquidity -> Bond Markets
+RELAZIONE: influences
+EVIDENZA: La liquidità impatta prezzi e spread obbligazionari
+PESO: 1.9
+
+# EDGE: Federal Reserve -> QE
+RELAZIONE: issued_by
+EVIDENZA: La Fed può espandere il bilancio acquistando asset
+PESO: 2.3
+
+# EDGE: Federal Reserve -> QT
+RELAZIONE: issued_by
+EVIDENZA: La Fed può ridurre il bilancio drenando liquidità
+PESO: 2.3
+
+# EDGE: Federal Reserve -> Balance Sheet
+RELAZIONE: influences
+EVIDENZA: QE e QT modificano la dimensione del bilancio
 PESO: 2.5
+
+# EDGE: Balance Sheet -> Liquidity
+RELAZIONE: influences
+EVIDENZA: Il bilancio centrale influenza la quantità di riserve nel sistema
+PESO: 2.1
+
+# EDGE: CPI -> Inflation
+RELAZIONE: tracks
+EVIDENZA: Il CPI misura una parte dell'inflazione osservata
+PESO: 2.8
+
+# EDGE: PCE -> Inflation
+RELAZIONE: tracks
+EVIDENZA: Il PCE è uno degli indicatori principali dell'inflazione
+PESO: 2.8
+
+# EDGE: Core PCE -> Inflation
+RELAZIONE: tracks
+EVIDENZA: Il core PCE è la misura preferita dalla Fed per leggere le pressioni di fondo
+PESO: 3.0
+
+# EDGE: Payrolls -> Unemployment Rate
+RELAZIONE: relates
+EVIDENZA: Occupazione e disoccupazione si muovono in modo opposto
+PESO: 1.8
+
+# EDGE: Unemployment Rate -> GDP
+RELAZIONE: correlates_with
+EVIDENZA: Mercato del lavoro debole spesso accompagna crescita più bassa
+PESO: 1.7
+
+# EDGE: VIX -> Risk Off
+RELAZIONE: causes
+EVIDENZA: Volatilità alta spinge gli investitori verso posizioni difensive
+PESO: 2.6
+
+# EDGE: Risk Off -> Gold
+RELAZIONE: influences
+EVIDENZA: In risk off gli investitori cercano beni rifugio come oro
+PESO: 2.0
+
+# EDGE: Risk On -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Il risk on favorisce i titoli azionari
+PESO: 2.3
+
+# EDGE: Gold -> Inflation
+RELAZIONE: correlates_with
+EVIDENZA: L'oro tende a proteggere dal rischio inflattivo
+PESO: 1.8
+
+# EDGE: Dollar Index -> Gold
+RELAZIONE: contradicts
+EVIDENZA: Un dollaro forte tende a comprimere il prezzo dell'oro
+PESO: 2.0
+
+# EDGE: Dollar Index -> Oil
+RELAZIONE: contradicts
+EVIDENZA: Il petrolio è prezzato in USD e soffre un dollaro forte
+PESO: 1.8
+
+# EDGE: Dollar Index -> USDJPY
+RELAZIONE: influences
+EVIDENZA: La forza del dollaro incide sul cambio con lo yen
+PESO: 1.9
+
+# EDGE: Dollar Index -> EURUSD
+RELAZIONE: influences
+EVIDENZA: Un dollaro forte tende a spingere il cambio EURUSD più in basso
+PESO: 2.0
+
+# EDGE: Oil -> Inflation
+RELAZIONE: causes
+EVIDENZA: Il petrolio influenza i costi energetici e il CPI
+PESO: 2.5
+
+# EDGE: Natural Gas -> Inflation
+RELAZIONE: causes
+EVIDENZA: Il gas influenza costi industriali e consumi energetici
+PESO: 2.0
+
+# EDGE: Copper -> GDP
+RELAZIONE: correlates_with
+EVIDENZA: Il rame è spesso visto come indicatore anticipatore della crescita
+PESO: 1.7
+
+# EDGE: Gold -> Real Rates
+RELAZIONE: contradicts
+EVIDENZA: Tassi reali più alti rendono meno attraente l'oro
+PESO: 2.1
+
+# EDGE: Treasury Yield -> Gold
+RELAZIONE: contradicts
+EVIDENZA: Rendimenti più alti aumentano il costo opportunità dell'oro
+PESO: 2.0
+
+# EDGE: Treasury Yield -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Rendimenti più alti comprimono le valutazioni azionarie
+PESO: 2.2
+
+# EDGE: 2Y Treasury -> Federal Reserve
+RELAZIONE: tracks
+EVIDENZA: Il biennale incorpora le attese sulla Fed
+PESO: 2.7
+
+# EDGE: 10Y Treasury -> GDP
+RELAZIONE: correlates_with
+EVIDENZA: Il decennale riflette crescita e inflazione attese
+PESO: 1.6
+
+# EDGE: Credit Spread -> Recession
+RELAZIONE: correlates_with
+EVIDENZA: Gli spread tendono ad allargarsi in fasi di stress economico
+PESO: 2.2
+
+# EDGE: Credit Spread -> High Yield
+RELAZIONE: tracks
+EVIDENZA: Gli spread di credito sono cruciali per i bond high yield
+PESO: 2.3
+
+# EDGE: Credit Spread -> Investment Grade
+RELAZIONE: tracks
+EVIDENZA: Gli spread misurano il rischio relativo anche per investment grade
+PESO: 1.9
+
+# EDGE: Default Risk -> High Yield
+RELAZIONE: influences
+EVIDENZA: Un rischio di default più alto si riflette nei bond high yield
+PESO: 2.2
+
+# EDGE: Default Risk -> CDS
+RELAZIONE: influences
+EVIDENZA: I CDS prezzano il rischio di insolvenza
+PESO: 2.5
+
+# EDGE: CDS -> Credit Spread
+RELAZIONE: correlates_with
+EVIDENZA: CDS e spread di credito tendono a muoversi insieme
+PESO: 2.1
+
+# EDGE: CPI -> Federal Reserve
+RELAZIONE: influences
+EVIDENZA: Un CPI elevato può spingere la Fed a mantenere toni restrittivi
+PESO: 2.4
+
+# EDGE: Core PCE -> Federal Reserve
+RELAZIONE: influences
+EVIDENZA: La Fed osserva il core PCE nelle sue decisioni
+PESO: 2.8
+
+# EDGE: Payrolls -> Federal Reserve
+RELAZIONE: influences
+EVIDENZA: Il mercato del lavoro guida le aspettative di politica monetaria
+PESO: 2.0
+
+# EDGE: GDP -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Una crescita economica robusta sostiene gli utili e le azioni
+PESO: 2.1
+
+# EDGE: GDP -> Oil
+RELAZIONE: influences
+EVIDENZA: Maggiore crescita tende ad aumentare la domanda di energia
+PESO: 1.8
+
+# EDGE: GDP -> Copper
+RELAZIONE: influences
+EVIDENZA: La crescita economica globale aumenta la domanda di rame
+PESO: 1.9
+
+# EDGE: Recession -> VIX
+RELAZIONE: causes
+EVIDENZA: Le recessioni aumentano paura e volatilità
+PESO: 2.5
+
+# EDGE: Recession -> Bond Markets
+RELAZIONE: influences
+EVIDENZA: In recessione i bond governativi possono beneficiare dei tagli ai tassi
+PESO: 2.0
+
+# EDGE: Stagflation -> Oil
+RELAZIONE: causes
+EVIDENZA: Shock energetici possono alimentare stagflazione
+PESO: 2.3
+
+# EDGE: Stagflation -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: La stagflazione è negativa per le azioni
+PESO: 2.6
+
+# EDGE: Geopolitical Risk -> Oil
+RELAZIONE: influences
+EVIDENZA: Le tensioni geopolitiche muovono spesso il petrolio
+PESO: 2.2
+
+# EDGE: Geopolitical Risk -> Gold
+RELAZIONE: influences
+EVIDENZA: Nei periodi di rischio geopolitico l'oro tende a salire
+PESO: 2.1
+
+# EDGE: Supply Shock -> Inflation
+RELAZIONE: causes
+EVIDENZA: Uno shock di offerta aumenta i prezzi
+PESO: 2.4
+
+# EDGE: Demand Shock -> GDP
+RELAZIONE: causes
+EVIDENZA: Uno shock della domanda altera la crescita economica
+PESO: 2.0
+
+# EDGE: Consumer Confidence -> Equity Markets
+RELAZIONE: correlates_with
+EVIDENZA: Fiducia dei consumatori e mercati azionari spesso si muovono insieme
+PESO: 1.6
+
+# EDGE: PMI -> GDP
+RELAZIONE: correlates_with
+EVIDENZA: Il PMI anticipa l'andamento dell'attività economica
+PESO: 2.0
+
+# EDGE: ISM -> GDP
+RELAZIONE: correlates_with
+EVIDENZA: L'ISM è un indicatore anticipatore della crescita USA
+PESO: 2.0
+
+# EDGE: Market Sentiment -> VIX
+RELAZIONE: contradicts
+EVIDENZA: Sentiment positivo tende ad abbassare la volatilità
+PESO: 1.7
+
+# EDGE: Market Sentiment -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Il sentiment guida i flussi sugli asset rischiosi
+PESO: 2.0
+
+# EDGE: Market Sentiment -> Risk On
+RELAZIONE: causes
+EVIDENZA: Un sentiment positivo favorisce il risk on
+PESO: 2.1
+
+# EDGE: Financial Conditions -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Condizioni finanziarie più facili sostengono le borse
+PESO: 2.2
+
+# EDGE: Financial Conditions -> Credit Spread
+RELAZIONE: influences
+EVIDENZA: Condizioni restrittive allargano gli spread di credito
+PESO: 2.0
+
+# EDGE: Treasury Supply -> Treasury Yield
+RELAZIONE: influences
+EVIDENZA: Più offerta di titoli può spingere i rendimenti al rialzo
+PESO: 1.9
+
+# EDGE: Fiscal Deficit -> Treasury Supply
+RELAZIONE: causes
+EVIDENZA: Un deficit elevato richiede più emissioni di debito
+PESO: 2.1
+
+# EDGE: Government Debt -> Treasury Supply
+RELAZIONE: influences
+EVIDENZA: Un debito pubblico elevato implica più rifinanziamento
+PESO: 1.8
+
+# EDGE: Reserve Currency -> Dollar Index
+RELAZIONE: influences
+EVIDENZA: Il ruolo di riserva sostiene la domanda di dollari
+PESO: 2.0
+
+# EDGE: Dollar Funding -> Repo Market
+RELAZIONE: related
+EVIDENZA: Il funding in dollari dipende anche dalla liquidità repo
+PESO: 1.6
+
+# EDGE: Repo Market -> Liquidity
+RELAZIONE: influences
+EVIDENZA: Il mercato repo è cruciale per la liquidità di breve termine
+PESO: 2.0
+
+# EDGE: SOFR -> Interest Rate
+RELAZIONE: tracks
+EVIDENZA: Il SOFR riflette il costo del denaro a breve in USD
+PESO: 1.8
+
+# EDGE: LIBOR -> SOFR
+RELAZIONE: happened_before
+EVIDENZA: Il LIBOR è stato progressivamente sostituito dal SOFR
+PESO: 2.2
+
+# EDGE: Banks -> Credit Cycle
+RELAZIONE: influences
+EVIDENZA: Le banche determinano la disponibilità di credito nell'economia
+PESO: 2.0
+
+# EDGE: Banks -> Financial Conditions
+RELAZIONE: influences
+EVIDENZA: Le banche condizionano l'accesso a prestiti e leva
+PESO: 2.1
+
+# EDGE: Basel III -> Banks
+RELAZIONE: regulated_by
+EVIDENZA: Basel III rafforza capitale e liquidità bancaria
+PESO: 2.5
+
+# EDGE: Stress Test -> Banks
+RELAZIONE: regulated_by
+EVIDENZA: Gli stress test verificano la resilienza delle banche
+PESO: 2.2
+
+# EDGE: Banking Crisis -> Credit Cycle
+RELAZIONE: causes
+EVIDENZA: Le crisi bancarie irrigidiscono il credito
+PESO: 2.4
+
+# EDGE: Banking Crisis -> VIX
+RELAZIONE: causes
+EVIDENZA: Le crisi bancarie aumentano la volatilità di mercato
+PESO: 2.3
+
+# EDGE: SEC -> Equity Markets
+RELAZIONE: regulated_by
+EVIDENZA: La SEC vigila sulle società quotate e sui mercati USA
+PESO: 2.0
+
+# EDGE: ESMA -> Equity Markets
+RELAZIONE: regulated_by
+EVIDENZA: ESMA vigila sui mercati finanziari europei
+PESO: 1.8
+
+# EDGE: FINRA -> Equity Markets
+RELAZIONE: regulated_by
+EVIDENZA: FINRA supervisiona intermediari e trading negli USA
+PESO: 1.7
+
+# EDGE: NASDAQ -> Nasdaq 100
+RELAZIONE: related
+EVIDENZA: Il Nasdaq è il mercato di riferimento per i titoli growth
+PESO: 2.0
+
+# EDGE: NYSE -> S&P 500
+RELAZIONE: related
+EVIDENZA: Molte componenti dell'S&P 500 sono quotate al NYSE
+PESO: 1.6
+
+# EDGE: LSE -> FTSE 100
+RELAZIONE: related
+EVIDENZA: Il FTSE 100 è il principale indice del London Stock Exchange
+PESO: 2.0
+
+# EDGE: TSE -> Nikkei 225
+RELAZIONE: related
+EVIDENZA: Il Nikkei 225 è il benchmark del mercato giapponese
+PESO: 2.0
+
+# EDGE: SSE -> Shanghai Composite
+RELAZIONE: related
+EVIDENZA: Lo Shanghai Composite è il riferimento della borsa di Shanghai
+PESO: 2.0
+
+# EDGE: S&P 500 -> SPY
+RELAZIONE: tracks
+EVIDENZA: SPY replica l'S&P 500
+PESO: 3.0
+
+# EDGE: Nasdaq 100 -> QQQ
+RELAZIONE: tracks
+EVIDENZA: QQQ replica il Nasdaq 100
+PESO: 3.0
+
+# EDGE: MSCI World -> EFA
+RELAZIONE: tracks
+EVIDENZA: EFA replica i mercati sviluppati ex-USA
+PESO: 2.8
+
+# EDGE: MSCI Emerging Markets -> EEM
+RELAZIONE: tracks
+EVIDENZA: EEM replica i mercati emergenti
+PESO: 2.8
+
+# EDGE: Treasury Bonds -> TLT
+RELAZIONE: tracks
+EVIDENZA: TLT investe in Treasury a lunga durata
+PESO: 2.8
+
+# EDGE: Treasury Bonds -> IEF
+RELAZIONE: tracks
+EVIDENZA: IEF investe in Treasury a media durata
+PESO: 2.8
+
+# EDGE: Corporate Bond -> LQD
+RELAZIONE: tracks
+EVIDENZA: LQD replica obbligazioni corporate investment grade
+PESO: 2.8
+
+# EDGE: High Yield -> HYG
+RELAZIONE: tracks
+EVIDENZA: HYG replica bond high yield USA
+PESO: 2.8
+
+# EDGE: Gold -> GLD
+RELAZIONE: tracks
+EVIDENZA: GLD replica il prezzo dell'oro
+PESO: 3.0
+
+# EDGE: Silver -> SLV
+RELAZIONE: tracks
+EVIDENZA: SLV replica il prezzo dell'argento
+PESO: 3.0
+
+# EDGE: Energy -> XLE
+RELAZIONE: tracks
+EVIDENZA: XLE replica il settore energia
+PESO: 2.9
+
+# EDGE: Financials -> XLF
+RELAZIONE: tracks
+EVIDENZA: XLF replica il settore finanziario
+PESO: 2.9
+
+# EDGE: Technology -> XLK
+RELAZIONE: tracks
+EVIDENZA: XLK replica il settore tecnologia
+PESO: 2.9
+
+# EDGE: Healthcare -> XLV
+RELAZIONE: tracks
+EVIDENZA: XLV replica il settore healthcare
+PESO: 2.9
+
+# EDGE: Consumer Discretionary -> XLY
+RELAZIONE: tracks
+EVIDENZA: XLY replica il settore consumer discretionary
+PESO: 2.9
+
+# EDGE: Consumer Staples -> XLP
+RELAZIONE: tracks
+EVIDENZA: XLP replica il settore consumer staples
+PESO: 2.9
+
+# EDGE: Industrials -> XLI
+RELAZIONE: tracks
+EVIDENZA: XLI replica il settore industriale
+PESO: 2.9
+
+# EDGE: Real Estate -> XLRE
+RELAZIONE: tracks
+EVIDENZA: XLRE replica il settore real estate
+PESO: 2.9
+
+# EDGE: Materials -> XLB
+RELAZIONE: tracks
+EVIDENZA: XLB replica il settore materials
+PESO: 2.9
+
+# EDGE: Communication Services -> XLC
+RELAZIONE: tracks
+EVIDENZA: XLC replica il settore communication services
+PESO: 2.9
+
+# EDGE: Interest Rate -> Real Estate
+RELAZIONE: influences
+EVIDENZA: Tassi più alti penalizzano immobili e REITs
+PESO: 2.2
+
+# EDGE: Interest Rate -> Utilities
+RELAZIONE: influences
+EVIDENZA: I settori difensivi soffrono meno ma restano sensibili ai tassi
+PESO: 1.5
+
+# EDGE: Interest Rate -> Small Caps
+RELAZIONE: influences
+EVIDENZA: Le small cap dipendono di più dal costo del debito
+PESO: 2.2
+
+# EDGE: Interest Rate -> Growth Stocks
+RELAZIONE: influences
+EVIDENZA: I titoli growth soffrono con discount rate più alti
+PESO: 2.3
+
+# EDGE: Interest Rate -> Value Stocks
+RELAZIONE: influences
+EVIDENZA: I value stock risultano spesso più resilienti ai tassi alti
+PESO: 1.5
+
+# EDGE: Technology -> Growth Stocks
+RELAZIONE: related
+EVIDENZA: Il settore tech include molte società growth
+PESO: 2.0
+
+# EDGE: Financials -> Banks
+RELAZIONE: part_of
+EVIDENZA: Le banche sono una componente chiave dei financials
+PESO: 2.7
+
+# EDGE: Financials -> Insurers
+RELAZIONE: related
+EVIDENZA: Le assicurazioni fanno parte dell'ampio universo finanziario
+PESO: 1.7
+
+# EDGE: Energy -> Oil
+RELAZIONE: correlates_with
+EVIDENZA: Il settore energia è fortemente legato al prezzo del petrolio
+PESO: 2.4
+
+# EDGE: Materials -> Copper
+RELAZIONE: correlates_with
+EVIDENZA: Il settore materials segue spesso il rame e le commodity industriali
+PESO: 2.0
+
+# EDGE: Consumer Discretionary -> Consumer Confidence
+RELAZIONE: influences
+EVIDENZA: La fiducia dei consumatori sostiene la spesa discrezionale
+PESO: 1.8
+
+# EDGE: Consumer Staples -> Inflation
+RELAZIONE: influences
+EVIDENZA: Prezzi dei beni essenziali impattano il carrello della spesa
+PESO: 1.4
+
+# EDGE: Treasury Yield -> Financials
+RELAZIONE: influences
+EVIDENZA: Tassi più alti possono migliorare il margine di interesse delle banche
+PESO: 1.9
+
+# EDGE: Yield Curve -> Financials
+RELAZIONE: influences
+EVIDENZA: La pendenza della curva influenza la redditività bancaria
+PESO: 2.0
+
+# EDGE: QE -> S&P 500
+RELAZIONE: influences
+EVIDENZA: La liquidità extra tende a sostenere i listini azionari
+PESO: 2.5
+
+# EDGE: QT -> S&P 500
+RELAZIONE: influences
+EVIDENZA: La stretta monetaria può comprimere le valutazioni azionarie
+PESO: 2.4
+
+# EDGE: QE -> Gold
+RELAZIONE: influences
+EVIDENZA: Maggiore liquidità e tassi reali bassi sostengono l'oro
+PESO: 2.0
+
+# EDGE: QT -> Dollar Index
+RELAZIONE: influences
+EVIDENZA: La stretta monetaria può rafforzare il dollaro
+PESO: 1.9
+
+# EDGE: Federal Reserve -> Dollar Index
+RELAZIONE: influences
+EVIDENZA: Una Fed restrittiva tende a rafforzare l'USD
+PESO: 2.1
+
+# EDGE: ECB -> EURUSD
+RELAZIONE: influences
+EVIDENZA: Le decisioni BCE influenzano il cambio euro/dollaro
+PESO: 2.0
+
+# EDGE: BOJ -> USDJPY
+RELAZIONE: influences
+EVIDENZA: La politica BOJ impatta fortemente il cambio USD/JPY
+PESO: 2.0
+
+# EDGE: PBoC -> USDCNY
+RELAZIONE: influences
+EVIDENZA: La politica cinese guida il cambio con lo yuan
+PESO: 2.0
+
+# EDGE: EURUSD -> Dollar Index
+RELAZIONE: correlates_with
+EVIDENZA: Il cambio euro/dollaro pesa molto sul DXY
+PESO: 2.1
+
+# EDGE: USDJPY -> Risk On
+RELAZIONE: correlates_with
+EVIDENZA: Yen debole spesso accompagna fasi di risk on globale
+PESO: 1.6
+
+# EDGE: GBPUSD -> UK Stocks
+RELAZIONE: influences
+EVIDENZA: La sterlina influisce sulla competitività delle società UK
+PESO: 1.4
+
+# EDGE: USDCNY -> Emerging Markets
+RELAZIONE: influences
+EVIDENZA: Il cambio con lo yuan ha impatti sui mercati emergenti e sul commercio globale
+PESO: 1.8
+
+# EDGE: Oil -> Energy
+RELAZIONE: influences
+EVIDENZA: Il prezzo del petrolio guida i ricavi del settore energy
+PESO: 2.2
+
+# EDGE: Oil -> Stagflation
+RELAZIONE: causes
+EVIDENZA: Shock petroliferi possono creare crescita debole e inflazione alta
+PESO: 2.4
+
+# EDGE: Copper -> Industrials
+RELAZIONE: influences
+EVIDENZA: Il rame è legato alla domanda industriale globale
+PESO: 1.8
+
+# EDGE: Gold -> Risk Off
+RELAZIONE: influences
+EVIDENZA: L'oro beneficia dei regimi di avversione al rischio
+PESO: 2.0
+
+# EDGE: VIX -> Volatility
+RELAZIONE: related
+EVIDENZA: Il VIX misura la volatilità implicita di mercato
+PESO: 3.0
+
+# EDGE: MOVE -> Treasury Yield
+RELAZIONE: correlates_with
+EVIDENZA: La volatilità obbligazionaria sale quando i rendimenti si muovono molto
+PESO: 1.9
+
+# EDGE: Market Sentiment -> Bull Market
+RELAZIONE: causes
+EVIDENZA: Sentiment positivo favorisce i mercati rialzisti
+PESO: 1.9
+
+# EDGE: Market Sentiment -> Bear Market
+RELAZIONE: influences
+EVIDENZA: Sentiment negativo accompagna spesso i ribassi
+PESO: 1.9
+
+# EDGE: Earnings Season -> Volatility
+RELAZIONE: causes
+EVIDENZA: La stagione utili aumenta i movimenti dei prezzi
+PESO: 1.6
+
+# EDGE: Guidance -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Le indicazioni future guidano la reazione degli investitori
+PESO: 2.0
+
+# EDGE: Buyback -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: I buyback sostengono l'EPS e il prezzo delle azioni
+PESO: 1.8
+
+# EDGE: Dividend -> Value Stocks
+RELAZIONE: influences
+EVIDENZA: I dividendi attraggono investitori orientati al valore e al reddito
+PESO: 1.6
+
+# EDGE: Leverage -> Margin Call
+RELAZIONE: causes
+EVIDENZA: Una leva elevata aumenta il rischio di margin call
+PESO: 2.2
+
+# EDGE: Margin Call -> Volatility
+RELAZIONE: causes
+EVIDENZA: Le liquidazioni forzate amplificano i movimenti di mercato
+PESO: 2.3
+
+# EDGE: Correlation -> Portfolio
+RELAZIONE: influences
+EVIDENZA: La correlazione tra asset determina la diversificazione
+PESO: 1.8
+
+# EDGE: Beta -> Portfolio
+RELAZIONE: influences
+EVIDENZA: Il beta mischia il rischio sistematico del portafoglio
+PESO: 1.6
+
+# EDGE: Alpha -> Portfolio
+RELAZIONE: influences
+EVIDENZA: L'alpha misura la capacità di battere il benchmark
+PESO: 1.5
+
+# EDGE: Sharpe Ratio -> Portfolio
+RELAZIONE: influences
+EVIDENZA: Lo Sharpe Ratio valuta il rendimento corretto per il rischio
+PESO: 1.8
+
+# EDGE: Drawdown -> Portfolio
+RELAZIONE: influences
+EVIDENZA: Il drawdown misura la perdita massima del portafoglio
+PESO: 1.7
+
+# EDGE: Asset Allocation -> Portfolio
+RELAZIONE: part_of
+EVIDENZA: L'asset allocation è la struttura del portafoglio
+PESO: 2.5
+
+# EDGE: Rebalancing -> Asset Allocation
+RELAZIONE: influences
+EVIDENZA: Il ribilanciamento mantiene la composizione target
+PESO: 1.8
+
+# EDGE: Retirement -> Portfolio
+RELAZIONE: related
+EVIDENZA: La pianificazione pensionistica utilizza strategie di portafoglio
+PESO: 1.4
+
+# EDGE: IPO -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Le IPO aumentano l'offerta di titoli sui mercati azionari
+PESO: 1.5
+
+# EDGE: M&A -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Fusioni e acquisizioni muovono i prezzi dei titoli coinvolti
+PESO: 1.7
+
+# EDGE: Private Equity -> Venture Capital
+RELAZIONE: related
+EVIDENZA: Entrambe sono forme di capitale non quotato
+PESO: 1.5
+
+# EDGE: Venture Capital -> IPO
+RELAZIONE: influences
+EVIDENZA: Il VC spesso prepara le società all'IPO
+PESO: 1.7
+
+# EDGE: Hedge Funds -> Volatility
+RELAZIONE: influences
+EVIDENZA: Strategie tattiche e leverage possono amplificare la volatilità
+PESO: 1.4
+
+# EDGE: Mutual Funds -> Equity Markets
+RELAZIONE: invests_in
+EVIDENZA: I fondi comuni investono in azioni e obbligazioni
+PESO: 1.6
