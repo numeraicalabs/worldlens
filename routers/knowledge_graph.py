@@ -298,6 +298,157 @@ def parse_txt(content: bytes) -> List[str]:
     return chunks[:100]  # cap
 
 
+def parse_structured_format(content: bytes) -> Optional[Dict]:
+    """
+    Parse WorldLens structured format directly — no AI needed.
+
+    Format example:
+        # NODO: Federal Reserve
+        TIPO: entity
+        DESC: US central bank
+        ALIAS: Fed, FED
+
+        # EDGE: Federal Reserve -> Interest Rate
+        RELAZIONE: influences
+        EVIDENZA: Fed controls rates
+        PESO: 2.0
+
+    Returns {nodes, edges} ready for ingest_extraction_result(), or None if not structured format.
+    """
+    text = content.decode("utf-8", errors="ignore")
+
+    # Detect if it uses our structured format
+    has_nodo = bool(re.search(r'^#\s*NODO\s*:', text, re.MULTILINE | re.IGNORECASE))
+    has_node = bool(re.search(r'^#\s*NODE\s*:', text, re.MULTILINE | re.IGNORECASE))
+    has_edge = bool(re.search(r'^#\s*EDGE\s*:', text, re.MULTILINE | re.IGNORECASE))
+
+    if not (has_nodo or has_node) and not has_edge:
+        return None  # not structured format, fall through to Gemini/regex
+
+    nodes = []
+    edges = []
+
+    # Parse node blocks
+    node_pattern = re.compile(
+        r'#\s*NOD[OE]\s*:\s*(.+?)\n(.*?)(?=^#|\Z)',
+        re.MULTILINE | re.DOTALL | re.IGNORECASE
+    )
+    for m in node_pattern.finditer(text):
+        label = m.group(1).strip()
+        body  = m.group(2)
+        if not label:
+            continue
+
+        # Extract fields
+        tipo  = re.search(r'TIPO\s*:\s*(.+)', body, re.IGNORECASE)
+        ntype = re.search(r'TYPE\s*:\s*(.+)', body, re.IGNORECASE)
+        desc  = re.search(r'DESC\s*(?:RIZIONE)?\s*:\s*(.+)', body, re.IGNORECASE)
+        desc2 = re.search(r'DESCRIPTION\s*:\s*(.+)', body, re.IGNORECASE)
+        conf  = re.search(r'CONF(?:IDENZA|IDENCE)?\s*:\s*([\d.]+)', body, re.IGNORECASE)
+        alias = re.search(r'ALIAS\s*:\s*(.+)', body, re.IGNORECASE)
+
+        node_type = "concept"
+        if tipo:
+            node_type = tipo.group(1).strip().lower()
+        elif ntype:
+            node_type = ntype.group(1).strip().lower()
+
+        description = ""
+        if desc:
+            description = desc.group(1).strip()
+        elif desc2:
+            description = desc2.group(1).strip()
+
+        confidence = float(conf.group(1)) if conf else 1.0
+
+        aliases = []
+        if alias:
+            aliases = [a.strip() for a in alias.group(1).split(",") if a.strip()]
+
+        nodes.append({
+            "label":       label,
+            "type":        node_type,
+            "description": description[:400],
+            "confidence":  min(1.0, confidence),
+            "aliases":     aliases,
+        })
+
+    # Parse edge blocks (both arrow and field format)
+    # Format 1: # EDGE: NodeA -> NodeB
+    edge_arrow = re.compile(
+        r'#\s*EDGE\s*:\s*(.+?)\s*[-=]>\s*(.+?)\n(.*?)(?=^#|\Z)',
+        re.MULTILINE | re.DOTALL | re.IGNORECASE
+    )
+    for m in edge_arrow.finditer(text):
+        src   = m.group(1).strip()
+        tgt   = m.group(2).strip()
+        body  = m.group(3)
+
+        rel   = re.search(r'RELAZ(?:IONE)?\s*:\s*(.+)', body, re.IGNORECASE)
+        rel2  = re.search(r'RELATION(?:SHIP)?\s*:\s*(.+)', body, re.IGNORECASE)
+        evid  = re.search(r'EVID(?:ENZA|ENCE)?\s*:\s*(.+)', body, re.IGNORECASE)
+        peso  = re.search(r'PESO\s*:\s*([\d.]+)', body, re.IGNORECASE)
+        weight_f = re.search(r'WEIGHT\s*:\s*([\d.]+)', body, re.IGNORECASE)
+
+        relation = "related"
+        if rel:
+            relation = rel.group(1).strip().lower()
+        elif rel2:
+            relation = rel2.group(1).strip().lower()
+
+        evidence = ""
+        if evid:
+            evidence = evid.group(1).strip()
+
+        weight = 1.0
+        if peso:
+            weight = min(3.0, float(peso.group(1)))
+        elif weight_f:
+            weight = min(3.0, float(weight_f.group(1)))
+
+        if src and tgt:
+            edges.append({
+                "src":      src,
+                "tgt":      tgt,
+                "relation": relation,
+                "evidence": evidence[:300],
+                "weight":   weight,
+            })
+
+    # Format 2: # EDGE: NodeA (no arrow, fields only)
+    edge_noarrow = re.compile(
+        r'#\s*EDGE\s*:\s*([^-\n>]+?)\n(.*?)(?=^#|\Z)',
+        re.MULTILINE | re.DOTALL | re.IGNORECASE
+    )
+    for m in edge_noarrow.finditer(text):
+        label = m.group(1).strip()
+        body  = m.group(2)
+
+        # Skip if already parsed as arrow
+        if "->" in m.group(0) or "=>" in m.group(0):
+            continue
+
+        src_m = re.search(r'FROM\s*:\s*(.+)', body, re.IGNORECASE)
+        tgt_m = re.search(r'TO\s*:\s*(.+)', body, re.IGNORECASE)
+        rel_m = re.search(r'RELAZ(?:IONE)?\s*:\s*(.+)', body, re.IGNORECASE)
+        evid  = re.search(r'EVID(?:ENZA|ENCE)?\s*:\s*(.+)', body, re.IGNORECASE)
+        peso  = re.search(r'PESO\s*:\s*([\d.]+)', body, re.IGNORECASE)
+
+        if src_m and tgt_m:
+            edges.append({
+                "src":      src_m.group(1).strip(),
+                "tgt":      tgt_m.group(1).strip(),
+                "relation": (rel_m.group(1).strip().lower() if rel_m else "related"),
+                "evidence": (evid.group(1).strip() if evid else "")[:300],
+                "weight":   min(3.0, float(peso.group(1))) if peso else 1.0,
+            })
+
+    if not nodes and not edges:
+        return None
+
+    return {"nodes": nodes, "edges": edges, "_source": "structured_format"}
+
+
 def parse_pdf(content: bytes) -> List[str]:
     """Extract text from PDF using pypdf."""
     try:
@@ -558,8 +709,72 @@ async def upload_file(
         chunks = parse_pdf(content)
         source_type = "pdf"
     else:
-        chunks = parse_txt(content)
-        source_type = "txt"
+        # Try structured format first (bypasses AI entirely)
+        structured = parse_structured_format(content)
+        if structured:
+            # Direct ingest — no chunking needed
+            source_type = "structured_format"
+            if not chunks:
+                chunks = []  # placeholder, will be handled below
+
+            # Create upload record immediately
+            pool = await get_pool()
+            upload_id = None
+            if pool:
+                async with pool.acquire() as conn:
+                    row = await conn.fetchrow(
+                        "INSERT INTO kg_uploads (user_id, filename, source_type, status) "
+                        "VALUES ($1,$2,$3,'processing') RETURNING id",
+                        user["id"], fname, source_type
+                    )
+                    upload_id = row["id"]
+            else:
+                import aiosqlite as _aio
+                async with _aio.connect(settings.db_path) as db:
+                    cur = await db.execute(
+                        "INSERT INTO kg_uploads (user_id, filename, source_type, status) "
+                        "VALUES (?,?,?,'processing')",
+                        (user["id"], fname, source_type)
+                    )
+                    await db.commit()
+                    upload_id = cur.lastrowid
+
+            # Ingest directly
+            n_nodes, n_edges = await ingest_extraction_result(structured, upload_id)
+
+            # Mark done
+            now = datetime.utcnow().isoformat()
+            pool = await get_pool()
+            if pool:
+                async with pool.acquire() as conn:
+                    await conn.execute(
+                        "UPDATE kg_uploads SET status='done', completed_at=NOW(), "
+                        "nodes_added=$1, edges_added=$2 WHERE id=$3",
+                        n_nodes, n_edges, upload_id
+                    )
+            else:
+                import aiosqlite as _aio
+                async with _aio.connect(settings.db_path) as db:
+                    await db.execute(
+                        "UPDATE kg_uploads SET status='done', completed_at=?, "
+                        "nodes_added=?, edges_added=? WHERE id=?",
+                        (now, n_nodes, n_edges, upload_id)
+                    )
+                    await db.commit()
+
+            return {
+                "upload_id":   upload_id,
+                "filename":    fname,
+                "source_type": source_type,
+                "chunks":      1,
+                "status":      "done",
+                "nodes_added": n_nodes,
+                "edges_added": n_edges,
+                "message":     f"Structured format parsed directly: +{n_nodes} nodes, +{n_edges} edges (no AI needed)",
+            }
+        else:
+            chunks = parse_txt(content)
+            source_type = "txt"
 
     if not chunks:
         raise HTTPException(422, "No extractable text found in file")
@@ -949,3 +1164,101 @@ async def trigger_manual_autopop(
 
     background_tasks.add_task(run)
     return {"ok": True, "message": "Deep extraction triggered in background"}
+
+
+# ── Template download ─────────────────────────────────────────────────────────
+
+@router.get("/template")
+async def download_template():
+    """Download the WorldLens structured knowledge format template."""
+    from fastapi.responses import PlainTextResponse
+    template = """# WorldLens Knowledge Graph — Structured Format
+# ─────────────────────────────────────────────────────────────────
+# Carica questo file in Brain Editor → tab Upload per creare nodi
+# ed edge direttamente senza AI (parsing immediato, zero quota).
+#
+# TIPI NODO: concept, entity, etf, indicator, event, policy, person, commodity
+# TIPI RELAZIONE: influences, correlates_with, causes, part_of,
+#   happened_before, contradicts, tracks, issued_by, invests_in,
+#   regulated_by, related
+# PESO: 0.1 – 3.0 (default 1.0, admin inject = 2.0)
+# ─────────────────────────────────────────────────────────────────
+
+# NODO: Federal Reserve
+TIPO: entity
+DESC: Banca centrale degli Stati Uniti, controlla la politica monetaria USA
+ALIAS: Fed, FED, US Federal Reserve, FOMC
+
+# NODO: Interest Rate
+TIPO: indicator
+DESC: Tasso di interesse sui fed funds, strumento principale della politica monetaria
+
+# NODO: Inflation
+TIPO: indicator
+DESC: Tasso di variazione dei prezzi al consumo (CPI, PCE)
+ALIAS: CPI, inflazione, tasso inflazione
+
+# NODO: Bond Markets
+TIPO: concept
+DESC: Mercati obbligazionari globali, reagiscono ai tassi e all inflazione
+
+# NODO: Equity Markets
+TIPO: concept
+DESC: Mercati azionari globali, correlano con crescita economica e sentiment
+
+# NODO: VWCE
+TIPO: etf
+DESC: Vanguard FTSE All-World — ETF azionario globale, replica FTSE All-World
+ALIAS: Vanguard All World
+
+# NODO: Oil Price
+TIPO: commodity
+DESC: Prezzo del petrolio greggio (Brent, WTI), driver principale dell inflazione energetica
+ALIAS: Brent, WTI, crude oil
+
+# ─── EDGE (formato freccia) ───────────────────────────────────────
+
+# EDGE: Federal Reserve -> Interest Rate
+RELAZIONE: influences
+EVIDENZA: La Fed alza o abbassa i tassi attraverso le decisioni del FOMC
+PESO: 2.0
+
+# EDGE: Interest Rate -> Inflation
+RELAZIONE: causes
+EVIDENZA: Tassi alti aumentano il costo del credito, frenano consumi e inflazione
+PESO: 1.8
+
+# EDGE: Inflation -> Bond Markets
+RELAZIONE: influences
+EVIDENZA: L inflazione erode il rendimento reale delle obbligazioni
+PESO: 1.5
+
+# EDGE: Federal Reserve -> Bond Markets
+RELAZIONE: influences
+EVIDENZA: QE e QT della Fed acquistano/vendono Treasury, muovendo i prezzi
+PESO: 1.8
+
+# EDGE: Interest Rate -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Tassi alti aumentano il costo del capitale e il discount rate dei DCF
+PESO: 1.6
+
+# EDGE: Oil Price -> Inflation
+RELAZIONE: causes
+EVIDENZA: Il prezzo dell energia è componente diretta del CPI
+PESO: 1.4
+
+# EDGE: VWCE -> Equity Markets
+RELAZIONE: tracks
+EVIDENZA: VWCE replica il FTSE All-World, esposizione a 3800+ titoli globali
+PESO: 2.0
+
+# ─────────────────────────────────────────────────────────────────
+# PUOI AGGIUNGERE I TUOI NODI ED EDGE SOTTO QUESTO COMMENTO
+# Salva come .txt e carica in Brain Editor → Upload
+# ─────────────────────────────────────────────────────────────────
+"""
+    return PlainTextResponse(
+        content=template,
+        headers={"Content-Disposition": "attachment; filename=worldlens_kg_template.txt"}
+    )
