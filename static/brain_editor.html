@@ -307,22 +307,77 @@ function resize(){
 var _rt2;window.addEventListener('resize',function(){clearTimeout(_rt2);_rt2=setTimeout(resize,80);});
 setTimeout(function(){requestAnimationFrame(resize);},100);
 
-/* AUTH — deferred until DOM ready */
+/* AUTH — robust: retry 3x, show login if missing */
+var _authRetries = 0;
 function initAuth(){
   var t=null;
   try{t=localStorage.getItem('wl_tok')||localStorage.getItem('wl_trade_token');}catch(e){}
   var dot=document.getElementById('sdot'),txt=document.getElementById('stxt');
   if(t){
+    // Validate token with a quick ping
     G.token=t;
-    if(dot)dot.style.background='#10B981';
-    if(txt)txt.textContent='online';
-    setTimeout(function(){loadBrainStats();loadUHist();loadKGFromServer();},500);
-  }else{
-    if(dot)dot.style.background='#F59E0B';
-    if(txt)txt.textContent='apri WorldLens';
+    fetch('/api/health').then(function(r){
+      if(r.ok){
+        if(dot)dot.style.background='#10B981';
+        if(txt)txt.textContent='online';
+        setTimeout(function(){loadBrainStats();loadUHist();loadKGFromServer();},300);
+      } else {
+        showLoginForm();
+      }
+    }).catch(function(){
+      // Server not reachable but token present — try anyway
+      if(dot)dot.style.background='#F59E0B';
+      if(txt)txt.textContent='server offline';
+      // Still try to load cached graph
+      setTimeout(function(){loadBrainStats();loadKGFromServer();},500);
+    });
+  } else if(_authRetries < 3) {
+    // Retry — token might not be written yet (race on page load)
+    _authRetries++;
+    setTimeout(initAuth, 400 * _authRetries);
+  } else {
+    if(dot)dot.style.background='#EF4444';
+    if(txt)txt.textContent='non connesso';
+    showLoginForm();
   }
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initAuth);}else{setTimeout(initAuth,0);}
+
+function showLoginForm(){
+  // Show inline login in sidebar
+  var sbody = document.querySelector('.sbody');
+  if(!sbody||document.getElementById('login-form-inline'))return;
+  var lf = document.createElement('div');
+  lf.id = 'login-form-inline';
+  lf.style.cssText = 'background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:14px;margin-bottom:12px';
+  lf.innerHTML = '<div style="font-size:11px;font-weight:700;color:#EF4444;margin-bottom:10px">⚠ Sessione non trovata</div>'+
+    '<input id="li-email" class="fi" placeholder="Email" type="email" style="margin-bottom:7px">'+
+    '<input id="li-pwd" class="fi" placeholder="Password" type="password" style="margin-bottom:10px">'+
+    '<button onclick="doLogin()" class="btn bp bw" style="font-size:11px">Accedi</button>'+
+    '<div id="li-err" style="color:#EF4444;font-size:10px;margin-top:7px;display:none"></div>';
+  sbody.insertBefore(lf, sbody.firstChild);
+}
+
+async function doLogin(){
+  var email=(document.getElementById('li-email')||{}).value||'';
+  var pwd=(document.getElementById('li-pwd')||{}).value||'';
+  var err=document.getElementById('li-err');
+  if(!email||!pwd){if(err){err.style.display='block';err.textContent='Inserisci email e password';}return;}
+  try{
+    var r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:email,password:pwd})});
+    var data=await r.json();
+    if(r.ok&&data.access_token){
+      localStorage.setItem('wl_tok',data.access_token);
+      G.token=data.access_token;
+      var lf=document.getElementById('login-form-inline');if(lf)lf.remove();
+      var dot=document.getElementById('sdot'),txt=document.getElementById('stxt');
+      if(dot)dot.style.background='#10B981';if(txt)txt.textContent='online';
+      setTimeout(function(){loadBrainStats();loadUHist();loadKGFromServer();},200);
+    } else {
+      if(err){err.style.display='block';err.textContent=data.detail||'Credenziali errate';}
+    }
+  }catch(e){if(err){err.style.display='block';err.textContent='Errore di rete: '+e.message;}}
+}
 
 /* API */
 function api(url,opts){
@@ -502,12 +557,32 @@ function updateStats(){
 function loadBrainStats(){
   if(!G.token)return;
   api('/api/brain/stats').then(function(r){
-    if(!r)return;
-    var lvl={seed:'🌱',growing:'🌿',active:'🧠',advanced:'⚡',expert:'🔥'};
-    var b=document.getElementById('blv');if(b)b.textContent=(lvl[r.brain_level]||'🌱')+' '+(r.brain_level||'seed').toUpperCase();
-    var sl=document.getElementById('st-lv');if(sl)sl.textContent=lvl[r.brain_level]||'🌱';
-    G.bsync=r.total_entries||0;updateStats();
+    if(!r){
+      // Brain stats failed — normal on first deploy, retry once
+      setTimeout(function(){if(G.token)api('/api/brain/stats').then(function(r2){if(r2)_applyBrainStats(r2);});},3000);
+      return;
+    }
+    _applyBrainStats(r);
+    // Also refresh KG stats
+    api('/api/kg/stats').then(function(ks){
+      if(!ks)return;
+      var dot=document.getElementById('sdot'),txt=document.getElementById('stxt');
+      if(dot)dot.style.background='#10B981';
+      if(txt)txt.textContent='online · '+((ks.total_nodes||0)+' nodi KG');
+    }).catch(function(){});
+  }).catch(function(){
+    var dot=document.getElementById('sdot'),txt=document.getElementById('stxt');
+    if(dot)dot.style.background='#EF4444';
+    if(txt)txt.textContent='connessione persa';
   });
+}
+
+function _applyBrainStats(r){
+  var lvl={seed:'🌱',growing:'🌿',active:'🧠',advanced:'⚡',expert:'🔥'};
+  var b=document.getElementById('blv');
+  if(b)b.textContent=(lvl[r.brain_level]||'🌱')+' '+(r.brain_level||'seed').toUpperCase();
+  var sl=document.getElementById('st-lv');if(sl)sl.textContent=lvl[r.brain_level]||'🌱';
+  G.bsync=r.total_entries||0;updateStats();
 }
 
 /* SYNC */
@@ -591,8 +666,25 @@ async function loadUHist(){
 async function loadKGFromServer(){
   if(!G.token)return;
   var h={'Authorization':'Bearer '+G.token};
-  var data=await fetch('/api/kg/graph?limit=150',{headers:h}).then(function(r){return r.json();}).catch(function(){return null;});
-  if(!data||!data.nodes)return;
+  var dot=document.getElementById('sdot'),txt=document.getElementById('stxt');
+  var resp=await fetch('/api/kg/graph?limit=150',{headers:h}).catch(function(e){
+    if(txt)txt.textContent='server offline';
+    return null;
+  });
+  if(!resp){return;}
+  if(resp.status===401||resp.status===403){
+    if(txt)txt.textContent='sessione scaduta';
+    showLoginForm();return;
+  }
+  var data=await resp.json().catch(function(){return null;});
+  if(!data){if(txt)txt.textContent='errore risposta KG';return;}
+  if(!data.nodes){
+    // Empty KG is OK — trigger autopop
+    if(dot)dot.style.background='#F59E0B';
+    if(txt)txt.textContent='KG vuoto — autopop in corso';
+    fetch('/api/kg/trigger-autopop',{method:'POST',headers:h}).catch(function(){});
+    return;
+  }
   var ex={};G.nodes.forEach(function(n){ex[n.label.toUpperCase()]=true;});
   var added=0;
   data.nodes.forEach(function(n){
