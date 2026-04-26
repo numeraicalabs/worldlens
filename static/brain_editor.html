@@ -23,24 +23,46 @@
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--t1);font-family:'Syne',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 
 /* ── Layout ── */
-#app{display:flex;height:100vh}
-#graph-area{flex:1;position:relative;overflow:hidden}
-#canvas{display:block;width:100%;height:100%;cursor:grab}
+#app{display:flex;height:100vh;height:100dvh;flex-direction:row}
+#graph-area{flex:1;min-width:0;position:relative;overflow:hidden}
+#canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
 #canvas.panning{cursor:grabbing}
 
 /* ── Sidebar ── */
-#sidebar{width:var(--sidebar);background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+#sidebar{width:var(--sidebar);background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:transform .25s ease}
 .sb-header{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .sb-logo{font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.15em;color:var(--violet2)}
 .sb-title{font-size:16px;font-weight:700;color:var(--t1);letter-spacing:-.02em}
 .sb-badge{font-size:9px;padding:2px 7px;border-radius:20px;background:var(--violet3);color:var(--violet2);font-family:'Space Mono',monospace;letter-spacing:.08em}
 
 .sb-tabs{display:flex;gap:2px;padding:10px 10px 0;flex-shrink:0}
-.sb-tab{flex:1;padding:7px 10px;border-radius:6px 6px 0 0;font-size:11px;font-weight:600;font-family:inherit;background:transparent;border:1px solid transparent;border-bottom:none;color:var(--t3);cursor:pointer;transition:all .15s}
+.sb-tab{flex:1;padding:7px 6px;border-radius:6px 6px 0 0;font-size:10px;font-weight:600;font-family:inherit;background:transparent;border:1px solid transparent;border-bottom:none;color:var(--t3);cursor:pointer;transition:all .15s}
 .sb-tab.active{background:var(--bg3);border-color:var(--border);color:var(--t1)}
 .sb-body{flex:1;overflow-y:auto;padding:14px;background:var(--bg3);border-top:1px solid var(--border)}
 .sb-body::-webkit-scrollbar{width:4px}
 .sb-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+
+/* ── Mobile sidebar toggle ── */
+#mob-sidebar-toggle{display:none;position:absolute;bottom:70px;right:12px;z-index:100;width:44px;height:44px;border-radius:50%;background:var(--violet);border:none;color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(124,58,237,.5);align-items:center;justify-content:center}
+
+/* ── Mobile: sidebar slides over canvas ── */
+@media (max-width: 600px) {
+  #app { flex-direction: column; }
+  #graph-area { flex: 1; min-height: 0; width: 100%; }
+  #canvas { width: 100% !important; }
+  #sidebar {
+    position: fixed;
+    right: 0; top: 0; bottom: 0;
+    width: min(320px, 92vw);
+    z-index: 200;
+    transform: translateX(100%);
+    box-shadow: -8px 0 32px rgba(0,0,0,.5);
+  }
+  #sidebar.open { transform: translateX(0); }
+  #mob-sidebar-toggle { display: flex; }
+  #topbar { right: 0 !important; }
+  #controls { bottom: 80px; }
+}
 
 /* ── Form elements ── */
 .field{margin-bottom:12px}
@@ -132,6 +154,7 @@ select.fi option{background:var(--bg2)}
 
   <!-- ── GRAPH AREA ── -->
   <div id="graph-area">
+    <button id="mob-sidebar-toggle" onclick="toggleMobileSidebar()" title="Pannello">☰</button>
     <div id="topbar">
       <span class="tb-logo">WL·BRAIN</span>
       <div class="tb-sep"></div>
@@ -399,16 +422,45 @@ var canvas = document.getElementById('canvas');
 var ctx    = canvas.getContext('2d');
 
 function resize() {
-  var w = canvas.offsetWidth, h = canvas.offsetHeight;
-  canvas.width  = w * devicePixelRatio;
-  canvas.height = h * devicePixelRatio;
-  ctx.scale(devicePixelRatio, devicePixelRatio);
-  G.W = w; G.H = h;
+  var w = canvas.offsetWidth;
+  var h = canvas.offsetHeight;
+
+  // Guard: if canvas not yet laid out, retry after layout
+  if (w < 10 || h < 10) {
+    requestAnimationFrame(resize);
+    return;
+  }
+
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+
+  // Reset transform before re-scaling to avoid accumulation
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  G.W = w;
+  G.H = h;
   draw();
 }
 
-window.addEventListener('resize', resize);
-resize();
+function toggleMobileSidebar() {
+  var sb = document.getElementById('sidebar');
+  if (sb) {
+    sb.classList.toggle('open');
+    // Resize canvas after sidebar animation completes
+    setTimeout(resize, 280);
+  }
+}
+
+window.addEventListener('resize', function() {
+  clearTimeout(window._resizeTimer);
+  window._resizeTimer = setTimeout(resize, 100);
+});
+
+// Initial resize — defer to let flexbox paint first
+requestAnimationFrame(function() {
+  setTimeout(resize, 50);
+});
 
 /* ── Auth (read token from localStorage) ─────────────── */
 (function initAuth() {
@@ -1012,6 +1064,55 @@ canvas.addEventListener('mouseup', function() {
   G.dragging = null; G.panning = false;
   canvas.classList.remove('panning');
 });
+
+/* ── Touch events (mobile) ─────────────────────────────── */
+var _lastTouchDist = 0;
+
+canvas.addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    var t = e.touches[0];
+    var fake = { clientX: t.clientX, clientY: t.clientY };
+    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: t.clientX, clientY: t.clientY, bubbles: true }));
+  } else if (e.touches.length === 2) {
+    _lastTouchDist = Math.hypot(
+      e.touches[1].clientX - e.touches[0].clientX,
+      e.touches[1].clientY - e.touches[0].clientY
+    );
+    G.dragging = null; G.panning = false;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', function(e) {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    var t = e.touches[0];
+    canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY, bubbles: true }));
+  } else if (e.touches.length === 2) {
+    var d = Math.hypot(
+      e.touches[1].clientX - e.touches[0].clientX,
+      e.touches[1].clientY - e.touches[0].clientY
+    );
+    if (_lastTouchDist > 0) {
+      var factor = d / _lastTouchDist;
+      var midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      var midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      var rect = canvas.getBoundingClientRect();
+      var cx = midX - rect.left, cy = midY - rect.top;
+      G.tx = cx - (cx - G.tx) * factor;
+      G.ty = cy - (cy - G.ty) * factor;
+      G.scale = Math.max(0.1, Math.min(5, G.scale * factor));
+      if (!G.physicsRunning) draw();
+    }
+    _lastTouchDist = d;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', function(e) {
+  e.preventDefault();
+  _lastTouchDist = 0;
+  canvas.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+}, { passive: false });
 
 canvas.addEventListener('wheel', function(e) {
   e.preventDefault();
