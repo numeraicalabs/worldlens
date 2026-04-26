@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v27">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v27">
-<link rel="stylesheet" href="/static/finance.bundle.css?v27">
+<link rel="stylesheet" href="/static/core.bundle.css?v29">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v29">
+<link rel="stylesheet" href="/static/finance.bundle.css?v29">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3077,6 +3077,18 @@
         <!-- KPIs -->
         <div class="adm-kpis" id="adm-brain-kpis" style="margin-bottom:16px"></div>
 
+        <!-- Auto-pop stats row -->
+        <div class="adm-chart-row" style="margin-bottom:16px">
+          <div class="adm-chart-box" style="flex:1;background:rgba(124,58,237,.05);border:1px solid rgba(124,58,237,.15)">
+            <div class="adm-chart-title" style="color:#A78BFA">⚙ Auto-Population Pipeline</div>
+            <div id="adm-autopop-stats" style="margin-top:8px;font-size:11px;color:var(--t3)">Loading…</div>
+            <div style="margin-top:10px;display:flex;gap:6px">
+              <button class="adm-btn adm-btn-blue" onclick="loadAdmAutoPopStats()" style="font-size:10px">↻ Stats</button>
+              <button class="adm-btn" onclick="triggerManualExtraction()" style="background:rgba(124,58,237,.15);color:#A78BFA;border:1px solid rgba(124,58,237,.3);font-size:10px">▶ Run extraction now</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Growth chart -->
         <div class="adm-chart-row" style="margin-bottom:16px">
           <div class="adm-chart-box" style="flex:2">
@@ -3117,10 +3129,10 @@
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v27"></script>
-<script src="/static/finance.bundle.js?v27"></script>
-<script src="/static/map.bundle.js?v27"></script>
-<script src="/static/dashboard.bundle.js?v27"></script>
+<script src="/static/core.bundle.js?v29"></script>
+<script src="/static/finance.bundle.js?v29"></script>
+<script src="/static/map.bundle.js?v29"></script>
+<script src="/static/dashboard.bundle.js?v29"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */

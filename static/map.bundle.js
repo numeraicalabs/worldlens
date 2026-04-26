@@ -9602,3 +9602,46 @@ window.loadBrainStats = function() {
     }
   });
 };
+
+/* ── Admin Brain: Auto-population stats ── */
+function loadAdmAutoPopStats() {
+  var el = document.getElementById('adm-autopop-stats');
+  if (!el) return;
+  el.textContent = 'Loading…';
+  rq('/api/kg/auto-pop-stats').then(function(r) {
+    if (!r) { el.textContent = 'Error loading stats'; return; }
+    var rows = [
+      ['Total nodes', (r.total_nodes||0).toLocaleString()],
+      ['Total edges', (r.total_edges||0).toLocaleString()],
+      ['Nodes last 24h', '+' + (r.nodes_24h||0)],
+      ['Edges last 24h', '+' + (r.edges_24h||0)],
+      ['Backend', r.backend||'?'],
+    ];
+    el.innerHTML = rows.map(function(row) {
+      return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+        '<span style="color:var(--t3)">' + row[0] + '</span>' +
+        '<span style="color:var(--t1);font-weight:600">' + row[1] + '</span></div>';
+    }).join('') + (r.top_nodes && r.top_nodes.length ? '<div style="margin-top:8px;font-size:10px;color:var(--t3)">TOP NODI</div>' +
+      r.top_nodes.map(function(n) {
+        return '<div style="font-size:10px;padding:2px 0;color:var(--t2)">' + n.label + ' <span style="color:var(--t3)">×' + n.source_count + '</span></div>';
+      }).join('') : '');
+  });
+}
+
+function triggerManualExtraction() {
+  if (!confirm('Avviare estrazione profonda Gemini ora? Usa quota AI.')) return;
+  rq('/api/kg/trigger-autopop', { method: 'POST' }).then(function(r) {
+    if (r && r.ok) toast('Estrazione avviata in background', 'i');
+    else toast('Errore avvio estrazione', 'e');
+    setTimeout(loadAdmAutoPopStats, 5000);
+  });
+}
+
+// Hook loadAdmBrain to also load autopop stats
+var _origLoadAdmBrain2 = window.loadAdmBrain;
+if (typeof _origLoadAdmBrain2 === 'function') {
+  window.loadAdmBrain = function() {
+    _origLoadAdmBrain2();
+    setTimeout(loadAdmAutoPopStats, 300);
+  };
+}

@@ -182,6 +182,7 @@ select.fi option{background:var(--bg2)}
     </div>
     <div class="sb-tabs">
       <button class="sb-tab active" onclick="setTab('add',this)">+ Aggiungi</button>
+      <button class="sb-tab" onclick="setTab('upload',this)">↑ Upload</button>
       <button class="sb-tab" onclick="setTab('nodes',this)">Nodi</button>
       <button class="sb-tab" onclick="setTab('stats',this)">Stats</button>
       <button class="sb-tab" onclick="setTab('edges',this)">Links</button>
@@ -232,6 +233,45 @@ select.fi option{background:var(--bg2)}
         <div class="node-list" id="node-list"></div>
       </div>
 
+
+      <!-- Tab: Upload -->
+      <div id="tab-upload" style="display:none">
+        <div style="font-size:11px;color:var(--t2);line-height:1.7;margin-bottom:14px">
+          Carica file per estrarre automaticamente nodi ed edge nel grafo condiviso.<br>
+          <strong style="color:var(--violet2)">Supportati:</strong> ChatGPT export (conversations.json), testo (.txt), PDF
+        </div>
+
+        <!-- How to export ChatGPT -->
+        <div style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);border-radius:8px;padding:12px;margin-bottom:14px">
+          <div style="font-size:10px;font-family:Space Mono,monospace;letter-spacing:.1em;color:var(--violet2);margin-bottom:8px">COME ESPORTARE DA CHATGPT</div>
+          <div style="font-size:11px;color:var(--t2);line-height:1.7">
+            1. ChatGPT → Settings<br>
+            2. Data Controls → Export Data<br>
+            3. Ricevi email → scarica ZIP<br>
+            4. Estrai <strong>conversations.json</strong><br>
+            5. Carica qui ↓
+          </div>
+        </div>
+
+        <!-- Drop zone -->
+        <div id="upload-dropzone" onclick="document.getElementById('kg-file-input').click()" style="border:2px dashed rgba(124,58,237,.3);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px">
+          <div style="font-size:28px;margin-bottom:8px">📂</div>
+          <div style="font-size:12px;font-weight:600;color:var(--t1)">Clicca o trascina file</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:4px">.json · .txt · .pdf · max 10MB</div>
+        </div>
+        <input type="file" id="kg-file-input" accept=".json,.txt,.pdf" style="display:none" onchange="kgUploadFile(event)">
+
+        <!-- Upload status -->
+        <div id="upload-status" style="display:none;padding:10px 12px;border-radius:8px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2);font-size:11px;margin-bottom:12px">
+          <div id="upload-status-txt" style="color:var(--violet2)">Elaborazione…</div>
+          <div id="upload-progress-bar" style="height:3px;background:rgba(124,58,237,.2);border-radius:2px;margin-top:8px"><div id="upload-progress-fill" style="height:100%;width:0%;background:var(--violet2);border-radius:2px;transition:width .5s"></div></div>
+        </div>
+
+        <!-- Upload history -->
+        <div style="font-size:10px;font-family:Space Mono,monospace;letter-spacing:.1em;color:var(--t3);margin-bottom:8px">UPLOAD RECENTI</div>
+        <div id="upload-history" style="display:flex;flex-direction:column;gap:5px"></div>
+        <button class="btn btn-ghost" onclick="loadUploadHistory()" style="width:100%;margin-top:8px;font-size:11px">↻ Aggiorna</button>
+      </div>
       <!-- Tab: Stats -->
       <div id="tab-stats" style="display:none">
         <div class="stats-grid" id="stats-grid">
@@ -463,7 +503,7 @@ function setTab(name, btn) {
   currentTab = name;
   document.querySelectorAll('.sb-tab').forEach(function(b){ b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
-  ['add','nodes','stats','edges'].forEach(function(t){
+  ['add','upload','nodes','stats','edges'].forEach(function(t){
     var el = document.getElementById('tab-' + t);
     if (el) el.style.display = t === name ? '' : 'none';
   });
@@ -1015,6 +1055,177 @@ function showToast(msg, type) {
   requestAnimationFrame(function(){ t.classList.add('show'); });
   setTimeout(function(){ t.classList.remove('show'); setTimeout(function(){ t.remove(); }, 400); }, 2800);
 }
+
+/* ── Knowledge Graph Upload ── */
+async function kgUploadFile(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+
+  var dz = document.getElementById('upload-dropzone');
+  var status = document.getElementById('upload-status');
+  var statusTxt = document.getElementById('upload-status-txt');
+  var fill = document.getElementById('upload-progress-fill');
+
+  if (dz) dz.style.opacity = '0.5';
+  if (status) status.style.display = 'block';
+  if (statusTxt) statusTxt.textContent = 'Caricamento ' + file.name + '…';
+  if (fill) fill.style.width = '20%';
+
+  var fd = new FormData();
+  fd.append('file', file);
+
+  try {
+    var h = {};
+    if (G.token) h['Authorization'] = 'Bearer ' + G.token;
+    var resp = await fetch('/api/kg/upload', { method: 'POST', headers: h, body: fd });
+    var r = await resp.json();
+
+    if (!resp.ok) {
+      if (statusTxt) statusTxt.textContent = '✗ Errore: ' + (r.detail || 'upload fallito');
+      if (fill) fill.style.width = '100%'; fill.style.background = '#EF4444';
+      if (dz) dz.style.opacity = '1';
+      return;
+    }
+
+    if (statusTxt) statusTxt.textContent = '⏳ Elaborazione ' + r.chunks + ' chunk… upload ID: ' + r.upload_id;
+    if (fill) fill.style.width = '50%';
+    if (dz) dz.style.opacity = '1';
+
+    // Poll for completion
+    pollUpload(r.upload_id, fill, statusTxt);
+    loadUploadHistory();
+  } catch(err) {
+    if (statusTxt) statusTxt.textContent = '✗ Errore di rete: ' + err.message;
+    if (dz) dz.style.opacity = '1';
+  }
+}
+
+async function pollUpload(uploadId, fill, statusTxt) {
+  var tries = 0;
+  var interval = setInterval(async function() {
+    try {
+      var h = {};
+      if (G.token) h['Authorization'] = 'Bearer ' + G.token;
+      var resp = await fetch('/api/kg/uploads/' + uploadId, { headers: h });
+      var r = await resp.json();
+
+      if (r.status === 'done') {
+        clearInterval(interval);
+        if (fill) { fill.style.width = '100%'; fill.style.background = '#10B981'; }
+        if (statusTxt) statusTxt.textContent = '✓ Completato! +' + r.nodes_added + ' nodi, +' + r.edges_added + ' edge';
+        loadUploadHistory();
+        showToast('+' + r.nodes_added + ' nodi estratti dal file', 'ok');
+        setTimeout(loadKGFromServer, 1000);
+      } else if (r.status === 'error') {
+        clearInterval(interval);
+        if (fill) { fill.style.width = '100%'; fill.style.background = '#EF4444'; }
+        if (statusTxt) statusTxt.textContent = '✗ Errore: ' + (r.error_msg || 'sconosciuto');
+      } else {
+        if (fill) fill.style.width = Math.min(90, 50 + tries * 8) + '%';
+        tries++;
+      }
+
+      if (tries > 60) clearInterval(interval); // 5 min timeout
+    } catch(err) { clearInterval(interval); }
+  }, 5000);
+}
+
+async function loadUploadHistory() {
+  if (!G.token) return;
+  var el = document.getElementById('upload-history');
+  if (!el) return;
+  try {
+    var h = { 'Authorization': 'Bearer ' + G.token };
+    var resp = await fetch('/api/kg/uploads', { headers: h });
+    var uploads = await resp.json();
+    if (!uploads.length) { el.innerHTML = '<div style="font-size:11px;color:var(--t3)">Nessun upload</div>'; return; }
+    el.innerHTML = uploads.slice(0,5).map(function(u) {
+      var statusColor = u.status==='done'?'#10B981':u.status==='error'?'#EF4444':'#F59E0B';
+      return '<div style="padding:8px 10px;background:var(--bg4);border-radius:7px;border-left:3px solid ' + statusColor + '">' +
+        '<div style="font-size:11px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + u.filename + '</div>' +
+        '<div style="font-size:10px;color:var(--t3);margin-top:2px">' + (u.status==='done'?'+'+u.nodes_added+' nodi +'+u.edges_added+' edge':u.status) + ' · ' + (u.created_at||'').slice(0,10) + '</div>' +
+        '</div>';
+    }).join('');
+  } catch(e) {}
+}
+
+// Drag and drop
+(function setupDrop() {
+  var dz = document.getElementById('upload-dropzone');
+  if (!dz) return;
+  dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.style.borderColor='var(--violet2)'; dz.style.background='rgba(124,58,237,.08)'; });
+  dz.addEventListener('dragleave', function() { dz.style.borderColor='rgba(124,58,237,.3)'; dz.style.background='transparent'; });
+  dz.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dz.style.borderColor='rgba(124,58,237,.3)'; dz.style.background='transparent';
+    var file = e.dataTransfer.files[0];
+    if (file) {
+      var inp = document.getElementById('kg-file-input');
+      var dt = new DataTransfer(); dt.items.add(file);
+      inp.files = dt.files;
+      kgUploadFile({target: inp});
+    }
+  });
+})();
+
+async function loadKGFromServer() {
+  if (!G.token) return;
+  try {
+    var h = { 'Authorization': 'Bearer ' + G.token };
+    var resp = await fetch('/api/kg/graph?limit=150', { headers: h });
+    var data = await resp.json();
+    if (!data.nodes) return;
+
+    // Add new nodes from server that aren't already in local graph
+    var existingLabels = {};
+    G.nodes.forEach(function(n){ existingLabels[n.label.toUpperCase()] = true; });
+
+    var typeColorMap = {
+      concept:'#10B981', entity:'#F59E0B', etf:'#7C3AED',
+      indicator:'#3B82F6', event:'#F97316', policy:'#EC4899',
+      person:'#06B6D4', commodity:'#EF4444'
+    };
+
+    data.nodes.forEach(function(n) {
+      var key = n.label.toUpperCase();
+      if (existingLabels[key]) return;
+      G.nodes.push({
+        id: 'kg_' + n.id, label: n.label, content: n.description || '',
+        type: n.type || 'concept', tags: [], weight: n.confidence || 1.0,
+        x: G.W/2 + (Math.random()-.5)*400, y: G.H/2 + (Math.random()-.5)*400,
+        vx: 0, vy: 0, fx: 0, fy: 0,
+        r: Math.max(8, Math.min(22, 6 + (n.source_count||1)*2)),
+        synced: true, fromServer: true,
+        color: typeColorMap[n.type] || '#7C3AED',
+        ts: n.created_at || new Date().toISOString(),
+      });
+      existingLabels[key] = true;
+    });
+
+    // Add edges
+    var nodeMap = {};
+    G.nodes.forEach(function(n){ nodeMap['kg_'+n.id] = n; nodeMap[n.id] = n; });
+
+    data.edges.forEach(function(e) {
+      var src = 'kg_' + e.src_id, tgt = 'kg_' + e.tgt_id;
+      var exists = G.edges.some(function(ex){ return (ex.src===src&&ex.tgt===tgt)||(ex.src===tgt&&ex.tgt===src); });
+      if (!exists && nodeMap[src] && nodeMap[tgt]) {
+        G.edges.push({ id: 'kge_'+e.id, src: src, tgt: tgt, type: e.relation, weight: e.weight||1 });
+      }
+    });
+
+    G.brainSynced = data.total_nodes || G.nodes.length;
+    updateStats(); renderNodeList(); renderEdgeList();
+    showToast('+' + data.nodes.length + ' nodi dal grafo condiviso', 'ok');
+    restartPhysics(); save();
+  } catch(err) { console.warn('loadKGFromServer:', err.message); }
+}
+
+// Auto-load from server on open
+if (G.token) setTimeout(loadKGFromServer, 1500);
+loadUploadHistory();
+
 </script>
 </body>
 </html>
