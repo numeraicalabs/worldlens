@@ -241,15 +241,51 @@ select.fi option{background:var(--bg2)}
           <strong style="color:var(--violet2)">Supportati:</strong> ChatGPT export (conversations.json), testo (.txt), PDF
         </div>
 
-        <!-- How to export ChatGPT -->
-        <div style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);border-radius:8px;padding:12px;margin-bottom:14px">
-          <div style="font-size:10px;font-family:Space Mono,monospace;letter-spacing:.1em;color:var(--violet2);margin-bottom:8px">COME ESPORTARE DA CHATGPT</div>
-          <div style="font-size:11px;color:var(--t2);line-height:1.7">
-            1. ChatGPT → Settings<br>
-            2. Data Controls → Export Data<br>
-            3. Ricevi email → scarica ZIP<br>
-            4. Estrai <strong>conversations.json</strong><br>
-            5. Carica qui ↓
+        <!-- Format tabs -->
+        <div style="display:flex;gap:4px;margin-bottom:12px">
+          <button onclick="showUploadGuide('chatgpt')" id="guide-chatgpt" style="flex:1;padding:6px;border-radius:6px;border:1px solid rgba(124,58,237,.3);background:rgba(124,58,237,.1);color:#A78BFA;font-size:10px;cursor:pointer;font-family:inherit;font-weight:700">ChatGPT</button>
+          <button onclick="showUploadGuide('structured')" id="guide-structured" style="flex:1;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:transparent;color:var(--t3);font-size:10px;cursor:pointer;font-family:inherit">Strutturato</button>
+          <button onclick="showUploadGuide('pdf')" id="guide-pdf" style="flex:1;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:transparent;color:var(--t3);font-size:10px;cursor:pointer;font-family:inherit">PDF / TXT</button>
+        </div>
+
+        <div id="guide-chatgpt-content" style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);border-radius:8px;padding:12px;margin-bottom:14px">
+          <div style="font-size:10px;font-family:Space Mono,monospace;letter-spacing:.1em;color:var(--violet2);margin-bottom:8px">EXPORT DA CHATGPT/CLAUDE</div>
+          <div style="font-size:11px;color:var(--t2);line-height:1.8">
+            <strong>ChatGPT:</strong> Settings → Data Controls → Export Data<br>
+            → ricevi email → scarica ZIP → estrai <code style="background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px">conversations.json</code><br><br>
+            <strong>Claude:</strong> Account → Privacy → Export Data<br>
+            → estrai <code style="background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px">conversations.json</code><br><br>
+            Il sistema estrae solo i messaggi dell'assistente (più densi di conoscenza) e usa Gemini per trovare nodi ed edge.
+          </div>
+        </div>
+
+        <div id="guide-structured-content" style="display:none;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:12px;margin-bottom:14px">
+          <div style="font-size:10px;font-family:Space Mono,monospace;letter-spacing:.1em;color:#10B981;margin-bottom:8px">FORMATO STRUTTURATO (parsing diretto, zero AI)</div>
+          <div style="font-size:11px;color:var(--t2);line-height:1.8;font-family:Space Mono,monospace;background:rgba(0,0,0,.3);padding:10px;border-radius:6px;white-space:pre">
+# NODO: Federal Reserve
+TIPO: entity
+DESC: Banca centrale USA
+ALIAS: Fed, FED
+
+# EDGE: Federal Reserve -> Interest Rate
+RELAZIONE: influences
+EVIDENZA: La Fed controlla i tassi
+PESO: 2.0</div>
+          <div style="margin-top:10px;display:flex;gap:6px">
+            <a href="/api/kg/template" download="worldlens_kg_template.txt" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.1);color:#10B981;font-size:11px;font-weight:700;text-align:center;text-decoration:none;font-family:Syne,system-ui">↓ Scarica template</a>
+          </div>
+          <div style="font-size:10px;color:var(--t3);margin-top:8px">Tipi nodo: concept, entity, etf, indicator, event, policy, person, commodity<br>Tipi edge: influences, causes, correlates_with, tracks, part_of, related...</div>
+        </div>
+
+        <div id="guide-pdf-content" style="display:none;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:12px;margin-bottom:14px">
+          <div style="font-size:10px;font-family:Space Mono,monospace;letter-spacing:.1em;color:#3B82F6;margin-bottom:8px">PDF / TXT — FONTI CONSIGLIATE</div>
+          <div style="font-size:11px;color:var(--t2);line-height:1.8">
+            <strong>Fed Minutes:</strong> federalreserve.gov/monetarypolicy<br>
+            <strong>ECB Bulletin:</strong> ecb.europa.eu/pub/economic-bulletin<br>
+            <strong>IMF WEO:</strong> imf.org/en/Publications/WEO<br>
+            <strong>BIS Quarterly:</strong> bis.org/publ/qtrpdf<br>
+            <strong>ETF Factsheets:</strong> vanguard, ishares, xtrackers<br><br>
+            Max 10MB, max 50 pagine PDF. Gemini estrae nodi ed edge automaticamente.
           </div>
         </div>
 
@@ -1225,6 +1261,22 @@ async function loadKGFromServer() {
 // Auto-load from server on open
 if (G.token) setTimeout(loadKGFromServer, 1500);
 loadUploadHistory();
+
+
+function showUploadGuide(name) {
+  ['chatgpt','structured','pdf'].forEach(function(g) {
+    var btn = document.getElementById('guide-' + g);
+    var content = document.getElementById('guide-' + g + '-content');
+    var isActive = g === name;
+    if (btn) {
+      btn.style.background = isActive ? 'rgba(124,58,237,.1)' : 'transparent';
+      btn.style.borderColor = isActive ? 'rgba(124,58,237,.3)' : 'rgba(255,255,255,.08)';
+      btn.style.color = isActive ? '#A78BFA' : 'var(--t3)';
+      btn.style.fontWeight = isActive ? '700' : '400';
+    }
+    if (content) content.style.display = isActive ? 'block' : 'none';
+  });
+}
 
 </script>
 </body>
