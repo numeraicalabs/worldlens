@@ -181,20 +181,20 @@ async def _poll_events():
                 except Exception:
                     pass
 
-            # ── Brain auto-population: events → KG ──────────────────────────
-            try:
-                fn_events, _, _, _ = await _get_autopop()
-                if fn_events and events:
-                    await fn_events(events[:50])
-            except Exception as _bpe:
-                logger.debug("brain autopop events: %s", _bpe)
+        # ── Brain L1: always run (not gated on new_count) ────────────────────
+        try:
+            fn_events, _, _, _ = await _get_autopop()
+            if fn_events and events:
+                await fn_events(events[:50])
+        except Exception as _bpe:
+            logger.debug("brain autopop events: %s", _bpe)
 
-            # ── Wikipedia enrichment: 5 nodes per cycle (continuous) ─────────
-            try:
-                from brain_autopop import enrich_new_nodes_batch
-                await enrich_new_nodes_batch(limit=5)
-            except Exception as _wpe:
-                logger.debug("wiki enrichment: %s", _wpe)
+        # ── Brain L4: Wikipedia enrichment (always, 5 nodes per cycle) ───────
+        try:
+            from brain_autopop import enrich_new_nodes_batch
+            await enrich_new_nodes_batch(limit=5)
+        except Exception as _wpe:
+            logger.debug("wiki enrichment: %s", _wpe)
 
     except Exception as e:
         logger.error("Event poll error: %s", e, exc_info=True)
@@ -797,6 +797,36 @@ def start():
         day_of_week="mon", hour=8, minute=0,    # Monday 08:00 UTC
         id="monday_verify",
         misfire_grace_time=3600,
+    )
+
+    # ── Brain autonomous population (every 15 min) ──────────────────────────
+    async def _autonomous_brain_pop():
+        try:
+            from brain_autopop import autonomous_brain_population
+            await autonomous_brain_population()
+        except Exception as e:
+            logger.warning("autonomous_brain_pop: %s", e)
+
+    _scheduler.add_job(
+        _autonomous_brain_pop, "interval",
+        minutes=15,
+        id="brain_autonomous",
+        misfire_grace_time=300,
+    )
+
+    # ── Brain cross-source synthesis (every 6h) ───────────────────────────────
+    async def _brain_cross_source():
+        try:
+            from brain_autopop import cross_source_synthesis
+            await cross_source_synthesis()
+        except Exception as e:
+            logger.warning("brain_cross_source: %s", e)
+
+    _scheduler.add_job(
+        _brain_cross_source, "interval",
+        hours=6,
+        id="brain_cross_source",
+        misfire_grace_time=1800,
     )
 
     # ── Brain nightly deep extraction (Level 3) ──────────────────────────────
