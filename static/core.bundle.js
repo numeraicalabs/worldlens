@@ -175,10 +175,11 @@ function toast(msg, type, dur) {
 // ── BOOT ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', function() {
   animCanvas();
+  // Safety timer: 30s to cover Render cold start (15-20s typical)
   var safetyTimer = setTimeout(function() {
     rmLoader();
-    console.warn('WorldLens: safety loader timeout');
-  }, 6000);
+    console.warn('WorldLens: loader timeout after 30s');
+  }, 30000);
 
   var tok = localStorage.getItem('wl_tok');
   if (tok) {
@@ -188,6 +189,13 @@ window.addEventListener('DOMContentLoaded', function() {
       if (u && u.id) {
         G.user = u;
         enterApp();
+      } else if (u && u._timeout) {
+        // Timeout on cold start — keep token, show login with retry button
+        G.token = null;
+        rmLoader();
+        showAuth('login');
+        var ler = document.getElementById('ler');
+        if (ler) ler.textContent = 'Server in avvio — riprova tra 10 secondi';
       } else {
         G.token = null;
         localStorage.removeItem('wl_tok');
@@ -195,9 +203,9 @@ window.addEventListener('DOMContentLoaded', function() {
       }
     }).catch(function() {
       clearTimeout(safetyTimer);
-      G.token = null;
-      localStorage.removeItem('wl_tok');
+      // Network error — show login but keep token for retry
       rmLoader();
+      showAuth('login');
     });
   } else {
     clearTimeout(safetyTimer);
@@ -259,31 +267,34 @@ function atab(t) {
   if (t === 'register' && typeof checkRegMode === 'function') checkRegMode();
 }
 function doLogin() {
-  var e = el('le').value, p = el('lp').value;
+  var e = el('le').value.trim(), p = el('lp').value;
   el('ler').textContent = '';
-  if (!e||!p) { el('ler').textContent = 'Fill all fields'; return; }
+  if (!e||!p) { el('ler').textContent = 'Inserisci email e password'; return; }
 
-  var btn = document.querySelector('#lif button[type=submit], #lif .btn');
-  if (btn) { btn._origText = btn.textContent; btn.textContent = '…'; btn.disabled = true; }
+  var btn = document.querySelector('#lif button');
+  if (btn) { btn._origText = btn.textContent; btn.textContent = '⏳ Accesso in corso…'; btn.disabled = true; }
 
   rq('/api/auth/login',{method:'POST',body:{email:e,password:p}}).then(function(r) {
     if (btn) { btn.textContent = btn._origText || 'Sign in'; btn.disabled = false; }
 
-    // Detect timeout / network failure (rq returns {} on those)
-    if (!r || (Object.keys(r).length === 0)) {
-      el('ler').textContent = 'Network error or timeout — check connection';
+    if (!r || r._timeout) {
+      el('ler').textContent = 'Server in avvio — attendi e riprova';
+      var hint = document.getElementById('cold-start-hint');
+      if (hint) hint.style.display = 'block';
+      return;
+    }
+    if (Object.keys(r).length === 0) {
+      el('ler').textContent = 'Errore di rete — controlla la connessione';
       return;
     }
     if (r.detail) { el('ler').textContent = r.detail; return; }
     if (!r.access_token) {
-      el('ler').textContent = r.error || r.message || 'Login failed — invalid response';
-      console.error('Login: missing access_token in response', r);
+      el('ler').textContent = r.error || r.message || 'Login fallito — risposta non valida';
       return;
     }
 
     G.token = r.access_token; G.user = r.user;
     localStorage.setItem('wl_tok', r.access_token);
-    track('login', 'auth', r.user && r.user.email || '');
     closeAuth(); enterApp();
   });
 }

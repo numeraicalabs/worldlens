@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v40">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v40">
-<link rel="stylesheet" href="/static/finance.bundle.css?v40">
+<link rel="stylesheet" href="/static/core.bundle.css?v41">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v41">
+<link rel="stylesheet" href="/static/finance.bundle.css?v41">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -109,9 +109,13 @@
   <h2>Welcome to World Lens</h2><p>Real-time global intelligence platform</p>
   <div class="atabs"><button class="atab on" id="tli" onclick="typeof atab==='function'&&atab('login')">Sign In</button><button class="atab" id="trg" onclick="typeof atab==='function'&&atab('register')">Create Account</button></div>
   <div id="lif">
-    <div class="fg"><label class="fl">Email</label><input class="fi" type="email" id="le" placeholder="you@example.com"></div>
-    <div class="fg"><label class="fl">Password</label><input class="fi" type="password" id="lp" placeholder="••••••••"><div class="ferr" id="ler"></div></div>
+    <div class="fg"><label class="fl">Email</label><input class="fi" type="email" id="le" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="fg"><label class="fl">Password</label><input class="fi" type="password" id="lp" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"><div class="ferr" id="ler"></div></div>
     <button class="btn btn-p" style="width:100%;justify-content:center;padding:10px" onclick="doLogin()">Sign In</button>
+    <div id="cold-start-hint" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:8px;font-size:10px;color:#F59E0B;text-align:center">
+      ⏳ Server in avvio (Render cold start) — attendi ~15s poi riprova
+      <br><a href="#" onclick="doLogin();return false" style="color:#F59E0B;font-weight:700">↻ Riprova ora</a>
+    </div>
   </div>
   <div id="rgf" style="display:none">
     <div id="invite-field" style="display:none" class="fg">
@@ -3151,10 +3155,10 @@
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v40"></script>
-<script src="/static/finance.bundle.js?v40"></script>
-<script src="/static/map.bundle.js?v40"></script>
-<script src="/static/dashboard.bundle.js?v40"></script>
+<script src="/static/core.bundle.js?v41"></script>
+<script src="/static/finance.bundle.js?v41"></script>
+<script src="/static/map.bundle.js?v41"></script>
+<script src="/static/dashboard.bundle.js?v41"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
