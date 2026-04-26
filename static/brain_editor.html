@@ -100,6 +100,33 @@ textarea.fi{min-height:65px;line-height:1.5}
   #ptoggle{display:flex}
   .tb-btn:not(.grn):not(#btn-sync){display:none}
 }
+
+/* ── Jarvis popup ── */
+#jarvis-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#jarvis-modal{background:#0D0F18;border:1px solid rgba(124,58,237,.3);border-radius:14px;width:min(680px,96vw);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 80px rgba(0,0,0,.7)}
+#jm-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}
+#jm-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7C3AED,#A78BFA);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+#jm-title{font-size:15px;font-weight:700;color:#F0F2FF;letter-spacing:-.01em}
+#jm-sub{font-size:10px;color:#5A6070;font-family:Space Mono,monospace;margin-top:2px}
+#jm-close{margin-left:auto;background:none;border:none;color:#5A6070;cursor:pointer;font-size:18px;padding:4px}
+#jm-graph-badge{display:flex;gap:6px;padding:8px 20px;background:rgba(124,58,237,.06);border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0;flex-wrap:wrap}
+.jm-badge{font-size:9px;padding:3px 9px;border-radius:20px;font-family:Space Mono,monospace;font-weight:700}
+#jm-body{flex:1;overflow-y:auto;padding:20px;overscroll-behavior:contain}
+#jm-body::-webkit-scrollbar{width:4px}
+#jm-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+#jm-content{font-size:13px;color:#A0A8C0;line-height:1.75;white-space:pre-wrap}
+#jm-loading{display:none;text-align:center;padding:40px;color:#5A6070}
+.jm-spinner{width:32px;height:32px;border:3px solid rgba(124,58,237,.2);border-top-color:#7C3AED;border-radius:50%;animation:jmSpin 1s linear infinite;margin:0 auto 14px}
+@keyframes jmSpin{to{transform:rotate(360deg)}}
+#jm-actions{display:flex;gap:8px;padding:12px 20px;border-top:1px solid rgba(255,255,255,.06);flex-shrink:0;flex-wrap:wrap}
+.jm-btn{padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#A0A8C0;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s;font-weight:600}
+.jm-btn:hover{border-color:rgba(255,255,255,.2);color:#F0F2FF}
+.jm-btn.primary{background:linear-gradient(135deg,#7C3AED,#6D28D9);border-color:transparent;color:#fff}
+#jm-paths{padding:0 20px 16px;flex-shrink:0}
+#jm-paths-inner{display:flex;gap:6px;flex-wrap:wrap}
+.jm-path{font-size:9px;padding:4px 10px;border-radius:20px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:#A78BFA;font-family:Space Mono,monospace;cursor:pointer;transition:all .15s}
+.jm-path:hover{background:rgba(124,58,237,.18)}
+
 </style>
 </head>
 <body>
@@ -763,6 +790,202 @@ function toast(msg,type){
   requestAnimationFrame(function(){t.classList.add('show');});
   setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},350);},2500);
 }
+
+/* ════════════════════════════════════════════════════
+   JARVIS — AI-powered node analysis popup
+   Double-click any KG node to open Jarvis analysis
+   ════════════════════════════════════════════════════ */
+var _jarvisLastNode = null;
+var _jarvisLastAnalysis = '';
+
+function openJarvis(nodeLabel) {
+  if (!G.token) { toast('Apri WorldLens prima per il token', 'err'); return; }
+  _jarvisLastNode = nodeLabel;
+  var ov = document.getElementById('jarvis-overlay');
+  if (ov) ov.style.display = 'flex';
+  var content = document.getElementById('jm-content');
+  var loading = document.getElementById('jm-loading');
+  var body    = document.getElementById('jm-body');
+  var paths   = document.getElementById('jm-paths');
+  if (content) content.innerHTML = '';
+  if (loading) loading.style.display = 'block';
+  if (body)    body.style.display = 'none';
+  if (paths)   paths.style.display = 'none';
+  document.getElementById('jm-title').textContent = nodeLabel;
+  document.getElementById('jm-sub').textContent = 'KG traversal in corso…';
+  var h = {'Content-Type':'application/json','Authorization':'Bearer '+G.token};
+  fetch('/api/jarvis/analyze-node', {method:'POST',headers:h,body:JSON.stringify({node:nodeLabel})})
+    .then(function(r){if(!r.ok)return r.json().then(function(e){throw e;});return r.json();})
+    .then(function(r){
+      if(loading)loading.style.display='none';
+      if(body)body.style.display='block';
+      _jarvisLastAnalysis = r.analysis||'';
+      var g=r.graph||{};
+      ['nodes','edges','paths'].forEach(function(k){var el=document.getElementById('jm-b-'+k);if(el)el.textContent=(g[k]||0)+' '+k;});
+      document.getElementById('jm-sub').textContent=(g.nodes||0)+' nodi · '+(g.edges||0)+' edge · '+(g.paths||0)+' paths';
+      if(content)content.innerHTML=jarvisMarkdown(_jarvisLastAnalysis);
+      if(r.graph&&r.graph.paths>0){
+        fetch('/api/jarvis/traverse',{method:'POST',headers:h,body:JSON.stringify({node:nodeLabel,hops:2,limit:20})})
+          .then(function(rr){return rr.json();}).then(function(td){
+            if(!td.paths||!td.paths.length)return;
+            var pi=document.getElementById('jm-paths-inner');if(!pi)return;pi.innerHTML='';
+            td.paths.slice(0,8).forEach(function(path){
+              var lbl=path.map(function(n){return n.label;}).join(' → ');
+              var btn=document.createElement('div');btn.className='jm-path';
+              btn.textContent=lbl.length>60?lbl.slice(0,58)+'…':lbl;
+              btn.onclick=function(){openJarvis(path[path.length-1].label);};
+              pi.appendChild(btn);
+            });
+            var pd=document.getElementById('jm-paths');if(pd)pd.style.display='block';
+          }).catch(function(){});
+      }
+    })
+    .catch(function(err){
+      if(loading)loading.style.display='none';if(body)body.style.display='block';
+      var msg=err.detail||err.message||'Errore';
+      var html='<div style="color:#EF4444;font-size:12px;line-height:1.7"><strong>⚠ '+msg+'</strong>';
+      if(msg.indexOf('key')>-1||msg.indexOf('Gemini')>-1)html+='<br><br>Aggiungi chiave Gemini in <strong>WorldLens → Profilo → La tua chiave AI</strong>';
+      html+='</div>';
+      if(content)content.innerHTML=html;
+      document.getElementById('jm-sub').textContent='Errore';
+    });
+}
+
+function closeJarvis(){var ov=document.getElementById('jarvis-overlay');if(ov)ov.style.display='none';}
+
+function copyJarvis(){
+  if(!_jarvisLastAnalysis)return;
+  navigator.clipboard.writeText(_jarvisLastAnalysis).then(function(){toast('Analisi copiata','ok');});
+}
+
+function addToReport(){
+  if(!_jarvisLastAnalysis)return;
+  toast('Aggiunto al report buffer','ok');
+}
+
+function jarvisPortfolioMode(){
+  closeJarvis();
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  ov.innerHTML='<div style="background:#0D0F18;border:1px solid rgba(124,58,237,.3);border-radius:14px;width:min(500px,94vw);padding:24px" onclick="event.stopPropagation()">'+
+    '<div style="font-size:15px;font-weight:700;color:#F0F2FF;margin-bottom:16px">💼 Analisi Portafoglio Jarvis</div>'+
+    '<textarea id="jv-port-inp" style="width:100%;min-height:120px;padding:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#F0F2FF;font-size:12px;font-family:Space Mono,monospace;resize:none;outline:none" placeholder="VWCE,60
+IBGL,25
+XGLD,15"></textarea>'+
+    '<div style="display:flex;gap:8px;margin-top:12px">'+
+    '<button onclick="this.closest('div').parentElement.remove()" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#A0A8C0;font-size:11px;cursor:pointer;font-family:inherit">Annulla</button>'+
+    '<button id="jv-run-btn" onclick="runJarvisPortfolio()" style="flex:2;padding:9px;border-radius:8px;border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">▶ Analizza con Jarvis</button>'+
+    '</div></div>';
+  document.body.appendChild(ov);
+  setTimeout(function(){var i=document.getElementById('jv-port-inp');if(i)i.focus();},100);
+}
+
+function runJarvisPortfolio(){
+  var raw=(document.getElementById('jv-port-inp')||{}).value||'';
+  var holdings=raw.split('\n').filter(Boolean).map(function(line){
+    var p=line.split(',');return{ticker:(p[0]||'').trim().toUpperCase(),weight:parseInt(p[1]||50)};
+  }).filter(function(h){return h.ticker;});
+  if(!holdings.length){toast('Inserisci almeno un ticker','err');return;}
+  // Close dialog
+  var dg=document.getElementById('jv-port-inp');if(dg)dg.closest('div[style*="fixed"]').remove();
+  var ov=document.getElementById('jarvis-overlay');
+  var loading=document.getElementById('jm-loading');
+  var body=document.getElementById('jm-body');
+  var content=document.getElementById('jm-content');
+  if(ov)ov.style.display='flex';if(loading)loading.style.display='block';if(body)body.style.display='none';
+  document.getElementById('jm-title').textContent='Portfolio Analysis';
+  document.getElementById('jm-sub').textContent='KG traversal per '+holdings.length+' asset…';
+  var h={'Content-Type':'application/json','Authorization':'Bearer '+G.token};
+  fetch('/api/jarvis/analyze-portfolio',{method:'POST',headers:h,body:JSON.stringify({holdings:holdings})})
+    .then(function(r){return r.json();})
+    .then(function(r){
+      if(loading)loading.style.display='none';if(body)body.style.display='block';
+      _jarvisLastAnalysis=r.analysis||'';_jarvisLastNode='portfolio';
+      if(content)content.innerHTML=jarvisMarkdown(_jarvisLastAnalysis);
+      document.getElementById('jm-sub').textContent=holdings.length+' holding analizzati via KG';
+    })
+    .catch(function(e){
+      if(loading)loading.style.display='none';if(body)body.style.display='block';
+      if(content)content.innerHTML='<div style="color:#EF4444">Errore: '+(e.detail||e.message||'?')+'</div>';
+    });
+}
+
+function jarvisMarkdown(text){
+  if(!text)return'';
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm,'<h4 style="color:#F0F2FF;font-size:13px;font-weight:700;margin:14px 0 5px">$1</h4>')
+    .replace(/^## (.+)$/gm,'<h3 style="color:#F0F2FF;font-size:14px;font-weight:700;margin:16px 0 7px;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:5px">$1</h3>')
+    .replace(/^# (.+)$/gm,'<h2 style="color:#A78BFA;font-size:16px;font-weight:800;margin:0 0 12px">$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong style="color:#F0F2FF">$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em style="color:#A0A8C0">$1</em>')
+    .replace(/`([^`]+)`/g,'<code style="background:rgba(124,58,237,.2);padding:1px 5px;border-radius:3px;font-family:Space Mono,monospace;font-size:10px;color:#A78BFA">$1</code>')
+    .replace(/^[-•] (.+)$/gm,'<div style="padding:2px 0 2px 14px;position:relative"><span style="position:absolute;left:3px;color:#7C3AED">•</span>$1</div>')
+    .replace(/^\d+\. (.+)$/gm,'<div style="padding:2px 0 2px 18px;position:relative"><span style="position:absolute;left:2px;color:#7C3AED;font-size:10px">›</span>$1</div>')
+    .replace(/^---+$/gm,'<hr style="border:none;border-top:1px solid rgba(255,255,255,.07);margin:14px 0">')
+    .replace(/→/g,'<span style="color:#A78BFA">→</span>')
+    .replace(/↑/g,'<span style="color:#10B981">↑</span>')
+    .replace(/↓/g,'<span style="color:#EF4444">↓</span>')
+    .replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
+}
+
+/* Double-click to open Jarvis */
+cv.addEventListener('dblclick',function(e){
+  var p=cxy(e);var hit=nAt(p.x,p.y);
+  if(hit){e.preventDefault();openJarvis(hit.label);}
+});
+
+/* Mobile double-tap */
+var _jlastTap={id:null,t:0};
+cv.addEventListener('touchend',function(e){
+  var now=Date.now();
+  var touch=e.changedTouches?e.changedTouches[0]:e;
+  var p=cxy(touch);var hit=nAt(p.x,p.y);
+  if(hit){
+    if(_jlastTap.id===hit.id&&now-_jlastTap.t<400){openJarvis(hit.label);_jlastTap={id:null,t:0};return;}
+    _jlastTap={id:hit.id,t:now};
+  }
+},{passive:true});
+
+/* J shortcut */
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  if((e.key==='j'||e.key==='J')&&G.sel)openJarvis(G.sel.label);
+});
+
 </script>
+
+<!-- ════ JARVIS POPUP ════ -->
+<div id="jarvis-overlay" onclick="if(event.target===this)closeJarvis()">
+  <div id="jarvis-modal" onclick="event.stopPropagation()">
+    <div id="jm-head">
+      <div id="jm-icon">🤖</div>
+      <div>
+        <div id="jm-title">Jarvis — Knowledge Analysis</div>
+        <div id="jm-sub">Multi-hop KG traversal + AI synthesis</div>
+      </div>
+      <button id="jm-close" onclick="closeJarvis()">✕</button>
+    </div>
+    <div id="jm-graph-badge">
+      <span class="jm-badge" id="jm-b-nodes" style="background:rgba(16,185,129,.1);color:#10B981">0 nodes</span>
+      <span class="jm-badge" id="jm-b-edges" style="background:rgba(59,130,246,.1);color:#3B82F6">0 edges</span>
+      <span class="jm-badge" id="jm-b-paths" style="background:rgba(245,158,11,.1);color:#F59E0B">0 paths</span>
+      <span class="jm-badge" id="jm-b-hops" style="background:rgba(124,58,237,.1);color:#A78BFA">3 hops</span>
+    </div>
+    <div id="jm-loading"><div class="jm-spinner"></div><div style="font-size:12px;font-family:Space Mono,monospace">Traversing knowledge graph…</div></div>
+    <div id="jm-paths" style="display:none">
+      <div style="font-size:8px;font-family:Space Mono,monospace;letter-spacing:.1em;color:#5A6070;margin-bottom:7px">CAUSAL CHAINS TROVATE — clicca per approfondire</div>
+      <div id="jm-paths-inner"></div>
+    </div>
+    <div id="jm-body"><div id="jm-content"></div></div>
+    <div id="jm-actions">
+      <button class="jm-btn" onclick="copyJarvis()">📋 Copia</button>
+      <button class="jm-btn" onclick="addToReport()">📊 Aggiungi al Report</button>
+      <button class="jm-btn primary" onclick="jarvisPortfolioMode()">💼 Analisi Portafoglio</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
