@@ -3,34 +3,43 @@ WorldLens — Supabase connection manager
 ----------------------------------------
 Primary:  Supabase PostgreSQL  (SUPABASE_URL env var set)
 Fallback: SQLite local          (SUPABASE_URL not set)
-
-This allows local dev and Render deploy without Supabase to work fine.
-When SUPABASE_URL is configured, the shared knowledge graph uses Postgres.
-All per-user data (brain_entries, sessions, etc.) stays in SQLite.
 """
 from __future__ import annotations
 import logging
-import os
-from typing import Optional, Any
+import asyncio
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# ── Connection pool (lazy init) ────────────────────────────────────────────────
 _pool = None
 _using_postgres = False
+_connect_failed = False   # True after a failed attempt — retry only after timeout
+_last_attempt:  float = 0.0
+_RETRY_AFTER = 60.0       # seconds before retrying a failed connection
 
 
 async def get_pool():
-    """Return asyncpg pool. None if Supabase not configured."""
-    global _pool, _using_postgres
+    """
+    Return asyncpg pool. None if Supabase not configured or unreachable.
+    Retries after 60s so a transient startup failure doesn't disable PG for the session.
+    """
+    global _pool, _using_postgres, _connect_failed, _last_attempt
+
     if _pool is not None:
         return _pool
 
+    import time
     from config import settings
     url = (settings.supabase_url or "").strip()
     if not url:
+        return None   # not configured — SQLite mode
+
+    # If we failed recently, don't hammer the DB
+    now = time.monotonic()
+    if _connect_failed and (now - _last_attempt) < _RETRY_AFTER:
         return None
 
+    _last_attempt = now
     try:
         import asyncpg
         _pool = await asyncpg.create_pool(
@@ -39,13 +48,16 @@ async def get_pool():
             max_size=5,
             command_timeout=30,
             statement_cache_size=0,   # required for pgBouncer/Supabase
+            timeout=15,               # connection timeout
         )
-        _using_postgres = True
-        logger.info("Supabase PostgreSQL connected ✓")
+        _using_postgres  = True
+        _connect_failed  = False
+        logger.info("Supabase PostgreSQL connected OK")
         return _pool
     except Exception as e:
-        logger.warning("Supabase connection failed (%s) — falling back to SQLite", e)
-        _pool = None
+        logger.warning("Supabase connection failed: %s — will retry in %ds", e, int(_RETRY_AFTER))
+        _pool           = None
+        _connect_failed = True
         return None
 
 
