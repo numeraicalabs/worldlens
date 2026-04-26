@@ -725,51 +725,89 @@ function syncToBrain() {
 }
 
 /* ── Physics ───────────────────────────────────────────── */
+// Physics state with cooling
+var _SIM = { alpha: 1.0, tick: 0 };
 var _K = 1.0;
 
 function physicsStep() {
   if (!G.physicsRunning) return;
   var W = G.W, H = G.H;
-  var alpha = Math.max(0.001, 0.95);
-  var k = Math.sqrt(W*H / Math.max(G.nodes.length,1)) * 0.65 * _K;
-  var k2 = k*k;
+  var n = G.nodes.length;
+  if (n === 0) return;
 
-  G.nodes.forEach(function(n){ n.fx=0; n.fy=0; });
+  // Cooling: alpha decays each tick → simulation settles naturally
+  _SIM.tick++;
+  _SIM.alpha = Math.max(0.005, _SIM.alpha * 0.992);  // reaches ~0.05 in ~600 ticks
 
-  // Repulsion
-  for (var i=0; i<G.nodes.length; i++) {
+  // Ideal spring length — fixed pixels, NOT area-based (prevents explosion)
+  var k = Math.min(120, Math.max(60, 260 / Math.sqrt(n))) * _K;
+  var k2 = k * k;
+
+  // Hard velocity cap — 8px/tick max, regardless of node count
+  var MAX_V = 8;
+
+  G.nodes.forEach(function(nd) { nd.fx = 0; nd.fy = 0; });
+
+  // Repulsion — O(n²) with early-out by distance
+  var cutoff2 = (k * 4) * (k * 4);
+  for (var i = 0; i < n; i++) {
     var ni = G.nodes[i];
-    for (var j=i+1; j<G.nodes.length; j++) {
-      var nj=G.nodes[j], dx=ni.x-nj.x, dy=ni.y-nj.y;
-      var d2=dx*dx+dy*dy;
-      if (d2<0.01){dx=Math.random()-.5;dy=Math.random()-.5;d2=0.25;}
-      var rep=k2/Math.sqrt(d2);
-      var ux=dx/Math.sqrt(d2)*rep, uy=dy/Math.sqrt(d2)*rep;
-      ni.fx+=ux; ni.fy+=uy; nj.fx-=ux; nj.fy-=uy;
+    for (var j = i + 1; j < n; j++) {
+      var nj = G.nodes[j];
+      var dx = ni.x - nj.x, dy = ni.y - nj.y;
+      var d2 = dx * dx + dy * dy;
+      if (d2 > cutoff2) continue;  // skip distant pairs — big speedup
+      if (d2 < 1) { dx = (Math.random() - 0.5) * 2; dy = (Math.random() - 0.5) * 2; d2 = 1; }
+      var d    = Math.sqrt(d2);
+      var rep  = k2 / d * _SIM.alpha;
+      var ux   = dx / d * rep, uy = dy / d * rep;
+      ni.fx += ux; ni.fy += uy;
+      nj.fx -= ux; nj.fy -= uy;
     }
   }
-  // Attraction
-  G.edges.forEach(function(e) {
-    var s=null,t=null;
-    G.nodes.forEach(function(n){if(n.id===e.src)s=n;if(n.id===e.tgt)t=n;});
-    if(!s||!t)return;
-    var dx=t.x-s.x,dy=t.y-s.y,d=Math.sqrt(dx*dx+dy*dy)||0.01;
-    var att=(d*d/k)*(e.weight||0.5)*0.5;
-    var ux=dx/d*att,uy=dy/d*att;
-    s.fx+=ux;s.fy+=uy;t.fx-=ux;t.fy-=uy;
-  });
-  // Centre gravity
-  G.nodes.forEach(function(n){n.fx+=(W/2-n.x)*0.006;n.fy+=(H/2-n.y)*0.006;});
 
-  var maxD=k*0.5;
-  G.nodes.forEach(function(n) {
-    if(n===G.dragging)return;
-    n.vx=(n.vx+n.fx)*0.75; n.vy=(n.vy+n.fy)*0.75;
-    var d2=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
-    if(d2>maxD){n.vx=n.vx/d2*maxD;n.vy=n.vy/d2*maxD;}
-    n.x=Math.max(n.r+4,Math.min(W-n.r-4,n.x+n.vx));
-    n.y=Math.max(n.r+4,Math.min(H-n.r-4,n.y+n.vy));
+  // Attraction — fast O(e) with pre-built node map
+  var nm = {};
+  G.nodes.forEach(function(nd) { nm[nd.id] = nd; });
+  G.edges.forEach(function(e) {
+    var s = nm[e.src], t = nm[e.tgt];
+    if (!s || !t) return;
+    var dx = t.x - s.x, dy = t.y - s.y;
+    var d  = Math.sqrt(dx * dx + dy * dy) || 0.01;
+    // Hooke's law: attract when d > k, repel when d < k
+    var att = (d - k) * 0.12 * (e.weight || 1.0) * _SIM.alpha;
+    var ux  = dx / d * att, uy = dy / d * att;
+    s.fx += ux; s.fy += uy;
+    t.fx -= ux; t.fy -= uy;
   });
+
+  // Weak centre gravity
+  var cx = W / 2, cy = H / 2;
+  G.nodes.forEach(function(nd) {
+    nd.fx += (cx - nd.x) * 0.004 * _SIM.alpha;
+    nd.fy += (cy - nd.y) * 0.004 * _SIM.alpha;
+  });
+
+  // Integrate — low damping, hard speed cap
+  G.nodes.forEach(function(nd) {
+    if (nd === G.dragging) return;
+    nd.vx = (nd.vx + nd.fx) * 0.55;  // strong damping (was 0.75)
+    nd.vy = (nd.vy + nd.fy) * 0.55;
+    // Hard cap
+    var spd = Math.sqrt(nd.vx * nd.vx + nd.vy * nd.vy);
+    if (spd > MAX_V) { nd.vx = nd.vx / spd * MAX_V; nd.vy = nd.vy / spd * MAX_V; }
+    // Boundary
+    nd.x = Math.max(nd.r + 6, Math.min(W - nd.r - 6, nd.x + nd.vx));
+    nd.y = Math.max(nd.r + 6, Math.min(H - nd.r - 6, nd.y + nd.vy));
+  });
+
+  // Auto-stop when settled
+  if (_SIM.alpha < 0.007 && _SIM.tick > 200) {
+    G.physicsRunning = false;
+    var btn = document.getElementById('btn-physics');
+    if (btn) { btn.textContent = '▶ Physics'; btn.classList.remove('active'); }
+  }
+}
 }
 
 function togglePhysics() {
@@ -781,7 +819,15 @@ function togglePhysics() {
 }
 
 function restartPhysics() {
-  G.nodes.forEach(function(n){ n.vx=0; n.vy=0; });
+  G.nodes.forEach(function(n){ n.vx = 0; n.vy = 0; });
+  _SIM.alpha = 1.0;
+  _SIM.tick  = 0;
+  if (!G.physicsRunning) {
+    G.physicsRunning = true;
+    var btn = document.getElementById('btn-physics');
+    if (btn) { btn.textContent = '⏸ Physics'; btn.classList.add('active'); }
+    loop();
+  }
 }
 
 /* ── Draw ──────────────────────────────────────────────── */

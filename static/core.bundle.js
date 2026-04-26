@@ -3659,3 +3659,128 @@ window.downloadReport = function() {
   a.download = 'worldlens_report_' + new Date().toISOString().slice(0,10) + '.md';
   a.click();
 };
+
+/* ══════════════════════════════════════════════════════════════
+   BRAIN DIGEST DASHBOARD CARD
+   Layer 2 summaries + Layer 4 digest items
+   ══════════════════════════════════════════════════════════════ */
+window.loadBrainDigest = function() {
+  if (!G.token) return;
+  var section = document.getElementById('brain-digest-section');
+
+  // Fetch digest items (Layer 4)
+  rq('/api/brain/digest?limit=6').then(function(r) {
+    if (!r || !r.items) return;
+    var items = r.items;
+    var unread = r.unread || 0;
+
+    // Show section if we have content
+    if (items.length > 0 && section) {
+      section.style.display = '';
+    }
+
+    // Badge
+    var badge = document.getElementById('brain-digest-badge');
+    if (badge) {
+      if (unread > 0) {
+        badge.style.display = 'inline';
+        badge.textContent = unread + ' nuovi';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    // Render digest items
+    var el = document.getElementById('brain-digest-items');
+    if (!el) return;
+    if (!items.length) {
+      el.innerHTML = '<div style="font-size:12px;color:var(--fire-text-dim);padding:12px 0">Nessun digest disponibile — il cervello genererà analisi automatiche man mano che apprende.</div>';
+      return;
+    }
+
+    var typeColors = {
+      topic_digest:     '#7C3AED',
+      connection_alert: '#3B82F6',
+      drift_alert:      '#F59E0B',
+    };
+    var typeIcons = {
+      topic_digest:     '📊',
+      connection_alert: '🔗',
+      drift_alert:      '⚡',
+    };
+
+    el.innerHTML = items.map(function(item) {
+      var col = typeColors[item.digest_type] || '#7C3AED';
+      var dimmed = item.read ? 'opacity:.55;' : '';
+      return '<div style="padding:14px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:3px solid ' + col + ';border-radius:10px;' + dimmed + '">' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--t1,#F0F2FF);line-height:1.4">' + item.title + '</div>' +
+        (!item.read ? '<button onclick="markDigestRead(' + item.id + ',this)" style="flex-shrink:0;padding:2px 8px;border-radius:20px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--t3);font-size:10px;cursor:pointer;font-family:inherit">✓ letto</button>' : '') +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--t2,#A0A8C0);margin-top:6px;line-height:1.7">' + item.body + '</div>' +
+        '<div style="font-size:10px;color:var(--t3);margin-top:8px;font-family:monospace">' +
+        (item.created_at || '').slice(0,16) + ' · ' + (item.topic || item.digest_type) +
+        '</div></div>';
+    }).join('');
+  });
+
+  // Fetch topic summaries (Layer 2)
+  rq('/api/brain/summaries').then(function(summaries) {
+    if (!summaries) return;
+    var keys = Object.keys(summaries);
+    if (!keys.length) return;
+
+    if (section) section.style.display = '';
+    var el = document.getElementById('brain-summaries-row');
+    if (!el) return;
+
+    var topicColors = {
+      finance: '#10B981', macro: '#3B82F6', security: '#EF4444',
+      tech: '#8B5CF6', energy: '#F59E0B', politics: '#EC4899',
+      geopolitics: '#F97316', trade: '#06B6D4',
+    };
+    var topicIcons = {
+      finance: '📈', macro: '🌐', security: '🛡', tech: '💻',
+      energy: '⚡', politics: '🏛', geopolitics: '🌍', trade: '🔄',
+    };
+
+    el.innerHTML = keys.slice(0, 4).map(function(topic) {
+      var s = summaries[topic];
+      var col = topicColors[topic] || '#7C3AED';
+      var icon = topicIcons[topic] || '🧠';
+      return '<div style="padding:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-top:2px solid ' + col + ';border-radius:10px">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+        '<span style="font-size:16px">' + icon + '</span>' +
+        '<span style="font-size:11px;font-weight:700;letter-spacing:.06em;color:' + col + ';text-transform:uppercase">' + topic + '</span>' +
+        '<span style="font-size:9px;color:var(--t3);margin-left:auto;font-family:monospace">' + (s.count || 0) + ' entries</span>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--t2);line-height:1.7">' + (s.summary || '') + '</div>' +
+        '</div>';
+    }).join('');
+  });
+};
+
+window.markDigestRead = function(id, btn) {
+  rq('/api/brain/digest/' + id + '/read', { method: 'POST' }).then(function() {
+    var card = btn.closest('div[style*="border-left"]');
+    if (card) card.style.opacity = '.55';
+    btn.remove();
+  });
+};
+
+// Load digest after login
+(function() {
+  var _orig = window.enterApp;
+  if (typeof _orig === 'function') {
+    window.enterApp = function() {
+      _orig.apply(this, arguments);
+      setTimeout(function() {
+        loadBrainDigest();
+        // Trigger digest generation if brain has enough entries
+        if (G.brainStats && G.brainStats.total_entries >= 10) {
+          rq('/api/brain/digest/trigger', { method: 'POST' });
+        }
+      }, 3000);
+    };
+  }
+})();

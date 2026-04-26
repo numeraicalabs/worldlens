@@ -1267,26 +1267,31 @@ async function saveAIKey(provider) {
   if (!inp || !inp.value.trim()) { toast('Enter a valid API key', 'e'); return; }
   var r = await rq('/api/admin/settings/ai', {method:'POST', body:{provider:provider, api_key:inp.value.trim()}})
   if (r && r.status === 'ok') {
-    // Auto-test after save — show inline result, never alert()
     var testEl = document.getElementById('ai-test-result');
     if (testEl) {
       testEl.style.display = 'block';
-      testEl.textContent = 'Testing connection…';
+      testEl.textContent = 'Verifica chiave…';
       testEl.style.background = 'rgba(255,255,255,0.06)';
       testEl.style.color = 'var(--t2)';
+      testEl.style.border = '1px solid rgba(255,255,255,.1)';
     }
+    // Delay to avoid back-to-back rate limit
+    await new Promise(function(res){ setTimeout(res, 1500); });
     var testR = await rq('/api/admin/test-ai');
     if (testEl && testR) {
-      var isOK = testR.status === 'OK';
-      testEl.textContent = (isOK ? '✓ ' : '✗ ') + (testR.message || 'Unknown result');
-      testEl.style.background = isOK
-        ? 'rgba(16,185,129,0.12)'
-        : 'rgba(239,68,68,0.12)';
+      var isOK = testR.status === 'OK' || testR.status === 'ok';
+      // 429 means key works — just rate limited
+      var msg = testR.message || testR.detail || 'Unknown result';
+      if (msg.toLowerCase().includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('quota')) {
+        isOK = true;
+        msg = '✓ Chiave valida (rate limit momentaneo — normale al primo test)';
+      }
+      testEl.textContent = (isOK ? '✓ ' : '✗ ') + msg;
+      testEl.style.background = isOK ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)';
       testEl.style.color = isOK ? 'var(--gr)' : 'var(--re)';
       testEl.style.border = '1px solid ' + (isOK ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)');
-      if (testR.response) {
-        testEl.textContent += ' — Response: "' + testR.response + '"';
-      }
+      if (testR.model) testEl.textContent += ' — modello: ' + testR.model;
+      if (testR.response) testEl.textContent += ' — "' + testR.response + '"';
     } else if (testEl) {
       testEl.textContent = '✗ Could not reach test endpoint';
       testEl.style.background = 'rgba(239,68,68,0.12)';
