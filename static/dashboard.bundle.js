@@ -1812,54 +1812,49 @@ var _mobileXpEvents = {
 window.saveUserAIKey = async function() {
   var inp    = document.getElementById('prof-ai-key');
   var status = document.getElementById('prof-ai-key-status');
-  if (!inp || !inp.value.trim()) return;
+  if (!inp || !inp.value.trim()) { if(status){status.style.display='block';status.textContent='Inserisci la chiave prima di salvare';} return; }
   var key = inp.value.trim();
 
-  if (status) {
+  var show = function(msg, color) {
+    if (!status) return;
     status.style.display = 'block';
-    status.style.background = 'rgba(59,130,246,0.1)';
-    status.style.borderRadius = '8px';
     status.style.padding = '8px 12px';
-    status.style.color = 'var(--t2)';
-    status.textContent = 'Salvataggio in corso…';
-  }
+    status.style.borderRadius = '8px';
+    status.style.background = color + '18';
+    status.style.color = color;
+    status.style.border = '1px solid ' + color + '44';
+    status.innerHTML = msg;
+  };
+  show('Salvataggio…', '#F59E0B');
 
   try {
-    // Use per-user endpoint (not admin)
-    var r = await rq('/api/user/ai-key', {
-      method: 'POST',
-      body: { provider: 'gemini', api_key: key }
-    });
+    // Step 1: Save
+    var r = await rq('/api/user/ai-key', { method:'POST', body:{ provider:'gemini', api_key:key } });
+    if (!r || r.status !== 'ok') {
+      show('✗ Errore salvataggio: ' + ((r&&r.message)||'sconosciuto'), '#EF4444');
+      return;
+    }
 
-    if (r && r.status === 'ok') {
-      // Quick test: call a lightweight AI endpoint with user key
-      var testR = await rq('/api/user/ai-key/test', { method: 'POST' });
-      var isOK  = testR && testR.status === 'ok';
-      if (status) {
-        status.textContent = isOK
-          ? '✓ Chiave salvata e verificata — AI attiva!'
-          : '⚠ Chiave salvata. ' + (testR && testR.message ? testR.message : 'Verifica in corso…');
-        status.style.background = isOK ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)';
-        status.style.color = isOK ? 'var(--gr,#10b981)' : 'var(--am,#f59e0b)';
-      }
-      inp.value = '';
-      // Trigger a brief reload so AI sections activate
+    show('✓ Salvata — verifica in corso…', '#F59E0B');
+    inp.value = '';
+
+    // Step 2: Test with diagnostics
+    var testR = await rq('/api/user/ai-key/test', { method:'POST' });
+    if (testR && testR.status === 'ok') {
+      show('✅ ' + (testR.message || 'Chiave verificata!') + (testR.model ? ' <span style="opacity:.6;font-size:10px">(' + testR.model + ')</span>' : ''), '#10B981');
+      // Reload brain + briefing
       setTimeout(function() {
+        if (typeof loadBrainStats === 'function') loadBrainStats();
         if (typeof loadMacroBrief === 'function') loadMacroBrief();
         if (typeof loadDailyInsight === 'function') loadDailyInsight();
       }, 800);
     } else {
-      if (status) {
-        status.textContent = '✗ Errore: ' + ((r && (r.detail || r.message)) || 'sconosciuto');
-        status.style.background = 'rgba(239,68,68,0.1)';
-        status.style.color = 'var(--re,#ef4444)';
-      }
+      var errMsg = (testR && testR.message) || 'Test fallito';
+      var fixMsg = (testR && testR.fix) ? '<br><span style="font-size:10px;opacity:.8">' + testR.fix + '</span>' : '';
+      show('⚠ Chiave salvata ma test fallito:<br>' + errMsg + fixMsg, '#EF4444');
     }
   } catch(e) {
-    if (status) {
-      status.textContent = '✗ Errore di rete: ' + (e && e.message || 'unknown');
-      status.style.color = 'var(--re,#ef4444)';
-    }
+    show('✗ Errore di rete: ' + (e&&e.message||'unknown'), '#EF4444');
   }
 };
 
