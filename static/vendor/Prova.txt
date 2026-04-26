@@ -1,1 +1,82 @@
 
+# WorldLens Knowledge Graph — Structured Format
+#
+
+# Carica questo file in Brain Editor → tab Upload per creare nodi
+# ed edge direttamente senza AI (parsing immediato, zero quota).
+#
+# TIPI NODO: concept, entity, etf, indicator, event, policy, person, commodity
+# TIPI RELAZIONE: influences, correlates_with, causes, part_of,
+# happened_before, contradicts, tracks, issued_by, invests_in,
+# regulated_by, related
+# PESO: 0.1 – 3.0 (default 1.0, admin inject = 2.0)
+#
+
+# NODO: Federal Reserve
+TIPO: entity
+DESC: Banca centrale degli Stati Uniti, controlla la politica monetaria USA
+ALIAS: Fed, FED, US Federal Reserve, FOMC
+
+# NODO: Interest Rate
+TIPO: indicator
+DESC: Tasso di interesse sui fed funds, strumento principale della politica monetaria
+
+# NODO: Inflation
+TIPO: indicator
+DESC: Tasso di variazione dei prezzi al consumo (CPI, PCE)
+ALIAS: CPI, inflazione, tasso inflazione
+
+# NODO: Bond Markets
+TIPO: concept
+DESC: Mercati obbligazionari globali, reagiscono ai tassi e all'inflazione
+
+# NODO: Equity Markets
+TIPO: concept
+DESC: Mercati azionari globali, correlano con crescita economica e sentiment
+
+# NODO: VWCE
+TIPO: etf
+DESC: Vanguard FTSE All-World — ETF azionario globale, replica FTSE All-World
+ALIAS: Vanguard All World
+
+# NODO: Oil Price
+TIPO: commodity
+DESC: Prezzo del petrolio greggio (Brent, WTI), driver principale dell'inflazione energetica
+ALIAS: Brent, WTI, crude oil
+
+# ——— EDGE (formato freccia) ————————————————————————————————————
+
+# EDGE: Federal Reserve -> Interest Rate
+RELAZIONE: influences
+EVIDENZA: La Fed alza o abbassa i tassi attraverso le decisioni del FOMC
+PESO: 2.0
+
+# EDGE: Interest Rate -> Inflation
+RELAZIONE: causes
+EVIDENZA: Tassi alti aumentano il costo del credito, frenano consumi e inflazione
+PESO: 1.8
+
+# EDGE: Inflation -> Bond Markets
+RELAZIONE: influences
+EVIDENZA: L'inflazione erode il rendimento reale delle obbligazioni
+PESO: 1.5
+
+# EDGE: Federal Reserve -> Bond Markets
+RELAZIONE: influences
+EVIDENZA: QE e QT della Fed acquistano/vendono Treasury, muovendo i prezzi
+PESO: 1.8
+
+# EDGE: Interest Rate -> Equity Markets
+RELAZIONE: influences
+EVIDENZA: Tassi alti aumentano il costo del capitale e il discount rate dei DCF
+PESO: 1.6
+
+# EDGE: Oil Price -> Inflation
+RELAZIONE: causes
+EVIDENZA: Aumenti del costo dell'energia si riflettono direttamente sull'inflazione
+PESO: 2.1
+
+# EDGE: Equity Markets -> VWCE
+RELAZIONE: part_of
+EVIDENZA: VWCE è composto da titoli azionari globali presenti negli Equity Markets
+PESO: 2.5
