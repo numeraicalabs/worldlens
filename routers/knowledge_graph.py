@@ -1276,3 +1276,25 @@ PESO: 2.0
         content=template,
         headers={"Content-Disposition": "attachment; filename=worldlens_kg_template.txt"}
     )
+
+
+@router.get("/status")
+async def kg_status(_=Depends(require_user)):
+    """Quick KG connectivity check — used by Brain Editor status bar."""
+    pool = await get_pool()
+    try:
+        if pool:
+            async with pool.acquire() as conn:
+                n = await conn.fetchval("SELECT COUNT(*) FROM kg_nodes")
+                e = await conn.fetchval("SELECT COUNT(*) FROM kg_edges")
+            return {"ok": True, "backend": "postgresql", "nodes": n, "edges": e}
+        else:
+            async with aiosqlite.connect(settings.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute("SELECT COUNT(*) as n FROM kg_nodes") as c:
+                    n = (await c.fetchone())["n"]
+                async with db.execute("SELECT COUNT(*) as n FROM kg_edges") as c:
+                    e = (await c.fetchone())["n"]
+            return {"ok": True, "backend": "sqlite", "nodes": n, "edges": e}
+    except Exception as ex:
+        return {"ok": False, "backend": "error", "detail": str(ex), "nodes": 0, "edges": 0}
