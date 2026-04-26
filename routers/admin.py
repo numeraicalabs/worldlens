@@ -737,12 +737,88 @@ async def behaviour_summary(
 @router.get("/test-ai")
 async def test_ai_connection(admin=Depends(require_admin)):
     """
-    Admin diagnostic: tests Gemini key with a real minimal prompt.
-    Returns status OK / ERROR — never WARN (any response = working key).
+    Admin diagnostic: tests Gemini/Claude key.
+    429 = key valid but rate limited (shown as OK).
+    Any non-empty response = OK.
     """
-    from ai_layer import _resolve_provider, ai_available_async, _call_claude
+    import httpx as _hx
+    from ai_layer import _resolve_provider, ai_available_async
     await ai_available_async()
     provider, key = _resolve_provider()
+
+    info = {
+        "provider":    provider,
+        "key_set":     bool(key),
+        "key_preview": ("***" + key[-4:]) if len(key) >= 4 else ("SET" if key else "EMPTY"),
+    }
+
+    if not key:
+        info["status"]  = "ERROR"
+        info["message"] = "No API key configured. Save it in Admin → Settings."
+        return info
+
+    if provider == "gemini":
+        models = [
+            "gemini-2.5-flash-preview-04-17",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+        ]
+        base = "https://generativelanguage.googleapis.com/v1beta/models"
+        body = {
+            "contents": [{"parts": [{"text": "Say: Paris"}], "role": "user"}],
+            "generationConfig": {"maxOutputTokens": 5, "temperature": 0},
+        }
+        try:
+            async with _hx.AsyncClient(timeout=30) as client:
+                for model in models:
+                    resp = await client.post(
+                        f"{base}/{model}:generateContent?key={key}",
+                        headers={"Content-Type": "application/json"},
+                        json=body
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("candidates"):
+                            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                            info.update({"status": "OK", "model": model,
+                                         "message": f"Gemini key valid — model: {model}",
+                                         "response": text[:40]})
+                            return info
+                    elif resp.status_code == 429:
+                        # Key works — just rate limited
+                        info.update({"status": "OK", "model": model,
+                                     "message": f"Chiave valida — rate limit momentaneo su {model} (normale al primo test)"})
+                        return info
+                    elif resp.status_code in (401, 403):
+                        err = ""
+                        try: err = resp.json().get("error", {}).get("message", "")
+                        except Exception: pass
+                        info.update({"status": "ERROR",
+                                     "message": f"Chiave non autorizzata (HTTP {resp.status_code}): {err}",
+                                     "fix": "Verifica la chiave su aistudio.google.com/app/apikey"})
+                        return info
+                    elif resp.status_code == 404:
+                        continue  # try next model
+            info.update({"status": "ERROR",
+                         "message": "Nessun modello Gemini raggiungibile con questa chiave"})
+        except Exception as e:
+            info.update({"status": "ERROR", "message": f"Connection error: {e}"})
+        return info
+
+    # Claude/Anthropic
+    try:
+        from ai_layer import _call_claude
+        resp = await _call_claude("In one word: capital of France?", max_tokens=10)
+        if resp and resp.strip():
+            info.update({"status": "OK", "message": "Claude key valid",
+                         "response": resp.strip()[:40]})
+        else:
+            info.update({"status": "ERROR",
+                         "message": "Key accepted but empty response — check quota"})
+    except Exception as e:
+        info.update({"status": "ERROR", "message": str(e)})
+    return info
 
     info = {
         "provider":    provider,
@@ -782,8 +858,8 @@ async def test_ai_connection(admin=Depends(require_admin)):
             info["status"]  = "ERROR"
             info["message"] = f"Invalid API key (HTTP auth error). Check the key in Google AI Studio."
         elif "429" in err:
-            info["status"]  = "ERROR"
-            info["message"] = "Rate limit hit. Wait a minute and retry, or check your Gemini quota."
+            info["status"]  = "OK"
+            info["message"] = "Chiave valida — rate limit momentaneo (normale al primo test, riprova tra 30s)."
         elif "timeout" in err.lower():
             info["status"]  = "ERROR"
             info["message"] = "Connection timed out. Check that Render can reach generativelanguage.googleapis.com."

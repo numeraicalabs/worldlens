@@ -417,10 +417,19 @@ async def ask_agent(payload: dict = Body(...), user=Depends(require_user)):
     if template not in TEMPLATES:
         template = "deep_dive"
 
-    # Search brain
-    brain_results = await brain_search(user_id, query, top_k=8)
-    source_ids    = [r["id"] for r in brain_results]
-    brain_ctx     = await brain_context_for_prompt(user_id, query, top_k=8)
+    # Search brain — use enhanced context (Layer 1+2+3)
+    source_ids = []
+    brain_ctx = ""
+    try:
+        from brain_enhance import get_brain_context_enhanced
+        brain_ctx = await get_brain_context_enhanced(user_id, query, top_k=8)
+        # Also get raw results for source tracking
+        brain_results = await brain_search(user_id, query, top_k=8)
+        source_ids = [r["id"] for r in brain_results]
+    except Exception:
+        brain_results = await brain_search(user_id, query, top_k=8)
+        source_ids = [r["id"] for r in brain_results]
+        brain_ctx = await brain_context_for_prompt(user_id, query, top_k=8)
 
     async with aiosqlite.connect(settings.db_path) as db:
         db.row_factory = aiosqlite.Row

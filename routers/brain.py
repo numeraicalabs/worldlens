@@ -499,3 +499,73 @@ async def admin_user_brain_entries(user_id: int, limit: int = 50, _=Depends(requ
         ) as c:
             entries = [dict(r) for r in await c.fetchall()]
     return {"entries": entries, "count": len(entries)}
+
+
+# ── Enhanced Brain endpoints (Layer 2-4) ─────────────────────────────────────
+
+@router.get("/summaries")
+async def get_summaries(user=Depends(require_user)):
+    """Layer 2: Get all cached topic summaries."""
+    from brain_enhance import get_topic_summaries
+    return await get_topic_summaries(user["id"])
+
+
+@router.post("/summaries/refresh")
+async def refresh_summaries(user=Depends(require_user)):
+    """Layer 2: Trigger topic summary refresh."""
+    from brain_enhance import refresh_topic_summaries
+    import asyncio
+    asyncio.create_task(refresh_topic_summaries(user["id"]))
+    return {"ok": True, "message": "Summary refresh started"}
+
+
+@router.get("/digest")
+async def get_digest(limit: int = 10, user=Depends(require_user)):
+    """Layer 4: Get proactive digest items for dashboard card."""
+    from brain_enhance import get_digest_for_user
+    items = await get_digest_for_user(user["id"], limit=limit)
+    unread = sum(1 for i in items if not i.get("read"))
+    return {"items": items, "unread": unread}
+
+
+@router.post("/digest/{item_id}/read")
+async def mark_read(item_id: int, user=Depends(require_user)):
+    """Mark a digest item as read."""
+    from brain_enhance import mark_digest_read
+    await mark_digest_read(user["id"], item_id)
+    return {"ok": True}
+
+
+@router.post("/digest/trigger")
+async def trigger_digest(user=Depends(require_user)):
+    """Manually trigger digest generation for this user."""
+    from brain_enhance import run_all_enhancements_for_user
+    import asyncio
+    asyncio.create_task(run_all_enhancements_for_user(user["id"]))
+    return {"ok": True, "message": "Digest generation started"}
+
+
+@router.get("/context-enhanced")
+async def get_enhanced_context(q: str, user=Depends(require_user)):
+    """Layer 1+2+3: Rich brain context for external integrations."""
+    from brain_enhance import get_brain_context_enhanced
+    ctx = await get_brain_context_enhanced(user["id"], q)
+    return {"context": ctx, "has_content": bool(ctx)}
+
+
+@router.get("/kg-explanations")
+async def get_kg_explanations(node: str = "", user=Depends(require_user)):
+    """Layer 3: Get cached KG edge explanations."""
+    from brain_enhance import get_edge_explanations_for_node, enrich_kg_edges_batch
+    if node:
+        explanations = await get_edge_explanations_for_node(node)
+    else:
+        # Return recent explanations
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT edge_sig, explanation, generated_at FROM kg_edge_explanations "
+                "ORDER BY generated_at DESC LIMIT 20"
+            ) as c:
+                explanations = [dict(r) for r in await c.fetchall()]
+    return {"explanations": explanations, "count": len(explanations)}
