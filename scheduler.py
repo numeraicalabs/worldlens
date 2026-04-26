@@ -815,6 +815,31 @@ def start():
         misfire_grace_time=3600,
     )
 
+    # ── Brain proactive digest — Layer 4 (07:00 UTC daily) ───────────────────
+    async def _daily_brain_digest():
+        try:
+            from brain_enhance import run_all_enhancements_for_user
+            async with aiosqlite.connect(settings.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute(
+                    "SELECT DISTINCT user_id FROM brain_entries "
+                    "WHERE datetime(timestamp) > datetime('now','-7 days') "
+                    "ORDER BY user_id"
+                ) as c:
+                    user_ids = [r["user_id"] for r in await c.fetchall()]
+            for uid in user_ids[:50]:
+                await run_all_enhancements_for_user(uid)
+                await asyncio.sleep(2)
+        except Exception as e:
+            logger.warning("daily_brain_digest: %s", e)
+
+    _scheduler.add_job(
+        _daily_brain_digest, "cron",
+        hour=7, minute=0,
+        id="brain_digest",
+        misfire_grace_time=3600,
+    )
+
     _scheduler.add_job(
         _broadcast_tg_pnl, "interval",
         seconds=30,

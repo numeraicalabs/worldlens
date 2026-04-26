@@ -563,9 +563,17 @@ async def nightly_deep_extraction():
     # Wikipedia enrichment for new nodes
     enriched = await enrich_new_nodes_batch(25)
 
+    # Layer 3: explain top KG edges
+    try:
+        from brain_enhance import enrich_kg_edges_batch
+        explained = await enrich_kg_edges_batch(limit=15)
+    except Exception as ex:
+        logger.warning("nightly edge explanation: %s", ex)
+        explained = 0
+
     logger.info(
-        "Nightly brain extraction complete: +%d nodes +%d edges | %d Wikipedia enrichments",
-        total_nodes, total_edges, enriched
+        "Nightly brain extraction complete: +%d nodes +%d edges | %d Wikipedia | %d edge explanations",
+        total_nodes, total_edges, enriched, explained
     )
 
 
