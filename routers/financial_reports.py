@@ -36,31 +36,31 @@ REPORT_TYPES = {
         "label":   "📊 Portfolio Stress Test",
         "icon":    "📊",
         "desc":    "Analisi esposizione portafoglio ETF ai rischi attuali del KG",
-        "tokens":  800,
+        "tokens":  2500,
     },
     "macro_outlook": {
         "label":   "🌐 Macro Outlook",
         "icon":    "🌐",
         "desc":    "Analisi regime macroeconomico basata su indicatori KG",
-        "tokens":  700,
+        "tokens":  2000,
     },
     "sector_digest": {
         "label":   "🏭 Sector Digest",
         "icon":    "🏭",
         "desc":    "Deep dive settore/tema con dati KG + eventi recenti",
-        "tokens":  700,
+        "tokens":  2000,
     },
     "geo_risk": {
         "label":   "🌍 Geo Risk Report",
         "icon":    "🌍",
         "desc":    "Mappa rischio geopolitico da nodi entità nel KG",
-        "tokens":  700,
+        "tokens":  2000,
     },
     "weekly_brief": {
         "label":   "📋 Weekly Intelligence Brief",
         "icon":    "📋",
         "desc":    "Brief settimanale completo: macro + geo + mercati + segnali",
-        "tokens":  1200,
+        "tokens":  3500,
     },
 }
 
