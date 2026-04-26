@@ -207,6 +207,9 @@ app.include_router(kg_router)
 
 from routers.financial_reports import router as fin_reports_router
 app.include_router(fin_reports_router)
+
+from routers.jarvis import router as jarvis_router
+app.include_router(jarvis_router)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
