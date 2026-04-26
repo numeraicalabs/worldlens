@@ -610,22 +610,22 @@ async def ingest_extraction_result(result: Dict, upload_id: int) -> Tuple[int, i
             if eid:
                 edges_added += 1
 
-    # Update upload record
-    pool = await get_pool()
-    if pool:
-        async with pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE kg_uploads SET nodes_added=nodes_added+$1, edges_added=edges_added+$2 WHERE id=$3",
-                nodes_added, edges_added, upload_id
-            )
-    else:
-        import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
-            await db.execute(
-                "UPDATE kg_uploads SET nodes_added=nodes_added+?, edges_added=edges_added+? WHERE id=?",
-                (nodes_added, edges_added, upload_id)
-            )
-            await db.commit()
+    # Update upload record (skip if upload_id is -1 = nightly system job)
+    if upload_id and upload_id > 0:
+        pool = await get_pool()
+        if pool:
+            async with pool.acquire() as conn:
+                await conn.execute(
+                    "UPDATE kg_uploads SET nodes_added=nodes_added+$1, edges_added=edges_added+$2 WHERE id=$3",
+                    nodes_added, edges_added, upload_id
+                )
+        else:
+            async with aiosqlite.connect(settings.db_path) as db:
+                await db.execute(
+                    "UPDATE kg_uploads SET nodes_added=nodes_added+?, edges_added=edges_added+? WHERE id=?",
+                    (nodes_added, edges_added, upload_id)
+                )
+                await db.commit()
 
     return nodes_added, edges_added
 
@@ -655,24 +655,8 @@ async def process_upload_job(upload_id: int, chunks: List[str], user_id: int):
         error = str(ex)[:500]
         status = "error"
 
-    # Mark upload complete
-    pool = await get_pool()
-    now = datetime.utcnow().isoformat()
-    if pool:
-        async with pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE kg_uploads SET status=$1, error_msg=$2, completed_at=NOW() WHERE id=$3",
-                status, error, upload_id
-            )
-    else:
-        import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
-            await db.execute(
-                "UPDATE kg_uploads SET status=?, error_msg=?, completed_at=? WHERE id=?",
-                (status, error, now, upload_id)
-            )
-            await db.commit()
-
+    # Mark upload complete using shared helper
+    await _finish_upload_record(upload_id, status, total_nodes, total_edges, error)
     logger.info("KG upload %s done: +%d nodes +%d edges", upload_id, total_nodes, total_edges)
 
 
@@ -681,6 +665,48 @@ async def process_upload_job(upload_id: int, chunks: List[str], user_id: int):
 @router.on_event("startup")
 async def _startup():
     await ensure_kg_schema()
+
+
+async def _create_upload_record(user_id: int, filename: str, source_type: str, status: str) -> int:
+    """Create a kg_uploads record. Returns the new id."""
+    pool = await get_pool()
+    if pool:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "INSERT INTO kg_uploads (user_id, filename, source_type, status) "
+                "VALUES ($1,$2,$3,$4) RETURNING id",
+                user_id, filename, source_type, status
+            )
+            return row["id"]
+    else:
+        async with aiosqlite.connect(settings.db_path) as db:
+            cur = await db.execute(
+                "INSERT INTO kg_uploads (user_id, filename, source_type, status) VALUES (?,?,?,?)",
+                (user_id, filename, source_type, status)
+            )
+            await db.commit()
+            return cur.lastrowid
+
+
+async def _finish_upload_record(upload_id: int, status: str, nodes: int, edges: int, error: str = ""):
+    """Mark upload done or errored."""
+    pool = await get_pool()
+    now = datetime.utcnow().isoformat()
+    if pool:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE kg_uploads SET status=$1, nodes_added=$2, edges_added=$3, "
+                "error_msg=$4, completed_at=NOW() WHERE id=$5",
+                status, nodes, edges, error[:500], upload_id
+            )
+    else:
+        async with aiosqlite.connect(settings.db_path) as db:
+            await db.execute(
+                "UPDATE kg_uploads SET status=?, nodes_added=?, edges_added=?, "
+                "error_msg=?, completed_at=? WHERE id=?",
+                (status, nodes, edges, error[:500], now, upload_id)
+            )
+            await db.commit()
 
 
 @router.post("/upload")
@@ -700,8 +726,14 @@ async def upload_file(
     if len(content) > max_mb * 1024 * 1024:
         raise HTTPException(413, f"File too large — max {max_mb}MB")
 
-    # Parse into text chunks
+    # ── Always ensure KG schema exists before any DB operation ──────────────
+    await ensure_kg_schema()
+
+    # ── Detect source type and parse ─────────────────────────────────────────
+    chunks: list = []
     source_type = ext
+    structured = None
+
     if ext == "json" or "conversations" in fname.lower():
         chunks = parse_chatgpt_json(content)
         source_type = "chatgpt_json"
@@ -709,59 +741,24 @@ async def upload_file(
         chunks = parse_pdf(content)
         source_type = "pdf"
     else:
-        # Try structured format first (bypasses AI entirely)
+        # Try structured format first (# NODO / # EDGE syntax — no AI needed)
         structured = parse_structured_format(content)
-        if structured:
-            # Direct ingest — no chunking needed
+        if structured and (structured.get("nodes") or structured.get("edges")):
             source_type = "structured_format"
-            if not chunks:
-                chunks = []  # placeholder, will be handled below
+        else:
+            # Fall back to free-text chunking for AI extraction
+            structured = None
+            chunks = parse_txt(content)
+            source_type = "txt"
 
-            # Create upload record immediately
-            pool = await get_pool()
-            upload_id = None
-            if pool:
-                async with pool.acquire() as conn:
-                    row = await conn.fetchrow(
-                        "INSERT INTO kg_uploads (user_id, filename, source_type, status) "
-                        "VALUES ($1,$2,$3,'processing') RETURNING id",
-                        user["id"], fname, source_type
-                    )
-                    upload_id = row["id"]
-            else:
-                import aiosqlite as _aio
-                async with _aio.connect(settings.db_path) as db:
-                    cur = await db.execute(
-                        "INSERT INTO kg_uploads (user_id, filename, source_type, status) "
-                        "VALUES (?,?,?,'processing')",
-                        (user["id"], fname, source_type)
-                    )
-                    await db.commit()
-                    upload_id = cur.lastrowid
+    # ── Structured format: direct ingest, synchronous, no background task ────
+    if structured is not None:
+        # Create upload record
+        upload_id = await _create_upload_record(user["id"], fname, source_type, "processing")
 
-            # Ingest directly
+        try:
             n_nodes, n_edges = await ingest_extraction_result(structured, upload_id)
-
-            # Mark done
-            now = datetime.utcnow().isoformat()
-            pool = await get_pool()
-            if pool:
-                async with pool.acquire() as conn:
-                    await conn.execute(
-                        "UPDATE kg_uploads SET status='done', completed_at=NOW(), "
-                        "nodes_added=$1, edges_added=$2 WHERE id=$3",
-                        n_nodes, n_edges, upload_id
-                    )
-            else:
-                import aiosqlite as _aio
-                async with _aio.connect(settings.db_path) as db:
-                    await db.execute(
-                        "UPDATE kg_uploads SET status='done', completed_at=?, "
-                        "nodes_added=?, edges_added=? WHERE id=?",
-                        (now, n_nodes, n_edges, upload_id)
-                    )
-                    await db.commit()
-
+            await _finish_upload_record(upload_id, "done", n_nodes, n_edges)
             return {
                 "upload_id":   upload_id,
                 "filename":    fname,
@@ -772,9 +769,9 @@ async def upload_file(
                 "edges_added": n_edges,
                 "message":     f"Structured format parsed directly: +{n_nodes} nodes, +{n_edges} edges (no AI needed)",
             }
-        else:
-            chunks = parse_txt(content)
-            source_type = "txt"
+        except Exception as e:
+            await _finish_upload_record(upload_id, "error", 0, 0, str(e))
+            raise HTTPException(500, f"Ingest error: {e}")
 
     if not chunks:
         raise HTTPException(422, "No extractable text found in file")
