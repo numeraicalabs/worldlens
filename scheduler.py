@@ -189,6 +189,13 @@ async def _poll_events():
             except Exception as _bpe:
                 logger.debug("brain autopop events: %s", _bpe)
 
+            # ── Wikipedia enrichment: 5 nodes per cycle (continuous) ─────────
+            try:
+                from brain_autopop import enrich_new_nodes_batch
+                await enrich_new_nodes_batch(limit=5)
+            except Exception as _wpe:
+                logger.debug("wiki enrichment: %s", _wpe)
+
     except Exception as e:
         logger.error("Event poll error: %s", e, exc_info=True)
 

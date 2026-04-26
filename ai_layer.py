@@ -141,11 +141,11 @@ async def _call_claude(prompt: str, system: str = "", max_tokens: int = 400,
         return await _call_anthropic(prompt, system, max_tokens, api_key)
     return None
 
-# Models to try in order — 2.5-flash is free tier current standard (April 2026)
-# 2.0-flash kept as fallback until its June 2026 deprecation
+# Models to try in order
 _GEMINI_MODELS = [
-    "gemini-2.5-flash",   # Primary: latest free-tier model
-    "gemini-2.0-flash",   # Fallback: still active, deprecated June 2026
+    "gemini-2.0-flash",          # Primary: stable free-tier, widely available
+    "gemini-1.5-flash",          # Fallback: always available free tier
+    "gemini-1.5-flash-8b",       # Last resort: smallest, always works
 ]
 _GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
@@ -153,64 +153,102 @@ _GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) -> Optional[str]:
     """
     Call Gemini via Google AI free-tier API.
-    Tries gemini-2.5-flash first, falls back to gemini-2.0-flash on 404/503.
+    Uses system_instruction field correctly (required for 2.0+).
+    Tries models in order until one works.
     """
-    full = (system + "\n\n" + prompt).strip() if system else prompt
-    body = {
-        "contents": [{"parts": [{"text": full}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.35},
-    }
+    if not api_key or not api_key.strip():
+        logger.warning("Gemini: empty API key")
+        return None
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    # Build body with proper system instruction (Gemini 1.5+ format)
+    body: dict = {
+        "contents": [{"parts": [{"text": prompt}], "role": "user"}],
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "temperature": 0.35,
+        },
+    }
+    if system:
+        body["system_instruction"] = {"parts": [{"text": system}]}
+
+    async with httpx.AsyncClient(timeout=45) as client:
         for model in _GEMINI_MODELS:
             try:
-                url = f"{_GEMINI_BASE}/{model}:generateContent?key={api_key}"
-                resp = await client.post(url, headers={"content-type": "application/json"}, json=body)
+                url = f"{_GEMINI_BASE}/{model}:generateContent?key={api_key.strip()}"
+                resp = await client.post(
+                    url,
+                    headers={"Content-Type": "application/json"},
+                    json=body
+                )
 
-                # Model not found or deprecated → try next model in list
-                if resp.status_code in (404, 503):
-                    logger.warning("Gemini model '%s' unavailable (HTTP %d) — trying next", model, resp.status_code)
+                if resp.status_code == 404:
+                    logger.debug("Gemini model '%s' not found — trying next", model)
                     continue
 
-                # Auth / quota errors — no point retrying with a different model
                 if resp.status_code in (400, 401, 403):
-                    body_preview = resp.text[:300]
+                    err = resp.text[:400]
                     logger.warning(
-                        "Gemini API key error (HTTP %d) — check key in Admin → Settings. "
-                        "Model: %s. Response: %s", resp.status_code, model, body_preview
+                        "Gemini key/auth error (HTTP %d) model=%s — "
+                        "Verify key at aistudio.google.com. Response: %s",
+                        resp.status_code, model, err
                     )
-                    return None
+                    # 400 can mean bad request (not always key error) — try next model
+                    if resp.status_code == 400:
+                        continue
+                    return None  # 401/403 = definitely key problem
 
                 if resp.status_code == 429:
-                    logger.warning("Gemini rate limit (HTTP 429) on model '%s'", model)
+                    logger.warning("Gemini rate limit (429) model=%s — quota exceeded", model)
                     return None
+
+                if resp.status_code == 503:
+                    logger.warning("Gemini overloaded (503) model=%s — trying next", model)
+                    continue
 
                 if resp.status_code != 200:
-                    logger.warning("Gemini HTTP %d on model '%s': %s", resp.status_code, model, resp.text[:200])
-                    return None
+                    logger.warning("Gemini HTTP %d model=%s: %s", resp.status_code, model, resp.text[:200])
+                    continue
 
                 data = resp.json()
-                candidates = data.get("candidates", [])
-                if not candidates:
-                    reason = data.get("promptFeedback", {}).get("blockReason", "unknown")
-                    logger.warning("Gemini '%s' returned no candidates — blockReason: %s", model, reason)
+
+                # Check for safety/content filters
+                if data.get("promptFeedback", {}).get("blockReason"):
+                    reason = data["promptFeedback"]["blockReason"]
+                    logger.warning("Gemini blocked prompt — reason: %s", reason)
                     return None
 
-                result = candidates[0]["content"]["parts"][0]["text"].strip()
-                logger.debug("Gemini '%s' responded OK (%d chars)", model, len(result))
-                return result
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    logger.warning("Gemini '%s' returned empty candidates list", model)
+                    continue
+
+                cand = candidates[0]
+                # Check finish reason
+                finish = cand.get("finishReason", "STOP")
+                if finish not in ("STOP", "MAX_TOKENS", ""):
+                    logger.warning("Gemini '%s' finishReason=%s", model, finish)
+                    if finish in ("SAFETY", "RECITATION"):
+                        return None
+
+                try:
+                    result = cand["content"]["parts"][0]["text"].strip()
+                    logger.debug("Gemini '%s' OK — %d chars", model, len(result))
+                    return result if result else None
+                except (KeyError, IndexError) as e:
+                    logger.warning("Gemini '%s' response parse error: %s | data: %s", model, e, str(data)[:200])
+                    continue
 
             except httpx.TimeoutException:
-                logger.warning("Gemini '%s' timeout after 30s", model)
+                logger.warning("Gemini '%s' timeout (45s)", model)
+                return None
+            except httpx.ConnectError as e:
+                logger.warning("Gemini connection error: %s", e)
                 return None
             except Exception as e:
-                logger.warning("Gemini '%s' error: %s", model, e)
-                # Only continue to next model if it looks like a model-level issue
-                if "model" in str(e).lower() or "deprecated" in str(e).lower():
-                    continue
-                return None
+                logger.warning("Gemini '%s' unexpected error: %s", model, type(e).__name__ + ": " + str(e))
+                continue
 
-    logger.warning("All Gemini models exhausted without a successful response")
+    logger.warning("All Gemini models failed for this request")
     return None
 
 # Anthropic model strings — updated April 2026
