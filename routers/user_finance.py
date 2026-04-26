@@ -289,20 +289,64 @@ async def get_user_ai_key_status(user=Depends(require_user)):
 
 @user_router.post("/ai-key/test")
 async def test_user_ai_key(user=Depends(require_user)):
-    """Quick test of the user's personal AI key."""
-    try:
-        ug, ua = await _get_user_ai_keys(user["id"])
-        if not ug and not ua:
-            return {"status": "error", "message": "Nessuna chiave configurata"}
-        result = await _call_claude(
-            "Reply with exactly: OK",
-            system="You are a test. Reply with exactly: OK",
-            max_tokens=10,
-            user_gemini_key=ug,
-            user_anthropic_key=ua,
-        )
-        if result:
-            return {"status": "ok", "message": "Chiave verificata con successo"}
-        return {"status": "error", "message": "Chiave non valida o quota esaurita"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    """Quick test of the user's personal AI key with full diagnostics."""
+    import httpx as _httpx
+
+    ug, ua = await _get_user_ai_keys(user["id"])
+    if not ug and not ua:
+        return {"status": "error", "message": "Nessuna chiave configurata — inserisci la chiave nel campo sopra e premi Salva prima di testare"}
+
+    # Test Gemini key directly with minimal request
+    if ug:
+        models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"]
+        base = "https://generativelanguage.googleapis.com/v1beta/models"
+        body = {
+            "contents": [{"parts": [{"text": "Say: OK"}], "role": "user"}],
+            "generationConfig": {"maxOutputTokens": 5, "temperature": 0},
+        }
+        async with _httpx.AsyncClient(timeout=20) as client:
+            for model in models_to_try:
+                try:
+                    url = f"{base}/{model}:generateContent?key={ug}"
+                    resp = await client.post(url, headers={"Content-Type": "application/json"}, json=body)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("candidates"):
+                            return {
+                                "status": "ok",
+                                "provider": "gemini",
+                                "model": model,
+                                "message": f"✓ Chiave Gemini verificata — modello: {model}",
+                            }
+                    elif resp.status_code in (401, 403):
+                        err_detail = resp.json().get("error", {}).get("message", resp.text[:200])
+                        return {
+                            "status": "error",
+                            "provider": "gemini",
+                            "http_status": resp.status_code,
+                            "message": f"Chiave non valida o non autorizzata. Dettaglio Google: {err_detail}",
+                            "fix": "Verifica che la chiave sia copiata correttamente da https://aistudio.google.com/app/apikey",
+                        }
+                    elif resp.status_code == 429:
+                        return {
+                            "status": "error",
+                            "provider": "gemini",
+                            "message": "Quota esaurita (429) — attendi qualche minuto o controlla i limiti del tuo progetto Google",
+                        }
+                    # 404 = model not available, try next
+                except Exception as ex:
+                    return {"status": "error", "provider": "gemini", "message": f"Errore di rete: {ex}"}
+
+        return {"status": "error", "provider": "gemini", "message": "Nessun modello Gemini disponibile con questa chiave"}
+
+    if ua:
+        try:
+            result = await _call_claude(
+                "Say: OK", system="", max_tokens=5,
+                user_gemini_key="", user_anthropic_key=ua,
+            )
+            if result:
+                return {"status": "ok", "provider": "claude", "message": "✓ Chiave Anthropic verificata"}
+            return {"status": "error", "provider": "claude", "message": "Chiave Anthropic non valida o quota esaurita"}
+        except Exception as e:
+            return {"status": "error", "provider": "claude", "message": str(e)}
