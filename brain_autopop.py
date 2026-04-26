@@ -470,7 +470,9 @@ async def autonomous_brain_population() -> Tuple[int, int]:
             from scheduler import get_finance_cache
             fin_data = get_finance_cache()
             if fin_data:
-                n, e = await auto_populate_from_finance(list(fin_data.values())[:60])
+                # finance_cache is a list of dicts [{symbol, price, ...}]
+                tickers = fin_data[:60] if isinstance(fin_data, list) else list(fin_data.values())[:60]
+                n, e = await auto_populate_from_finance(tickers)
                 tn += n; te += e
         except Exception as fe:
             logger.debug("Brain L3 finance: %s", fe)
