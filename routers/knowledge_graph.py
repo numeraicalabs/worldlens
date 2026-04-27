@@ -1290,6 +1290,10 @@ async def mega_seed_endpoint(
 
     background_tasks.add_task(run)
     return {"ok": True, "message": "Mega-seed started — 500+ nodes being added in background"}
+
+
+@router.get("/status")
+async def kg_status(_=Depends(require_user)):
     """Quick KG connectivity check — used by Brain Editor status bar."""
     pool = await get_pool()
     try:
