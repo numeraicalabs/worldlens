@@ -475,15 +475,17 @@
 
 .fire-risk-quote {
   flex: 1;
-  max-width: 600px;         /* wider to accommodate 3–4 sentence brief */
+  max-width: 600px;
   font-family: var(--fire-serif);
   font-size: 16px;
   font-weight: 400;
-  line-height: 1.7;          /* more breathing room between lines */
+  line-height: 1.7;
   font-style: italic;
   color: var(--fire-text-mid);
   border-left: 2px solid var(--fire-border-hi);
   padding-left: 24px;
+  overflow: visible;
+  max-height: none;
 }
 /* Extended brief paragraphs inside quote */
 .fire-risk-quote p {

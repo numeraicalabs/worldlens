@@ -971,7 +971,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
   line-height:1; letter-spacing:-.05em; min-width:88px;
 }
 .ew-score-label { font-size:13px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; margin-top:4px; }
-.ew-score-desc  { font-size:12px; color:var(--t2); line-height:1.65; margin-top:6px; }
+.ew-score-desc  { font-size:12px; color:var(--t2); line-height:1.65; margin-top:6px; overflow:visible; max-height:none; }
 .ew-gauges { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .ew-gauge {
   background:var(--bg2); border-radius:var(--r12); padding:12px;

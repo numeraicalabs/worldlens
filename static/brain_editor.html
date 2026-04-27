@@ -141,6 +141,7 @@ textarea.fi{min-height:65px;line-height:1.5}
       <button class="tb-btn" onclick="importJSON()">↑ Import</button>
       <button class="tb-btn" onclick="exportJSON()">↓ Export</button>
       <button class="tb-btn grn" id="btn-sync" onclick="syncToBrain()">⇧ Sync</button>
+      <button class="tb-btn" id="btn-seed" onclick="runMegaSeed()" title="Popola KG con 500+ nodi finanziari">🌱 Seed</button>
       <div class="tb-sep"></div>
       <span id="sdot"></span><span id="stxt">…</span>
     </div>
@@ -1059,6 +1060,26 @@ document.addEventListener('keydown',function(e){
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
   if((e.key==='j'||e.key==='J')&&G.sel)openJarvis(G.sel.label);
 });
+
+
+function runMegaSeed(){
+  if(!G.token){toast('Token mancante — apri WorldLens prima','err');return;}
+  var btn=document.getElementById('btn-seed');
+  if(btn){btn.textContent='⏳ Seeding…';btn.disabled=true;}
+  var h={'Content-Type':'application/json','Authorization':'Bearer '+G.token};
+  fetch('/api/kg/mega-seed',{method:'POST',headers:h})
+    .then(function(r){return r.json();})
+    .then(function(r){
+      toast((r.message||'Mega-seed avviato!'),'ok');
+      if(btn){btn.textContent='🌱 Seed';btn.disabled=false;}
+      // Reload KG after 15s
+      setTimeout(function(){loadKGFromServer();},15000);
+    })
+    .catch(function(e){
+      toast('Errore seed: '+e.message,'err');
+      if(btn){btn.textContent='🌱 Seed';btn.disabled=false;}
+    });
+}
 
 </script>
 
