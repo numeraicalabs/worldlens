@@ -155,7 +155,7 @@ TEMPLATES: Dict[str, Dict] = {
             "**Outlook 30 giorni:** [breve proiezione]\n\n"
             "*Fonte: WorldLens Brain — [N] entries analizzate*"
         ),
-        "max_tokens": 600,
+        "max_tokens": 2000,
     },
     "risk_summary": {
         "label": "🚨 Risk Summary",
@@ -175,7 +175,7 @@ TEMPLATES: Dict[str, Dict] = {
             "Base: [descrizione]\nStress: [descrizione]\n\n"
             "*Risk intelligence basata su [N] segnali nel cervello*"
         ),
-        "max_tokens": 550,
+        "max_tokens": 2000,
     },
     "geo_digest": {
         "label": "🌍 Geo Digest",
@@ -198,7 +198,7 @@ TEMPLATES: Dict[str, Dict] = {
             "🟢 Positivo: [scenario]\n🔴 Negativo: [scenario]\n\n"
             "*Geo intelligence da [N] fonti nel cervello*"
         ),
-        "max_tokens": 600,
+        "max_tokens": 2000,
     },
     "compare": {
         "label": "⚖ Confronto",
@@ -223,7 +223,7 @@ TEMPLATES: Dict[str, Dict] = {
             "• [A] se: [condizione]\n• [B] se: [condizione]\n\n"
             "*Analisi basata su [N] data points nel cervello*"
         ),
-        "max_tokens": 600,
+        "max_tokens": 2000,
     },
     "deep_dive": {
         "label": "🔬 Deep Dive",
@@ -245,7 +245,7 @@ TEMPLATES: Dict[str, Dict] = {
             "• [aspetto ancora incerto]\n• [variabile da monitorare]\n\n"
             "*Deep dive alimentato da [N] entries del tuo cervello AI*"
         ),
-        "max_tokens": 700,
+        "max_tokens": 2500,
     },
     "action_plan": {
         "label": "🎯 Action Plan",
@@ -268,7 +268,7 @@ TEMPLATES: Dict[str, Dict] = {
             "**⚠ Rischi del piano**\n[1-2 rischi principali da tenere a mente]\n\n"
             "*Piano generato con [N] insights dal tuo cervello AI*"
         ),
-        "max_tokens": 600,
+        "max_tokens": 2000,
     },
 }
 
@@ -417,19 +417,38 @@ async def ask_agent(payload: dict = Body(...), user=Depends(require_user)):
     if template not in TEMPLATES:
         template = "deep_dive"
 
-    # Search brain — use enhanced context (Layer 1+2+3)
+    # Search brain — Layer 1+2+3 + KG traversal
     source_ids = []
     brain_ctx = ""
     try:
         from brain_enhance import get_brain_context_enhanced
         brain_ctx = await get_brain_context_enhanced(user_id, query, top_k=8)
-        # Also get raw results for source tracking
         brain_results = await brain_search(user_id, query, top_k=8)
         source_ids = [r["id"] for r in brain_results]
     except Exception:
         brain_results = await brain_search(user_id, query, top_k=8)
         source_ids = [r["id"] for r in brain_results]
         brain_ctx = await brain_context_for_prompt(user_id, query, top_k=8)
+
+    # Inject KG traversal context — find most relevant node for query
+    try:
+        from routers.jarvis import traverse_kg, build_graph_context
+        # Extract key term from query for KG lookup
+        import re as _re
+        kg_term = query.strip()
+        # Try to find a finance/macro keyword in the query
+        fin_kw = re.findall(r'\b(VWCE|IWDA|SPY|QQQ|TLT|GLD|IBGL|HYG|EEM|EMAE|'
+                              r'Fed|ECB|inflation|GDP|VIX|DXY|gold|oil|bitcoin|'
+                              r'equity|bond|market|macro|rate|yield|risk)\b',
+                              query, re.IGNORECASE)
+        if fin_kw:
+            kg_term = fin_kw[0]
+        traversal = await traverse_kg(kg_term, max_hops=2, max_nodes=20)
+        if traversal.get("found"):
+            kg_ctx = build_graph_context(traversal)
+            brain_ctx = kg_ctx + "\n\n" + brain_ctx if brain_ctx else kg_ctx
+    except Exception as _ke:
+        logger.debug("brain_agent KG inject: %s", _ke)
 
     async with aiosqlite.connect(settings.db_path) as db:
         db.row_factory = aiosqlite.Row

@@ -1278,8 +1278,18 @@ PESO: 2.0
     )
 
 
-@router.get("/status")
-async def kg_status(_=Depends(require_user)):
+@router.post("/mega-seed")
+async def mega_seed_endpoint(
+    background_tasks: BackgroundTasks,
+    user=Depends(require_user),
+):
+    """Trigger KG mega-seed: 500+ financial/geopolitical nodes and relationships."""
+    async def run():
+        from kg_mega_seed import run_mega_seed
+        await run_mega_seed()
+
+    background_tasks.add_task(run)
+    return {"ok": True, "message": "Mega-seed started — 500+ nodes being added in background"}
     """Quick KG connectivity check — used by Brain Editor status bar."""
     pool = await get_pool()
     try:

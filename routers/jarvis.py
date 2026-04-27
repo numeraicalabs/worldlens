@@ -127,60 +127,87 @@ async def _find_node(pool, label: str) -> Optional[Dict]:
 
 
 async def _get_neighbors(pool, node_id: int) -> List[Tuple[Dict, Dict]]:
-    """Get all neighbors (both directions) with edge data. Returns [(node, edge)]."""
+    """Get all neighbors (both directions) with edge data."""
     results = []
     try:
         if pool:
             async with pool.acquire() as conn:
-                rows = await conn.fetch(
-                    """SELECT e.id as eid, e.relation, e.weight, e.evidence_text,
-                              e.evidence_count,
-                              n.id, n.label, n.type, n.description, n.source_count,
-                              CASE WHEN e.src_id=$1 THEN 'out' ELSE 'in' END as direction
-                       FROM kg_edges e
-                       JOIN kg_nodes n ON (
-                           CASE WHEN e.src_id=$1 THEN e.tgt_id ELSE e.src_id END = n.id
-                       )
-                       WHERE e.src_id=$1 OR e.tgt_id=$1
-                       ORDER BY e.weight DESC, e.evidence_count DESC
-                       LIMIT 15""",
+                # Split into two queries to avoid asyncpg CASE parameter type inference issues
+                rows_out = await conn.fetch(
+                    """SELECT e.id as eid, e.relation, COALESCE(e.weight,1.0) as weight,
+                              COALESCE(e.evidence_text,'') as evidence_text,
+                              n.id, n.label, n.type,
+                              COALESCE(n.description,'') as description,
+                              COALESCE(n.source_count,1) as source_count,
+                              'out' as direction, e.src_id, e.tgt_id
+                       FROM kg_edges e JOIN kg_nodes n ON e.tgt_id = n.id
+                       WHERE e.src_id = $1 ORDER BY e.weight DESC LIMIT 12""",
                     node_id
                 )
-                for r in rows:
+                rows_in = await conn.fetch(
+                    """SELECT e.id as eid, e.relation, COALESCE(e.weight,1.0) as weight,
+                              COALESCE(e.evidence_text,'') as evidence_text,
+                              n.id, n.label, n.type,
+                              COALESCE(n.description,'') as description,
+                              COALESCE(n.source_count,1) as source_count,
+                              'in' as direction, e.src_id, e.tgt_id
+                       FROM kg_edges e JOIN kg_nodes n ON e.src_id = n.id
+                       WHERE e.tgt_id = $1 ORDER BY e.weight DESC LIMIT 12""",
+                    node_id
+                )
+                for r in list(rows_out) + list(rows_in):
                     d = dict(r)
                     node = {"id": d["id"], "label": d["label"], "type": d["type"],
                             "description": d["description"], "source_count": d["source_count"]}
-                    edge = {"id": d["eid"], "relation": d["relation"], "weight": d["weight"],
+                    edge = {"id": d["eid"], "relation": d["relation"], "weight": float(d["weight"]),
                             "evidence": d["evidence_text"], "direction": d["direction"],
-                            "src_id": node_id if d["direction"] == "out" else d["id"],
-                            "tgt_id": d["id"] if d["direction"] == "out" else node_id}
+                            "src_id": d["src_id"], "tgt_id": d["tgt_id"]}
                     results.append((node, edge))
         else:
             async with aiosqlite.connect(settings.db_path) as db:
                 db.row_factory = aiosqlite.Row
+                # Outgoing edges
                 async with db.execute(
-                    """SELECT e.id as eid, e.src_id, e.tgt_id, e.relation, e.weight,
-                              e.evidence_text, e.evidence_count,
-                              n.id, n.label, n.type, n.description, n.source_count
-                       FROM kg_edges e
-                       JOIN kg_nodes n ON (
-                           CASE WHEN e.src_id=? THEN e.tgt_id ELSE e.src_id END = n.id
-                       )
-                       WHERE e.src_id=? OR e.tgt_id=?
-                       ORDER BY e.weight DESC LIMIT 15""",
-                    (node_id, node_id, node_id)
+                    """SELECT e.id as eid, e.src_id, e.tgt_id, e.relation,
+                              COALESCE(e.weight,1.0) as weight,
+                              COALESCE(e.evidence_text,'') as evidence_text,
+                              n.id, n.label, n.type,
+                              COALESCE(n.description,'') as description,
+                              COALESCE(n.source_count,1) as source_count
+                       FROM kg_edges e JOIN kg_nodes n ON e.tgt_id=n.id
+                       WHERE e.src_id=? ORDER BY e.weight DESC LIMIT 12""",
+                    (node_id,)
                 ) as c:
                     for r in await c.fetchall():
                         d = dict(r)
-                        direction = "out" if d["src_id"] == node_id else "in"
                         node = {"id": d["id"], "label": d["label"], "type": d["type"],
                                 "description": d["description"], "source_count": d["source_count"]}
-                        edge = {"id": d["eid"], "relation": d["relation"], "weight": d["weight"],
-                                "evidence": d["evidence_text"], "direction": direction,
+                        edge = {"id": d["eid"], "relation": d["relation"], "weight": float(d["weight"]),
+                                "evidence": d["evidence_text"], "direction": "out",
+                                "src_id": d["src_id"], "tgt_id": d["tgt_id"]}
+                        results.append((node, edge))
+                # Incoming edges
+                async with db.execute(
+                    """SELECT e.id as eid, e.src_id, e.tgt_id, e.relation,
+                              COALESCE(e.weight,1.0) as weight,
+                              COALESCE(e.evidence_text,'') as evidence_text,
+                              n.id, n.label, n.type,
+                              COALESCE(n.description,'') as description,
+                              COALESCE(n.source_count,1) as source_count
+                       FROM kg_edges e JOIN kg_nodes n ON e.src_id=n.id
+                       WHERE e.tgt_id=? ORDER BY e.weight DESC LIMIT 12""",
+                    (node_id,)
+                ) as c:
+                    for r in await c.fetchall():
+                        d = dict(r)
+                        node = {"id": d["id"], "label": d["label"], "type": d["type"],
+                                "description": d["description"], "source_count": d["source_count"]}
+                        edge = {"id": d["eid"], "relation": d["relation"], "weight": float(d["weight"]),
+                                "evidence": d["evidence_text"], "direction": "in",
                                 "src_id": d["src_id"], "tgt_id": d["tgt_id"]}
                         results.append((node, edge))
     except Exception as e:
-        logger.warning("_get_neighbors %s: %s", node_id, e)
+        logger.warning("_get_neighbors node_id=%s: %s", node_id, e)
     return results
 
 
