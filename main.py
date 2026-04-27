@@ -133,11 +133,20 @@ async def lifespan(app: FastAPI):
         import asyncio as _aio
         await _aio.sleep(8)  # let scheduler + DB settle
         try:
-            from brain_autopop import auto_populate_from_macro
-            n, e = await auto_populate_from_macro([])
-            logger.info("Startup brain seed L2: +%d nodes +%d edges", n, e)
+            # Run mega-seed first for comprehensive coverage
+            from kg_mega_seed import run_mega_seed
+            logger.info("Startup: running KG mega-seed (500+ nodes)…")
+            n, e = await run_mega_seed()
+            logger.info("Startup KG mega-seed: +%d nodes +%d edges", n, e)
         except Exception as _se:
-            logger.warning("Startup brain seed: %s", _se)
+            logger.warning("Startup mega-seed: %s", _se)
+            try:
+                # Fallback to basic macro seed
+                from brain_autopop import auto_populate_from_macro
+                n, e = await auto_populate_from_macro([])
+                logger.info("Startup brain seed L2: +%d nodes +%d edges", n, e)
+            except Exception as _se2:
+                logger.warning("Startup brain seed fallback: %s", _se2)
 
     import asyncio as _asyncio
     _asyncio.create_task(_startup_brain_seed())
