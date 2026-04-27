@@ -290,6 +290,499 @@ var SIM={a:1,tick:0};
 var ST='concept',CT='add',FLT='';
 
 /* ═══════════════════════════════════════════════════════════════
+   CANVAS INIT + RESIZE
+   ═══════════════════════════════════════════════════════════════ */
+var cv  = document.getElementById('cv');
+var ctx = cv ? cv.getContext('2d') : null;
+
+function resize(){
+  if(!cv) return;
+  var w = cv.offsetWidth, h = cv.offsetHeight;
+  if(w<10||h<10){ requestAnimationFrame(resize); return; }
+  var dpr = window.devicePixelRatio || 1;
+  cv.width  = Math.round(w*dpr);
+  cv.height = Math.round(h*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  G.W = w; G.H = h;
+  if(typeof draw==='function') draw();
+}
+window.addEventListener('resize', function(){
+  clearTimeout(window._rzt);
+  window._rzt = setTimeout(resize, 80);
+});
+setTimeout(resize, 50);
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+function uid(){ return 'n'+(G._id++)+'_'+Math.random().toString(36).slice(2,7); }
+function cx(){ return G.W/2 || 400; }
+function cy(){ return G.H/2 || 300; }
+
+function toast(msg,type){
+  type = type||'inf';
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:10px;font-size:12px;font-weight:600;z-index:9999;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);'+
+    (type==='ok'?'background:rgba(16,185,129,.92);color:#fff;border:1px solid rgba(16,185,129,.5)':
+     type==='err'?'background:rgba(239,68,68,.92);color:#fff;border:1px solid rgba(239,68,68,.5)':
+     'background:rgba(124,58,237,.92);color:#fff;border:1px solid rgba(124,58,237,.5)');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(function(){t.remove();},300); }, 2400);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUTH + API
+   ═══════════════════════════════════════════════════════════════ */
+function api(url, opts){
+  opts = opts || {};
+  var h = {'Content-Type':'application/json'};
+  if(G.token) h['Authorization'] = 'Bearer '+G.token;
+  return fetch(url, {
+    method: opts.method||'GET',
+    headers: h,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  }).then(function(r){
+    if(r.status===401||r.status===403){ G.token=null; showLoginForm(); return null; }
+    if(!r.ok) return null;
+    return r.json();
+  }).catch(function(){ return null; });
+}
+
+var _authRetries = 0;
+function initAuth(){
+  var t = null;
+  try{ t = localStorage.getItem('wl_tok') || localStorage.getItem('wl_trade_token'); }catch(e){}
+  var dot = document.getElementById('sdot'), txt = document.getElementById('stxt');
+  if(t){
+    G.token = t;
+    fetch('/api/kg/status', {headers:{'Authorization':'Bearer '+t}})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(ks){
+        if(!ks){
+          if(dot) dot.style.background='#F59E0B';
+          if(txt) txt.textContent='token non valido';
+          showLoginForm();
+          return;
+        }
+        if(dot) dot.style.background='#10B981';
+        var be = ks.backend==='postgresql' ? ' · PG' : ' · SQLite';
+        if(txt) txt.textContent = 'online'+be+' · '+(ks.nodes||0)+' nodi';
+        setTimeout(function(){
+          loadBrainStats();
+          loadUHist();
+          loadKGFromServer();
+        }, 200);
+      })
+      .catch(function(){
+        if(dot) dot.style.background='#F59E0B';
+        if(txt) txt.textContent='server non raggiungibile';
+        // Try to load anyway
+        setTimeout(function(){ loadBrainStats(); loadKGFromServer(); }, 1000);
+      });
+  } else if(_authRetries < 3) {
+    _authRetries++;
+    setTimeout(initAuth, 350*_authRetries);
+  } else {
+    if(dot) dot.style.background='#EF4444';
+    if(txt) txt.textContent='non connesso';
+    showLoginForm();
+  }
+}
+
+function showLoginForm(){
+  var sbody = document.querySelector('.sbody');
+  if(!sbody||document.getElementById('login-form-inline')) return;
+  var lf = document.createElement('div');
+  lf.id = 'login-form-inline';
+  lf.style.cssText = 'background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:14px;margin-bottom:12px';
+  lf.innerHTML = '<div style="font-size:11px;font-weight:700;color:#EF4444;margin-bottom:10px">⚠ Accedi a WorldLens</div>'+
+    '<input id="li-email" class="fi" placeholder="Email" type="email" style="margin-bottom:7px">'+
+    '<input id="li-pwd" class="fi" placeholder="Password" type="password" style="margin-bottom:10px" onkeydown="if(event.key===\'Enter\')doLogin()">'+
+    '<button onclick="doLogin()" class="btn bp bw" style="font-size:11px;width:100%;justify-content:center">Accedi</button>'+
+    '<div id="li-err" style="color:#EF4444;font-size:10px;margin-top:7px;display:none"></div>';
+  sbody.insertBefore(lf, sbody.firstChild);
+}
+
+async function doLogin(){
+  var email = (document.getElementById('li-email')||{}).value || '';
+  var pwd   = (document.getElementById('li-pwd')||{}).value || '';
+  var err   = document.getElementById('li-err');
+  if(!email||!pwd){ if(err){err.style.display='block';err.textContent='Inserisci email e password';} return; }
+  try{
+    var r = await fetch('/api/auth/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email:email, password:pwd}),
+    });
+    var data = await r.json();
+    if(r.ok && data.access_token){
+      localStorage.setItem('wl_tok', data.access_token);
+      G.token = data.access_token;
+      var lf = document.getElementById('login-form-inline'); if(lf) lf.remove();
+      var dot = document.getElementById('sdot'), txt = document.getElementById('stxt');
+      if(dot) dot.style.background='#10B981';
+      if(txt) txt.textContent='online';
+      setTimeout(function(){ loadBrainStats(); loadUHist(); loadKGFromServer(); }, 200);
+    } else {
+      if(err){ err.style.display='block'; err.textContent = data.detail || 'Credenziali errate'; }
+    }
+  } catch(e){
+    if(err){ err.style.display='block'; err.textContent='Errore di rete: '+e.message; }
+  }
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', initAuth);
+} else {
+  setTimeout(initAuth, 0);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DATA LOADING
+   ═══════════════════════════════════════════════════════════════ */
+function _applyBrainStats(r){
+  var lvl = {seed:'🌱',growing:'🌿',active:'🧠',advanced:'⚡',expert:'🔥'};
+  var b = document.getElementById('blv');
+  if(b) b.textContent = (lvl[r.brain_level]||'🌱')+' '+(r.brain_level||'seed').toUpperCase();
+  var sl = document.getElementById('st-lv'); if(sl) sl.textContent = lvl[r.brain_level]||'🌱';
+  G.bsync = r.total_entries||0;
+  updateStats();
+}
+
+function loadBrainStats(){
+  if(!G.token) return;
+  api('/api/brain/stats').then(function(r){
+    if(!r){
+      setTimeout(function(){ if(G.token) api('/api/brain/stats').then(function(r2){ if(r2) _applyBrainStats(r2); }); }, 3000);
+      return;
+    }
+    _applyBrainStats(r);
+  });
+}
+
+async function loadKGFromServer(){
+  if(!G.token) return;
+  var dot = document.getElementById('sdot'), txt = document.getElementById('stxt');
+  var resp = await fetch('/api/kg/graph?limit=300', {headers:{'Authorization':'Bearer '+G.token}}).catch(function(){
+    if(txt) txt.textContent='server offline';
+    return null;
+  });
+  if(!resp) return;
+  if(resp.status===401||resp.status===403){
+    if(txt) txt.textContent='sessione scaduta';
+    showLoginForm(); return;
+  }
+  var data = await resp.json().catch(function(){ return null; });
+  if(!data){ if(txt) txt.textContent='errore risposta KG'; return; }
+  if(!data.nodes || data.nodes.length===0){
+    if(dot) dot.style.background='#F59E0B';
+    if(txt) txt.textContent='KG vuoto — seed in corso…';
+    fetch('/api/kg/trigger-autopop', {method:'POST', headers:{'Authorization':'Bearer '+G.token}})
+      .then(function(){ setTimeout(loadKGFromServer, 8000); })
+      .catch(function(){});
+    return;
+  }
+  // Merge server nodes into G.nodes (skip already-present by id)
+  var existing = {};
+  G.nodes.forEach(function(n){ existing[n.id]=true; });
+  data.nodes.forEach(function(n){
+    var nid = 'kg_'+n.id;
+    if(existing[nid]) return;
+    G.nodes.push({
+      id: nid,
+      label: n.label,
+      content: n.description||'',
+      type: n.type||'concept',
+      tags: [],
+      weight: n.confidence||1.0,
+      x: cx() + (Math.random()-0.5)*Math.min(800, G.W*0.8),
+      y: cy() + (Math.random()-0.5)*Math.min(600, G.H*0.8),
+      vx:0, vy:0, fx:0, fy:0,
+      r: Math.max(8, Math.min(20, 8 + (n.source_count||1)*0.8)),
+      synced: true,
+      fromServer: true,
+      ts: new Date().toISOString(),
+    });
+    existing[nid] = true;
+  });
+  if(data.edges){
+    var eMap = {};
+    G.edges.forEach(function(e){ eMap[e.id] = true; });
+    data.edges.forEach(function(e){
+      var s = 'kg_'+e.src_id, t = 'kg_'+e.tgt_id;
+      if(!existing[s] || !existing[t]) return;
+      var eid = 'eg_'+e.id;
+      if(eMap[eid]) return;
+      G.edges.push({
+        id: eid,
+        src: s, tgt: t,
+        type: e.relation||'related',
+        weight: e.weight||1.0,
+        synced: true,
+      });
+    });
+  }
+  if(dot) dot.style.background='#10B981';
+  if(txt) txt.textContent='online · '+G.nodes.length+' nodi';
+  _buildDeg();
+  updateStats();
+  if(typeof renderNL==='function') renderNL();
+  if(typeof renderEL==='function') renderEL();
+  restartSim();
+}
+
+async function loadUHist(){
+  if(!G.token) return;
+  var r = await fetch('/api/kg/uploads', {headers:{'Authorization':'Bearer '+G.token}})
+    .then(function(x){ return x.json(); }).catch(function(){ return null; });
+  var hist = document.getElementById('uhist');
+  if(!hist||!r||!r.uploads) return;
+  if(r.uploads.length===0){ hist.innerHTML='<div style="font-size:10px;color:var(--t3);text-align:center;padding:14px">Nessun upload</div>'; return; }
+  hist.innerHTML = r.uploads.slice(0,8).map(function(u){
+    return '<div style="padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:5px;font-size:10px">'+
+      '<div style="color:var(--t1);font-weight:600">'+(u.filename||'upload').slice(0,28)+'</div>'+
+      '<div style="color:var(--t3);font-family:Space Mono,monospace;margin-top:3px">+'+(u.nodes_added||0)+' nodi · '+(u.edges_added||0)+' edge · '+(u.created_at||'').slice(0,10)+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CRUD: nodes, edges, stats, lists
+   ═══════════════════════════════════════════════════════════════ */
+function selType(btn){
+  document.querySelectorAll('.type-pill').forEach(function(b){ b.classList.remove('on'); });
+  if(btn) btn.classList.add('on');
+  ST = btn ? (btn.dataset.type||'concept') : 'concept';
+}
+
+function addNode(){
+  var lbl = (document.getElementById('n-lbl')||{}).value || '';
+  lbl = lbl.trim();
+  if(!lbl){ toast('Inserisci un titolo','err'); return; }
+  var cnt = (document.getElementById('n-cnt')||{}).value || '';
+  var tags = ((document.getElementById('n-tags')||{}).value||'').split(',').map(function(t){return t.trim();}).filter(Boolean);
+  var w = parseFloat((document.getElementById('n-wgt')||{}).value) || 1.0;
+  var n = {
+    id: uid(), label: lbl, content: cnt, type: ST,
+    tags: tags, weight: w,
+    x: cx()+(Math.random()-0.5)*200, y: cy()+(Math.random()-0.5)*200,
+    vx:0, vy:0, fx:0, fy:0,
+    r: Math.max(9, Math.min(22, 7+w*4)),
+    synced: false, ts: new Date().toISOString(),
+  };
+  G.nodes.push(n);
+  G.sel = n;
+  ['n-lbl','n-cnt','n-tags'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  var wgEl = document.getElementById('n-wgt'); if(wgEl) wgEl.value = '1.0';
+  if(typeof showNd==='function') showNd(n);
+  updateStats();
+  if(typeof renderNL==='function') renderNL();
+  _buildDeg();
+  toast('Aggiunto: '+lbl,'ok');
+  restartSim();
+  save();
+}
+
+function editNode(){
+  if(!G.sel) return;
+  var lbl = prompt('Nuovo titolo:', G.sel.label);
+  if(lbl===null) return;
+  G.sel.label = lbl.trim() || G.sel.label;
+  G.sel.synced = false;
+  updateStats();
+  if(typeof renderNL==='function') renderNL();
+  if(typeof showNd==='function') showNd(G.sel);
+  save();
+  toast('Modificato','ok');
+}
+
+function delSelNode(){
+  if(!G.sel) return;
+  if(!confirm('Eliminare il nodo "'+G.sel.label+'"?')) return;
+  var id = G.sel.id;
+  G.nodes = G.nodes.filter(function(n){ return n.id!==id; });
+  G.edges = G.edges.filter(function(e){ return e.src!==id && e.tgt!==id; });
+  G.sel = null;
+  closeNd();
+  updateStats();
+  if(typeof renderNL==='function') renderNL();
+  if(typeof renderEL==='function') renderEL();
+  _buildDeg();
+  save();
+  toast('Eliminato','inf');
+}
+
+function addEdge(srcId, tgtId){
+  if(srcId===tgtId) return;
+  var e = {
+    id: uid(), src: srcId, tgt: tgtId,
+    type: 'related', weight: 1.0, synced: false,
+  };
+  G.edges.push(e);
+  _buildDeg();
+  updateStats();
+  if(typeof renderEL==='function') renderEL();
+  save();
+  toast('Connessione creata','ok');
+}
+
+function setMode(m){
+  G.mode = m;
+  if(m==='conn' && G.sel){ G.cf = G.sel; toast('Tocca un altro nodo per collegarlo','inf'); }
+  else G.cf = null;
+}
+
+function showNd(n){
+  if(!n) return;
+  var pn = document.getElementById('node-detail');
+  if(!pn) return;
+  pn.classList.add('on');
+  var fields = {
+    'nd-lbl': n.label,
+    'nd-type': n.type,
+    'nd-cnt': n.content||'',
+    'nd-w': (n.weight||1).toFixed(1),
+    'nd-tags': (n.tags||[]).join(', ') || '—',
+    'nd-sync': n.synced ? '✓ sincronizzato' : '○ locale',
+  };
+  Object.keys(fields).forEach(function(k){
+    var el = document.getElementById(k); if(el) el.textContent = fields[k];
+  });
+}
+function closeNd(){
+  var pn = document.getElementById('node-detail');
+  if(pn) pn.classList.remove('on');
+  G.sel = null;
+}
+
+function updateStats(){
+  var sNodes = document.getElementById('st-nodes');
+  var sEdges = document.getElementById('st-edges');
+  var sSync  = document.getElementById('st-sync');
+  if(sNodes) sNodes.textContent = G.nodes.length;
+  if(sEdges) sEdges.textContent = G.edges.length;
+  if(sSync)  sSync.textContent  = G.bsync || 0;
+}
+
+function renderNL(){
+  var nl = document.getElementById('nlist');
+  if(!nl) return;
+  var q = (document.getElementById('nf-inp')||{}).value || '';
+  q = q.toLowerCase();
+  var filtered = q ? G.nodes.filter(function(n){ return n.label.toLowerCase().includes(q); }) : G.nodes;
+  if(filtered.length===0){ nl.innerHTML = '<div style="font-size:10px;color:var(--t3);text-align:center;padding:14px">Nessun nodo</div>'; return; }
+  nl.innerHTML = filtered.slice(0, 100).map(function(n){
+    return '<div onclick="(function(){G.sel=G.nodes.find(function(x){return x.id===\''+n.id+'\'});showNd(G.sel);focusNode(G.sel);})()" style="padding:7px 9px;background:rgba(255,255,255,.03);border-radius:7px;margin-bottom:4px;font-size:11px;cursor:pointer;border:1px solid rgba(255,255,255,.04)">'+
+      '<div style="color:'+(TC[n.type]||'#7C3AED')+';font-weight:600">'+n.label.slice(0,32)+'</div>'+
+      '<div style="color:var(--t3);font-size:9px;font-family:Space Mono,monospace;margin-top:2px">'+n.type+(n.synced?' · ✓':'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+function renderEL(){
+  var el = document.getElementById('elist');
+  if(!el) return;
+  var nm = {};
+  G.nodes.forEach(function(n){ nm[n.id] = n.label; });
+  if(G.edges.length===0){ el.innerHTML='<div style="font-size:10px;color:var(--t3);text-align:center;padding:14px">Nessun edge</div>'; return; }
+  el.innerHTML = G.edges.slice(0, 100).map(function(e){
+    return '<div style="padding:7px 9px;background:rgba(255,255,255,.03);border-radius:7px;margin-bottom:4px;font-size:10px;font-family:Space Mono,monospace">'+
+      '<span style="color:var(--t2)">'+(nm[e.src]||'?').slice(0,16)+'</span> '+
+      '<span style="color:var(--accent)">→ '+e.type+' →</span> '+
+      '<span style="color:var(--t2)">'+(nm[e.tgt]||'?').slice(0,16)+'</span>'+
+    '</div>';
+  }).join('');
+}
+
+function setTab(name, btn){
+  CT = name;
+  document.querySelectorAll('.stab').forEach(function(b){ b.classList.remove('on'); });
+  if(btn) btn.classList.add('on');
+  document.querySelectorAll('.tabp').forEach(function(p){ p.classList.remove('on'); });
+  var p = document.getElementById('tab-'+name);
+  if(p) p.classList.add('on');
+  if(name==='nodes') renderNL();
+  if(name==='edges') renderEL();
+  if(name==='stats') loadBrainStats();
+}
+
+function showGuide(t){
+  document.querySelectorAll('.guide-pane').forEach(function(g){ g.classList.remove('on'); });
+  document.querySelectorAll('.guide-tab').forEach(function(g){ g.classList.remove('on'); });
+  var p = document.getElementById('guide-'+t); if(p) p.classList.add('on');
+  var b = event && event.target; if(b) b.classList.add('on');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SYNC + UPLOAD + IMPORT
+   ═══════════════════════════════════════════════════════════════ */
+function syncToBrain(){
+  if(!G.token){ toast('Login prima di sincronizzare','err'); return; }
+  var unsynced = G.nodes.filter(function(n){ return !n.synced && !n.fromServer; });
+  if(unsynced.length===0){ toast('Niente da sincronizzare','inf'); return; }
+  var entries = unsynced.map(function(n){
+    return {
+      title: n.label,
+      content: n.content || n.label,
+      type: n.type,
+      tags: n.tags || [],
+      weight: n.weight || 1.0,
+    };
+  });
+  var btn = document.getElementById('btn-sync');
+  if(btn){ btn._t = btn.textContent; btn.textContent = '⏳…'; btn.disabled = true; }
+  api('/api/brain/feed/batch', {method:'POST', body:{entries:entries}}).then(function(r){
+    if(btn){ btn.textContent = btn._t || '⇧ Sync'; btn.disabled = false; }
+    if(!r){ toast('Errore sync','err'); return; }
+    unsynced.forEach(function(n){ n.synced = true; });
+    save();
+    toast('+'+(r.added||entries.length)+' sincronizzati','ok');
+    loadBrainStats();
+  });
+}
+
+function batchImport(){
+  var fi = document.getElementById('kf');
+  if(fi) fi.click();
+}
+
+/* File upload handler */
+(function setupKfUpload(){
+  var fi = document.getElementById('kf');
+  if(!fi) return;
+  fi.addEventListener('change', async function(e){
+    var f = e.target.files[0];
+    if(!f) return;
+    if(!G.token){ toast('Login richiesto','err'); return; }
+    var fd = new FormData();
+    fd.append('file', f);
+    var pf = document.getElementById('upload-fill');
+    var pt = document.getElementById('upload-status');
+    if(pt) pt.textContent = 'Upload in corso…';
+    try{
+      var resp = await fetch('/api/kg/upload', {
+        method:'POST',
+        headers:{'Authorization':'Bearer '+G.token},
+        body: fd,
+      });
+      var r = await resp.json();
+      if(!resp.ok){ toast(r.detail||'Upload fallito','err'); return; }
+      toast('+'+(r.nodes_added||0)+' nodi','ok');
+      if(pf) pf.style.width='100%';
+      if(pt) pt.textContent = '✓ '+(r.nodes_added||0)+' nodi · '+(r.edges_added||0)+' edge';
+      loadUHist();
+      setTimeout(loadKGFromServer, 800);
+    } catch(err){
+      toast('Errore: '+err.message,'err');
+    }
+    fi.value = '';
+  });
+})();
+
+
+
+/* ═══════════════════════════════════════════════════════════════
    FIRE GRAPH ENGINE v2
    - Category colors with glow (photo 3 style)
    - Hub-spoke radial layout via degree-based pull
