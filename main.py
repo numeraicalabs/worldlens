@@ -134,9 +134,9 @@ async def lifespan(app: FastAPI):
         await _aio.sleep(8)  # let scheduler + DB settle
         try:
             # Run mega-seed first for comprehensive coverage
-            from kg_mega_seed import run_mega_seed
-            logger.info("Startup: running KG mega-seed (500+ nodes)…")
-            n, e = await run_mega_seed()
+            from kg_mega_seed_v2 import run_mega_seed_v2
+            logger.info("Startup: running KG mega-seed v2 (3000+ nodes)…")
+            n, e = await run_mega_seed_v2()
             logger.info("Startup KG mega-seed: +%d nodes +%d edges", n, e)
         except Exception as _se:
             logger.warning("Startup mega-seed: %s", _se)

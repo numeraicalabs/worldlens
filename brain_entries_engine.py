@@ -28,22 +28,13 @@ _SYSTEM_USER_ID = 1   # Admin user receives all auto-entries
 
 
 async def _ensure_brain_tables_exist(db: aiosqlite.Connection):
-    """Create brain_entries if it doesn't exist (safe no-op if already exists)."""
-    await db.execute("""
-        CREATE TABLE IF NOT EXISTS brain_entries (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id      INTEGER NOT NULL DEFAULT 1,
-            title        TEXT NOT NULL,
-            content      TEXT NOT NULL DEFAULT '',
-            source_type  TEXT NOT NULL DEFAULT 'auto',
-            tags         TEXT NOT NULL DEFAULT '[]',
-            weight       REAL NOT NULL DEFAULT 1.0,
-            confidence   REAL NOT NULL DEFAULT 0.8,
-            ai_enhanced  INTEGER NOT NULL DEFAULT 0,
-            created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
+    """Ensure brain tables exist using the canonical schema from brain.py."""
+    try:
+        from routers.brain import BRAIN_SCHEMA
+        await db.executescript(BRAIN_SCHEMA)
+    except Exception:
+        pass
+    # brain_digests is additional
     await db.execute("""
         CREATE TABLE IF NOT EXISTS brain_digests (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,23 +64,38 @@ async def _write_entry(
     tags_json = json.dumps(tags or [])
     try:
         async with aiosqlite.connect(settings.db_path) as db:
-            await _ensure_brain_tables_exist(db)
-            # Avoid duplicate: skip if same title exists in last 24h
+            from routers.brain import BRAIN_SCHEMA
+            await db.executescript(BRAIN_SCHEMA)
+            # Avoid duplicate: same content snippet in last 24h
+            snippet = title[:80]
             async with db.execute(
-                "SELECT id FROM brain_entries WHERE user_id=? AND title=? "
-                "AND datetime(created_at) > datetime('now','-24 hours') LIMIT 1",
-                (user_id, title[:200])
+                "SELECT id FROM brain_entries WHERE user_id=? "
+                "AND content LIKE ? "
+                "AND datetime(timestamp) > datetime('now','-24 hours') LIMIT 1",
+                (user_id, f"%{snippet}%")
             ) as c:
                 if await c.fetchone():
-                    return None  # already written recently
+                    return None
+            # Build content with title + body
+            full_content = f"**{title}**\n\n{content}"[:3000]
+            # topic from tags
+            topic = tags[0] if tags else source_type
+            # context JSON
+            import json as _json
+            ctx = _json.dumps({"tags": tags, "ai_enhanced": ai_enhanced, "confidence": confidence})
             async with db.execute(
-                "INSERT INTO brain_entries (user_id,title,content,source_type,tags,weight,confidence,ai_enhanced) "
-                "VALUES (?,?,?,?,?,?,?,?)",
-                (user_id, title[:200], content[:2000], source_type,
-                 tags_json, weight, confidence, int(ai_enhanced))
+                "INSERT INTO brain_entries (user_id, content, source, topic, weight, context) "
+                "VALUES (?,?,?,?,?,?)",
+                (user_id, full_content, source_type, topic, weight, ctx)
             ) as c:
                 entry_id = c.lastrowid
             await db.commit()
+            # Trigger FTS rebuild
+            try:
+                await db.execute("INSERT INTO brain_fts(brain_fts) VALUES('rebuild')")
+                await db.commit()
+            except Exception:
+                pass
             return entry_id
     except Exception as e:
         logger.debug("_write_entry: %s", e)
