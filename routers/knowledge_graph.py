@@ -980,7 +980,7 @@ async def get_neighbors(node_id: int, depth: int = 1, user=Depends(require_user)
 
 
 @router.get("/graph")
-async def get_full_graph(limit: int = 200, user=Depends(require_user)):
+async def get_full_graph(limit: int = 1000, user=Depends(require_user)):
     """Get nodes + edges for visualization. Returns top N by source_count."""
     pool = await get_pool()
 
@@ -1312,3 +1312,73 @@ async def kg_status(_=Depends(require_user)):
             return {"ok": True, "backend": "sqlite", "nodes": n, "edges": e}
     except Exception as ex:
         return {"ok": False, "backend": "error", "detail": str(ex), "nodes": 0, "edges": 0}
+
+
+# ── Mega-seed v2 endpoint ─────────────────────────────────────────────────────
+
+@router.post("/mega-seed-v2")
+async def mega_seed_v2_endpoint(
+    background_tasks: BackgroundTasks,
+    user=Depends(require_user),
+):
+    """Trigger KG mega-seed v2: 3000+ nodes including companies, ETFs, countries, people."""
+    async def run():
+        from kg_mega_seed_v2 import run_mega_seed_v2
+        await run_mega_seed_v2()
+
+    background_tasks.add_task(run)
+    return {"ok": True, "message": "Mega-seed v2 started — 3000+ nodes being added. May take 2-3 minutes."}
+
+
+# ── Text-to-KG endpoint ───────────────────────────────────────────────────────
+
+@router.post("/ingest-text-v2")
+async def ingest_text_v2(
+    payload: dict = Body(...),
+    user=Depends(require_user),
+):
+    """Convert text (paste/URL) to KG nodes+edges using rule-based + optional Gemini."""
+    from text_to_kg import ingest_text_to_kg, scrape_url_to_kg
+    from ai_layer import _get_user_ai_keys
+
+    text = (payload.get("text") or "").strip()
+    url  = (payload.get("url") or "").strip()
+    if not text and not url:
+        raise HTTPException(400, "Provide 'text' or 'url'")
+
+    ug, ua = await _get_user_ai_keys(user["id"])
+
+    if url:
+        result = await scrape_url_to_kg(url, ug, ua)
+    else:
+        result = await ingest_text_to_kg(text, "user_paste", ug, ua)
+
+    return result
+
+
+# ── Template endpoints ────────────────────────────────────────────────────────
+
+@router.get("/templates")
+async def list_templates(_=Depends(require_user)):
+    """List available pre-built knowledge templates."""
+    from text_to_kg import get_template_list
+    return {"templates": get_template_list()}
+
+
+@router.post("/templates/{template_id}")
+async def ingest_template_endpoint(
+    template_id: str,
+    background_tasks: BackgroundTasks,
+    user=Depends(require_user),
+):
+    """Load and ingest a pre-built domain template into the KG."""
+    from text_to_kg import ingest_template
+    from ai_layer import _get_user_ai_keys
+
+    ug, ua = await _get_user_ai_keys(user["id"])
+
+    async def run():
+        await ingest_template(template_id, ug, ua)
+
+    background_tasks.add_task(run)
+    return {"ok": True, "message": f"Template '{template_id}' ingestion started"}

@@ -15,7 +15,7 @@ from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 
 import aiosqlite
-from fastapi import APIRouter, Depends, Body, HTTPException
+from fastapi import APIRouter, Depends, Body, HTTPException, BackgroundTasks
 from auth import require_user, require_admin
 from config import settings
 
@@ -569,3 +569,45 @@ async def get_kg_explanations(node: str = "", user=Depends(require_user)):
             ) as c:
                 explanations = [dict(r) for r in await c.fetchall()]
     return {"explanations": explanations, "count": len(explanations)}
+
+
+# ── Daily digest endpoint ──────────────────────────────────────────────────────
+
+@router.get("/digest")
+async def get_digest(user=Depends(require_user)):
+    """Get today's brain digest (generate if missing)."""
+    user_id = user["id"]
+    today = date.today().isoformat()
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM brain_digests WHERE user_id=? AND date=? LIMIT 1",
+                (user_id, today)
+            ) as c:
+                row = await c.fetchone()
+            if row:
+                return dict(row)
+        # Try system digest (user_id=1)
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM brain_digests WHERE user_id=1 AND date=? LIMIT 1",
+                (today,)
+            ) as c:
+                row = await c.fetchone()
+            if row:
+                return dict(row)
+    except Exception as e:
+        logger.debug("get_digest: %s", e)
+    return {"content": None, "date": today, "ai_enhanced": False}
+
+
+@router.post("/digest/generate")
+async def trigger_digest(background_tasks: BackgroundTasks, user=Depends(require_user)):
+    """Manually trigger digest generation."""
+    async def run():
+        from brain_entries_engine import generate_daily_digest
+        await generate_daily_digest(user["id"])
+    background_tasks.add_task(run)
+    return {"ok": True, "message": "Digest generation started"}
