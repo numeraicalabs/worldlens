@@ -444,6 +444,18 @@ async def analyze_node(payload: dict = Body(...), user=Depends(require_user)):
         # Structured fallback without AI
         result = _build_fallback_analysis(traversal, live_ctx)
 
+    # ── Self-improvement: store analysis as brain entry ──────────────────────
+    try:
+        from brain_entries_engine import store_analysis_as_entry
+        asyncio.create_task(store_analysis_as_entry(
+            query=node_label,
+            analysis=result,
+            source_type="jarvis",
+            user_id=user.get("id", 1),
+        ))
+    except Exception:
+        pass
+
     return {
         "node":         node_label,
         "analysis":     result,
