@@ -146,6 +146,16 @@ textarea.fi{min-height:65px;line-height:1.5}
 .jm-path{font-size:9px;padding:4px 10px;border-radius:20px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);color:#A78BFA;font-family:Space Mono,monospace;cursor:pointer;transition:all .15s}
 .jm-path:hover{background:rgba(124,58,237,.18)}
 
+.jq-chip{padding:5px 9px;border-radius:20px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#A0A8C0;font-size:9px;font-family:inherit;cursor:pointer;font-weight:600;transition:all .15s;white-space:nowrap}
+.jq-chip:hover{border-color:#7C3AED;color:#A78BFA;background:rgba(124,58,237,.1)}
+.jchat-sys{font-size:10px;color:#5A6070;text-align:center;padding:8px;font-family:"Space Mono",monospace}
+.jchat-user{align-self:flex-end;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;padding:9px 12px;border-radius:12px 12px 4px 12px;font-size:11px;max-width:90%;line-height:1.5}
+.jchat-ai{align-self:flex-start;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:#D0D8F0;padding:10px 12px;border-radius:4px 12px 12px 12px;font-size:11px;max-width:95%;line-height:1.65;white-space:pre-wrap}
+.jchat-ai strong{color:#F0F2FF}
+.jchat-loading{align-self:flex-start;color:#5A6070;font-size:10px;font-family:"Space Mono",monospace;padding:6px 0;animation:pulse 1.2s ease-in-out infinite}
+.jchat-node-ctx{background:rgba(124,58,237,.08);border-left:2px solid #7C3AED;padding:6px 10px;border-radius:0 6px 6px 0;font-size:9px;color:#A78BFA;font-family:"Space Mono",monospace;margin-bottom:4px}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+
 </style>
 </head>
 <body>
@@ -210,16 +220,41 @@ textarea.fi{min-height:65px;line-height:1.5}
       <span id="blv">🌱 SEED</span>
     </div>
     <div class="stabs">
-      <button class="stab on" onclick="setTab('add',this)">＋ADD</button>
+      <button class="stab on" onclick="setTab('jarvis',this)">🤖 Jarvis</button>
+      <button class="stab" onclick="setTab('add',this)">＋ADD</button>
       <button class="stab" onclick="setTab('upload',this)">↑UP</button>
       <button class="stab" onclick="setTab('nodes',this)">NODI</button>
       <button class="stab" onclick="setTab('stats',this)">STATS</button>
-      <button class="stab" onclick="setTab('edges',this)">LINKS</button>
     </div>
     <div class="sbody">
 
-      <div id="tab-add">
-        <div class="fld"><label>Tipo nodo</label>
+      <!-- ══ JARVIS CHAT TAB ══ -->
+      <div id="tab-jarvis" style="display:flex;flex-direction:column;height:100%;gap:0">
+
+        <!-- Quick actions -->
+        <div style="display:flex;flex-wrap:wrap;gap:5px;padding:10px 12px 8px;border-bottom:1px solid rgba(255,255,255,.06)">
+          <button class="jq-chip" onclick="jarvisQuick('Market brief equity globale')">📈 Market Brief</button>
+          <button class="jq-chip" onclick="jarvisQuick('Risk summary geopolitico oggi')">⚠️ Risk Summary</button>
+          <button class="jq-chip" onclick="jarvisQuick('Analisi macro inflazione tassi')">📊 Macro</button>
+          <button class="jq-chip" onclick="jarvisQuick('Portfolio VWCE IBGL stress test')">💼 Portfolio</button>
+          <button class="jq-chip" onclick="loadDailyDigest()">🗞 Digest oggi</button>
+          <button class="jq-chip" onclick="jarvisQuick('Supply chain disruption risk')">🔗 Supply Chain</button>
+        </div>
+
+        <!-- Chat messages -->
+        <div id="jchat-msgs" style="flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:10px;min-height:0">
+          <div class="jchat-sys">👋 Interroga il Knowledge Graph. Clicca un nodo per analizzarlo, o usa i pulsanti rapidi sopra.</div>
+        </div>
+
+        <!-- Input -->
+        <div style="padding:10px 12px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:6px">
+          <input id="jchat-inp" class="fi" placeholder="Chiedi qualcosa al brain…" style="flex:1;font-size:11px"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendJarvisChat();}">
+          <button onclick="sendJarvisChat()" style="padding:8px 12px;border-radius:8px;border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:12px;cursor:pointer;flex-shrink:0">▶</button>
+        </div>
+      </div>
+
+      <div id="tab-add" style="display:none">
           <div class="tg">
             <button class="tb2 sel" data-t="concept" onclick="selType(this)">● Concetto</button>
             <button class="tb2" data-t="finance" onclick="selType(this)">▲ Finanza</button>
@@ -252,29 +287,30 @@ textarea.fi{min-height:65px;line-height:1.5}
       </div>
 
       <div id="tab-upload" style="display:none">
-        <p style="font-size:10px;color:var(--t2);line-height:1.7;margin-bottom:10px">Carica file per estrarre nodi ed edge nel grafo condiviso.<br><strong style="color:var(--via)">Supportati:</strong> ChatGPT JSON · .txt · .pdf</p>
-        <div style="display:flex;gap:3px;margin-bottom:9px">
-          <button onclick="showGuide('chatgpt')" id="g-chatgpt" style="flex:1;padding:4px;border-radius:5px;border:1px solid rgba(124,58,237,.3);background:rgba(124,58,237,.1);color:var(--via);font-size:8px;cursor:pointer;font-family:inherit;font-weight:700">ChatGPT</button>
-          <button onclick="showGuide('struct')" id="g-struct" style="flex:1;padding:4px;border-radius:5px;border:1px solid var(--b1);background:transparent;color:var(--t3);font-size:8px;cursor:pointer;font-family:inherit">Strutturato</button>
-          <button onclick="showGuide('pdf')" id="g-pdf" style="flex:1;padding:4px;border-radius:5px;border:1px solid var(--b1);background:transparent;color:var(--t3);font-size:8px;cursor:pointer;font-family:inherit">PDF/TXT</button>
-        </div>
-        <div id="g-chatgpt-c" style="background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.2);border-radius:7px;padding:9px;margin-bottom:9px;font-size:9px;color:var(--t2);line-height:1.8">
-          <strong style="color:var(--via)">ChatGPT:</strong> Settings → Data Controls → Export Data → ZIP → <code style="background:rgba(255,255,255,.08);padding:1px 4px;border-radius:3px">conversations.json</code><br>
-          <strong style="color:var(--via)">Claude:</strong> Account → Privacy → Export Data
-        </div>
-        <div id="g-struct-c" style="display:none;background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.2);border-radius:7px;padding:9px;margin-bottom:9px">
-          <pre style="font-size:8px;color:var(--t2);line-height:1.7;white-space:pre-wrap"># NODO: Federal Reserve
-TIPO: entity
-DESC: Banca centrale USA
+        <p style="font-size:10px;color:var(--t2);line-height:1.7;margin-bottom:10px">
+          Carica testo, URL o usa template pre-impostati per popolare il KG.<br>
+          <strong style="color:var(--via)">Gemini AI</strong> estrae entità e relazioni automaticamente.
+        </p>
 
-# EDGE: Federal Reserve -> Interest Rate
-RELAZIONE: influences
-PESO: 2.0</pre>
-          <a href="/api/kg/template" download="template.txt" style="display:block;margin-top:7px;text-align:center;padding:5px;border-radius:6px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.1);color:var(--grn);font-size:9px;font-weight:700;text-decoration:none">↓ Template .txt</a>
+        <!-- ── Templates pre-impostati ── -->
+        <div style="font-size:8px;font-family:Space Mono,monospace;letter-spacing:.1em;color:#A78BFA;margin-bottom:7px">TEMPLATE DOMINIO</div>
+        <div id="tmpl-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px"></div>
+        <button class="btn bg2 bw bsm" onclick="loadTemplates()" style="margin-bottom:12px;width:100%">↻ Carica template</button>
+
+        <!-- ── Text paste ── -->
+        <div style="font-size:8px;font-family:Space Mono,monospace;letter-spacing:.1em;color:var(--t3);margin-bottom:5px">INCOLLA TESTO / ARTICOLO</div>
+        <textarea id="txt-paste" class="fi" rows="5" placeholder="Incolla testo da analizzare: articoli, report, minutes, earnings…&#10;&#10;Il sistema estrae automaticamente entità, indicatori e relazioni." style="resize:none;margin-bottom:7px"></textarea>
+        <button class="btn bp bw bsm" onclick="ingestPastedText()" style="width:100%;margin-bottom:12px">🧠 Analizza → KG</button>
+
+        <!-- ── URL scraping ── -->
+        <div style="font-size:8px;font-family:Space Mono,monospace;letter-spacing:.1em;color:var(--t3);margin-bottom:5px">SCRAPING URL</div>
+        <div style="display:flex;gap:5px;margin-bottom:12px">
+          <input id="url-inp" class="fi" placeholder="https://..." style="flex:1;font-size:10px">
+          <button class="btn bp bsm" onclick="ingestURL()" style="flex-shrink:0">→ KG</button>
         </div>
-        <div id="g-pdf-c" style="display:none;background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);border-radius:7px;padding:9px;margin-bottom:9px;font-size:9px;color:var(--t2);line-height:1.8">
-          Fed Minutes · ECB Bulletin · IMF WEO · BIS Quarterly · ETF factsheets<br>Max 10MB · 50 pagine
-        </div>
+
+        <!-- ── File upload (original) ── -->
+        <div style="font-size:8px;font-family:Space Mono,monospace;letter-spacing:.1em;color:var(--t3);margin-bottom:5px">CARICA FILE</div>
         <div id="udz" onclick="document.getElementById('kf').click()">
           <div style="font-size:24px;margin-bottom:5px">📂</div>
           <div style="font-size:10px;font-weight:600;color:var(--t1)">Clicca o trascina file</div>
@@ -282,6 +318,14 @@ PESO: 2.0</pre>
         </div>
         <input type="file" id="kf" accept=".json,.txt,.pdf" style="display:none" onchange="uploadFile(event)">
         <div id="ust"><div id="ustxt">Elaborazione…</div><div id="upb"><div id="upf"></div></div></div>
+
+        <!-- ── Mega seed ── -->
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)">
+          <div style="font-size:8px;font-family:Space Mono,monospace;letter-spacing:.1em;color:var(--t3);margin-bottom:7px">SEED MASSIVO KG</div>
+          <button class="btn bg2 bw bsm" onclick="runMegaSeed()" style="width:100%;margin-bottom:5px">🌱 Seed Base (500 nodi)</button>
+          <button class="btn bp bw bsm" onclick="runMegaSeedV2()" style="width:100%">🚀 Seed Completo (3000+ nodi)</button>
+        </div>
+
         <div style="font-size:8px;font-family:Space Mono,monospace;letter-spacing:.1em;color:var(--t3);margin:9px 0 5px">UPLOAD RECENTI</div>
         <div id="uhist" style="display:flex;flex-direction:column;gap:3px"></div>
         <button class="btn bg2 bw bsm" onclick="loadUHist()" style="margin-top:7px">↻ Aggiorna</button>
@@ -524,7 +568,7 @@ function loadBrainStats(){
 async function loadKGFromServer(){
   if(!G.token) return;
   var dot = document.getElementById('sdot'), txt = document.getElementById('stxt');
-  var resp = await fetch('/api/kg/graph?limit=300', {headers:{'Authorization':'Bearer '+G.token}}).catch(function(){
+  var resp = await fetch('/api/kg/graph?limit=1000', {headers:{'Authorization':'Bearer '+G.token}}).catch(function(){
     if(txt) txt.textContent='server offline';
     return null;
   });
@@ -759,9 +803,15 @@ function setTab(name, btn){
   CT = name;
   document.querySelectorAll('.stab').forEach(function(b){ b.classList.remove('on'); });
   if(btn) btn.classList.add('on');
-  document.querySelectorAll('.tabp').forEach(function(p){ p.classList.remove('on'); });
+  else {
+    var firstTab = document.querySelector('.stab');
+    if(firstTab) firstTab.classList.add('on');
+  }
+  document.querySelectorAll('.tabp, #tab-jarvis, #tab-add, #tab-upload, #tab-nodes, #tab-stats, #tab-edges').forEach(function(p){
+    p.style.display = 'none';
+  });
   var p = document.getElementById('tab-'+name);
-  if(p) p.classList.add('on');
+  if(p) p.style.display = name==='jarvis' ? 'flex' : 'block';
   if(name==='nodes') renderNL();
   if(name==='edges') renderEL();
   if(name==='stats') loadBrainStats();
@@ -1927,6 +1977,248 @@ function runMegaSeed(){
       toast('Errore seed: '+e.message,'err');
       if(btn){btn.textContent='🌱 Seed';btn.disabled=false;}
     });
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   JARVIS SIDEBAR CHAT
+   Interactive brain interrogation in the sidebar panel.
+   Uses /api/jarvis/analyze-node for node queries,
+   /api/brain/agent/ask for general queries.
+   ═══════════════════════════════════════════════════════════════ */
+
+var _jchatHistory = [];
+
+function _appendChat(cls, html){
+  var msgs = document.getElementById('jchat-msgs');
+  if(!msgs) return;
+  var div = document.createElement('div');
+  div.className = cls;
+  div.innerHTML = html;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function jarvisQuick(query){
+  document.getElementById('jchat-inp').value = query;
+  sendJarvisChat();
+}
+
+async function sendJarvisChat(){
+  var inp = document.getElementById('jchat-inp');
+  var query = (inp ? inp.value : '').trim();
+  if(!query) return;
+  if(!G.token){ _appendChat('jchat-sys','⚠️ Accedi prima per usare Jarvis'); return; }
+
+  if(inp) inp.value = '';
+
+  // Show user message
+  _appendChat('jchat-user', escHtml(query));
+
+  // Show loading
+  var loadEl = _appendChat('jchat-loading', '⏳ Analisi in corso…');
+
+  var h = {'Content-Type':'application/json','Authorization':'Bearer '+G.token};
+
+  // Check if query matches a node label (try Jarvis node analysis first)
+  var nodeMatch = G.nodes.find(function(n){
+    return n.label.toLowerCase() === query.toLowerCase() ||
+           n.label.toLowerCase().includes(query.toLowerCase());
+  });
+
+  try {
+    var result;
+    if(nodeMatch && query.length > 2){
+      // Node analysis via Jarvis
+      _appendChat('jchat-node-ctx', '🔍 Analizzo nodo: <strong>'+escHtml(nodeMatch.label)+'</strong> · KG traversal 2 hop');
+      var r = await fetch('/api/jarvis/analyze-node', {
+        method:'POST', headers:h,
+        body: JSON.stringify({node: nodeMatch.label})
+      }).then(function(r){ return r.json(); });
+      result = r.analysis || r.detail || 'Nessuna analisi disponibile';
+      // Update graph: highlight the analyzed node
+      G.sel = nodeMatch;
+      if(G.viewMode==='cluster') drillInto(nodeMatch.type);
+      if(typeof showNd==='function') showNd(nodeMatch);
+    } else {
+      // General brain agent query
+      var r = await fetch('/api/brain/agent/ask', {
+        method:'POST', headers:h,
+        body: JSON.stringify({query: query, session_id: 'sidebar_chat'})
+      }).then(function(r){ return r.json(); });
+      result = r.answer || r.response || r.detail || 'Nessuna risposta disponibile';
+    }
+
+    if(loadEl) loadEl.remove();
+    _appendChat('jchat-ai', jarvisMarkdown(result));
+    _jchatHistory.push({q:query, a:result});
+
+  } catch(err){
+    if(loadEl) loadEl.remove();
+    _appendChat('jchat-ai', '⚠️ Errore: '+(err.message||'connessione persa'));
+  }
+}
+
+async function loadDailyDigest(){
+  if(!G.token){ _appendChat('jchat-sys','⚠️ Accedi per vedere il digest'); return; }
+  var loadEl = _appendChat('jchat-loading', '📰 Carico digest giornaliero…');
+  var h = {'Authorization':'Bearer '+G.token};
+  try {
+    var r = await fetch('/api/brain/digest', {headers:h}).then(function(x){ return x.json(); });
+    if(loadEl) loadEl.remove();
+    if(r && r.content){
+      _appendChat('jchat-node-ctx', '🗞 Digest del '+( r.date||new Date().toISOString().slice(0,10))+(r.ai_enhanced?' · ✨ AI enhanced':''));
+      _appendChat('jchat-ai', jarvisMarkdown(r.content));
+    } else {
+      _appendChat('jchat-ai', '📊 Digest non ancora generato. Tornerà disponibile alle 07:00 UTC o esegui manualmente dalla sezione Stats.');
+    }
+  } catch(e){
+    if(loadEl) loadEl.remove();
+    _appendChat('jchat-ai', '⚠️ Errore caricamento digest');
+  }
+}
+
+/* Auto-open Jarvis chat when user double-clicks node:
+   1. Opens sidebar Jarvis tab if on mobile
+   2. Opens full Jarvis modal on desktop */
+var _origOpenJarvis = window.openJarvis;
+window.openJarvis = function(nodeLabel){
+  if(window.innerWidth <= 900){
+    // Mobile: use sidebar chat instead of modal
+    var sb = document.getElementById('sb');
+    if(sb && !sb.classList.contains('open')){
+      sb.classList.add('open');
+      var ptg = document.getElementById('ptoggle');
+      if(ptg) ptg.textContent = '✕';
+    }
+    setTab('jarvis', document.querySelector('.stab'));
+    setTimeout(function(){
+      var inp = document.getElementById('jchat-inp');
+      if(inp){ inp.value = nodeLabel; sendJarvisChat(); }
+    }, 150);
+  } else {
+    // Desktop: full modal
+    if(_origOpenJarvis) _origOpenJarvis(nodeLabel);
+  }
+};
+
+/* openJarvisInSidebar: called from cluster click context */
+function openJarvisInSidebar(label){
+  setTab('jarvis', document.querySelector('.stab'));
+  setTimeout(function(){
+    var inp = document.getElementById('jchat-inp');
+    if(inp){ inp.value = label; sendJarvisChat(); }
+  }, 50);
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+
+/* ═══════════════════════════════════════════════════
+   TEXT-TO-KG + TEMPLATES JS
+   ═══════════════════════════════════════════════════ */
+
+async function loadTemplates(){
+  if(!G.token) return;
+  var h = {'Authorization':'Bearer '+G.token};
+  var r = await fetch('/api/kg/templates',{headers:h}).then(function(x){return x.json();}).catch(function(){return null;});
+  if(!r||!r.templates) return;
+  var grid = document.getElementById('tmpl-grid');
+  if(!grid) return;
+  grid.innerHTML = r.templates.map(function(t){
+    return '<button onclick="loadTemplate(\''+t.id+'\')" style="padding:8px 6px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:var(--t1);font-size:9px;font-family:inherit;cursor:pointer;text-align:left;line-height:1.4;transition:all .15s" onmouseover="this.style.borderColor=\'rgba(124,58,237,.4)\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,.08)\'">'
+      +'<div>'+t.name+'</div>'
+      +'<div style="color:var(--t3);font-size:8px;margin-top:2px">'+t.word_count+' parole</div>'
+      +'</button>';
+  }).join('');
+}
+
+async function loadTemplate(templateId){
+  if(!G.token){toast('Login required','err');return;}
+  toast('Carico template '+templateId+'…','inf');
+  var h = {'Content-Type':'application/json','Authorization':'Bearer '+G.token};
+  var r = await fetch('/api/kg/templates/'+templateId,{method:'POST',headers:h})
+    .then(function(x){return x.json();}).catch(function(e){return {error:e.message};});
+  if(r.ok){
+    toast(r.message||'Template avviato!','ok');
+    setTimeout(function(){loadKGFromServer();},8000);
+  } else {
+    toast(r.error||'Errore template','err');
+  }
+}
+
+async function ingestPastedText(){
+  var txt = (document.getElementById('txt-paste')||{}).value||'';
+  txt = txt.trim();
+  if(!txt){toast('Inserisci del testo','err');return;}
+  if(!G.token){toast('Login required','err');return;}
+  var btn = document.querySelector('button[onclick="ingestPastedText()"]');
+  if(btn){btn.textContent='⏳ Analisi in corso…';btn.disabled=true;}
+  var h = {'Content-Type':'application/json','Authorization':'Bearer '+G.token};
+  try{
+    var r = await fetch('/api/kg/ingest-text-v2',{method:'POST',headers:h,body:JSON.stringify({text:txt})}).then(function(x){return x.json();});
+    if(btn){btn.textContent='🧠 Analizza → KG';btn.disabled=false;}
+    toast('+'+(r.nodes_added||0)+' nodi · '+(r.edges_added||0)+' edge · '+r.method,'ok');
+    if((r.nodes_added||0)>0) setTimeout(loadKGFromServer,1500);
+  }catch(e){
+    if(btn){btn.textContent='🧠 Analizza → KG';btn.disabled=false;}
+    toast('Errore: '+e.message,'err');
+  }
+}
+
+async function ingestURL(){
+  var url = (document.getElementById('url-inp')||{}).value||'';
+  url = url.trim();
+  if(!url||!url.startsWith('http')){toast('URL non valido','err');return;}
+  if(!G.token){toast('Login required','err');return;}
+  var btn = document.querySelector('button[onclick="ingestURL()"]');
+  if(btn){btn.textContent='⏳';btn.disabled=true;}
+  var h = {'Content-Type':'application/json','Authorization':'Bearer '+G.token};
+  try{
+    var r = await fetch('/api/kg/ingest-text-v2',{method:'POST',headers:h,body:JSON.stringify({url:url})}).then(function(x){return x.json();});
+    if(btn){btn.textContent='→ KG';btn.disabled=false;}
+    if(r.error){toast('Errore: '+r.error,'err');}
+    else{toast('+'+(r.nodes_added||0)+' nodi da URL','ok');if((r.nodes_added||0)>0)setTimeout(loadKGFromServer,1500);}
+  }catch(e){
+    if(btn){btn.textContent='→ KG';btn.disabled=false;}
+    toast('Errore: '+e.message,'err');
+  }
+}
+
+function runMegaSeedV2(){
+  if(!G.token){toast('Login required','err');return;}
+  var btn = document.querySelector('button[onclick="runMegaSeedV2()"]');
+  if(btn){btn.textContent='⏳ Avvio seed…';btn.disabled=true;}
+  var h = {'Content-Type':'application/json','Authorization':'Bearer '+G.token};
+  fetch('/api/kg/mega-seed-v2',{method:'POST',headers:h})
+    .then(function(r){return r.json();})
+    .then(function(r){
+      toast(r.message||'Seed v2 avviato — aspetta 2-3 minuti','ok');
+      if(btn){btn.textContent='🚀 Seed Completo (3000+ nodi)';btn.disabled=false;}
+      // Reload KG after 3 minutes
+      setTimeout(function(){loadKGFromServer();toast('KG aggiornato con seed v2','ok');},180000);
+    })
+    .catch(function(e){
+      toast('Errore: '+e.message,'err');
+      if(btn){btn.textContent='🚀 Seed Completo (3000+ nodi)';btn.disabled=false;}
+    });
+}
+
+/* Auto-load templates when upload tab opens */
+var _tmplLoaded = false;
+var _origSetTab = window.setTab;
+if(typeof setTab === 'function'){
+  var __innerSetTab = setTab;
+  window.setTab = function(name,btn){
+    __innerSetTab(name,btn);
+    if(name==='upload' && !_tmplLoaded && G.token){
+      _tmplLoaded=true;
+      setTimeout(loadTemplates,200);
+    }
+  };
 }
 
 </script>
