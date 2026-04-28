@@ -148,8 +148,21 @@ async def lifespan(app: FastAPI):
             except Exception as _se2:
                 logger.warning("Startup brain seed fallback: %s", _se2)
 
+    # ── Startup brain enrichment ──────────────────────────────────────────────
+    async def _startup_brain_entries():
+        import asyncio as _aio
+        await _aio.sleep(12)
+        try:
+            from brain_entries_engine import run_brain_enrichment_cycle, generate_daily_digest
+            logger.info("Startup: running brain entries enrichment…")
+            await run_brain_enrichment_cycle()
+            # Generate today's digest if not already present
+            await generate_daily_digest()
+        except Exception as _e:
+            logger.warning("Startup brain entries: %s", _e)
+
     import asyncio as _asyncio
-    _asyncio.create_task(_startup_brain_seed())
+    _asyncio.create_task(_startup_brain_entries())
     # Init tradgentic tables
     try:
         from routers.tradgentic.portfolio import ensure_tables as tg_init

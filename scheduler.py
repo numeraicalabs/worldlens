@@ -799,6 +799,36 @@ def start():
         misfire_grace_time=3600,
     )
 
+    # ── Brain entries enrichment (every 15 min) ──────────────────────────────
+    async def _brain_entries_cycle():
+        try:
+            from brain_entries_engine import run_brain_enrichment_cycle
+            await run_brain_enrichment_cycle()
+        except Exception as e:
+            logger.warning("brain_entries_cycle: %s", e)
+
+    _scheduler.add_job(
+        _brain_entries_cycle, "interval",
+        minutes=15,
+        id="brain_entries_cycle",
+        misfire_grace_time=300,
+    )
+
+    # ── Daily brain digest (07:00 UTC) ────────────────────────────────────────
+    async def _daily_digest():
+        try:
+            from brain_entries_engine import generate_daily_digest
+            await generate_daily_digest()
+        except Exception as e:
+            logger.warning("daily_digest: %s", e)
+
+    _scheduler.add_job(
+        _daily_digest, "cron",
+        hour=7, minute=0,
+        id="brain_daily_digest",
+        misfire_grace_time=3600,
+    )
+
     # ── Brain autonomous population (every 15 min) ──────────────────────────
     async def _autonomous_brain_pop():
         try:
