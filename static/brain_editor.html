@@ -180,6 +180,7 @@ textarea.fi{min-height:65px;line-height:1.5}
       <button class="cb" onclick="zoomBy(0.8)">－</button>
       <button class="cb" onclick="fitView()">⊡ Fit</button>
       <button class="cb" onclick="togglePhysics()" id="btn-phys">⏸ Phys</button>
+      <button class="cb on" onclick="toggleViewMode()" id="btn-view-toggle" title="Alterna tra vista Cluster e grafo completo">⊞ Cluster</button>
       <button class="cb" onclick="clearAll()">⊘</button>
     </div>
     <button id="ptoggle" onclick="togglePanel()">☰</button>
@@ -322,9 +323,31 @@ PESO: 2.0</pre>
 
 <script>
 'use strict';
-var G={nodes:[],edges:[],sel:null,hov:null,drag:null,dox:0,doy:0,mode:'sel',cf:null,tx:0,ty:0,sc:1,pan:false,px:0,py:0,W:0,H:0,token:null,bsync:0,_id:1,phys:true};
+var G={nodes:[],edges:[],sel:null,hov:null,drag:null,dox:0,doy:0,mode:'sel',cf:null,tx:0,ty:0,sc:1,pan:false,px:0,py:0,W:0,H:0,token:null,bsync:0,_id:1,phys:true,
+  viewMode:'cluster',   /* 'cluster' | 'full' | 'drill' */
+  drillType:null,       /* current drill-down category */
+};
 var SIM={a:1,tick:0};
 var ST='concept',CT='add',FLT='';
+
+/* ═══════════════════════════════════════════════════
+   CLUSTER VIEW METADATA
+   12 super-nodes — one per type — with icons + colors
+   ═══════════════════════════════════════════════════ */
+var CLUSTER_META = {
+  entity:    {label:'Entità',    icon:'🏛', col:'#F97316'},
+  etf:       {label:'ETF',       icon:'📈', col:'#A78BFA'},
+  indicator: {label:'Indicatori',icon:'📊', col:'#06B6D4'},
+  concept:   {label:'Concetti',  icon:'💡', col:'#F59E0B'},
+  policy:    {label:'Policy',    icon:'⚖️', col:'#10B981'},
+  currency:  {label:'Valute',    icon:'💱', col:'#84CC16'},
+  commodity: {label:'Commodity', icon:'🛢', col:'#FB923C'},
+  geo:       {label:'Geo/Pol',   icon:'🌍', col:'#EF4444'},
+  event:     {label:'Eventi',    icon:'⚡', col:'#3B82F6'},
+  source:    {label:'Fonti',     icon:'📰', col:'#EC4899'},
+  person:    {label:'Persone',   icon:'👤', col:'#F472B6'},
+  finance:   {label:'Finanza',   icon:'💰', col:'#7C3AED'},
+};
 
 /* ═══════════════════════════════════════════════════════════════
    CANVAS INIT + RESIZE
@@ -820,12 +843,255 @@ function batchImport(){
 
 
 /* ═══════════════════════════════════════════════════════════════
-   FIRE GRAPH ENGINE v2
+   CLUSTER VIEW ENGINE
    - Category colors with glow (photo 3 style)
    - Hub-spoke radial layout via degree-based pull
    - Zoom-dependent labels
    - Smooth alpha decay for neural network feel
    ═══════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════
+   CLUSTER VIEW ENGINE
+   Default view: 12 super-nodes (one per type)
+   Click → drill-down into that type's individual nodes
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Build cluster aggregate data from G.nodes */
+function buildClusters(){
+  var clusters = {};
+  Object.keys(CLUSTER_META).forEach(function(t){
+    clusters[t] = {type:t, nodes:[], edgeCount:0};
+  });
+  G.nodes.forEach(function(n){
+    var t = n.type||'concept';
+    if(!clusters[t]) clusters[t] = {type:t, nodes:[], edgeCount:0};
+    clusters[t].nodes.push(n);
+  });
+  /* Count cross-type edges */
+  var nm = {};
+  G.nodes.forEach(function(n){ nm[n.id]=n; });
+  G.edges.forEach(function(e){
+    var s=nm[e.src], t=nm[e.tgt];
+    if(s&&t&&s.type!==t.type){
+      clusters[s.type] && clusters[s.type].edgeCount++;
+      clusters[t.type] && clusters[t.type].edgeCount++;
+    }
+  });
+  return clusters;
+}
+
+/* Compute cross-cluster edge summary */
+function buildClusterEdges(clusters){
+  var nm = {};
+  G.nodes.forEach(function(n){ nm[n.id]=n; });
+  var cEdges = {};
+  G.edges.forEach(function(e){
+    var s=nm[e.src], t=nm[e.tgt];
+    if(!s||!t||s.type===t.type) return;
+    var key = [s.type,t.type].sort().join('|');
+    cEdges[key] = (cEdges[key]||0) + 1;
+  });
+  return cEdges;
+}
+
+/* Arrange cluster super-nodes in a circle */
+function clusterPositions(){
+  var types = Object.keys(CLUSTER_META).filter(function(t){
+    return G.nodes.some(function(n){ return n.type===t; });
+  });
+  var cx2=G.W/2, cy2=G.H/2;
+  var rx=Math.min(G.W,G.H)*0.34, ry=Math.min(G.W,G.H)*0.34;
+  var pos = {};
+  types.forEach(function(t,i){
+    var angle = (i/types.length)*Math.PI*2 - Math.PI/2;
+    pos[t] = {x: cx2+Math.cos(angle)*rx, y: cy2+Math.sin(angle)*ry};
+  });
+  return pos;
+}
+
+/* Draw the cluster overview */
+function drawClusterView(){
+  ctx.fillStyle='#000';
+  ctx.fillRect(0,0,G.W,G.H);
+
+  var clusters = buildClusters();
+  var cEdges   = buildClusterEdges(clusters);
+  var pos      = clusterPositions();
+
+  ctx.save();
+
+  /* Draw cross-cluster edges */
+  Object.keys(cEdges).forEach(function(key){
+    var parts = key.split('|');
+    var pa=pos[parts[0]], pb=pos[parts[1]];
+    if(!pa||!pb) return;
+    var w = Math.min(4, 0.6+Math.log(cEdges[key]+1)*0.5);
+    var col = CLUSTER_META[parts[0]] ? CLUSTER_META[parts[0]].col : '#888';
+    ctx.beginPath();
+    ctx.moveTo(pa.x,pa.y);
+    ctx.lineTo(pb.x,pb.y);
+    ctx.strokeStyle=col+'44';
+    ctx.lineWidth=w;
+    ctx.stroke();
+  });
+
+  /* Draw cluster super-nodes */
+  Object.keys(clusters).forEach(function(type){
+    var cl = clusters[type];
+    if(!cl.nodes.length) return;
+    var p = pos[type];
+    if(!p) return;
+    var meta = CLUSTER_META[type]||{label:type,icon:'●',col:'#7C3AED'};
+    var col  = meta.col;
+    var r    = Math.max(32, Math.min(70, 20+Math.sqrt(cl.nodes.length)*5));
+    var isHov= G._hovCluster===type;
+
+    /* Outer glow */
+    ctx.save();
+    ctx.shadowBlur = isHov ? 35 : 22;
+    ctx.shadowColor= col;
+    var halo = ctx.createRadialGradient(p.x,p.y,r*0.2,p.x,p.y,r+12);
+    halo.addColorStop(0, col+'55');
+    halo.addColorStop(1, col+'00');
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,r+12,0,Math.PI*2);
+    ctx.fillStyle=halo;
+    ctx.fill();
+    ctx.restore();
+
+    /* Node body */
+    ctx.save();
+    ctx.shadowBlur=isHov?20:10;
+    ctx.shadowColor=col;
+    var gr = ctx.createRadialGradient(p.x-r*.3,p.y-r*.3,r*.05,p.x,p.y,r);
+    gr.addColorStop(0,'#ffffff');
+    gr.addColorStop(0.3,col);
+    gr.addColorStop(1,col+'99');
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,r,0,Math.PI*2);
+    ctx.fillStyle=gr;
+    ctx.fill();
+    ctx.restore();
+
+    /* Icon */
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.font = Math.round(r*0.52)+'px serif';
+    ctx.fillText(meta.icon, p.x, p.y-r*0.18);
+    ctx.restore();
+
+    /* Labels: type name + count */
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.font='bold 12px "Space Mono",monospace';
+    ctx.fillStyle='#F0F2FF';
+    ctx.shadowBlur=6; ctx.shadowColor=col;
+    ctx.fillText(meta.label, p.x, p.y+r+16);
+    ctx.font='10px "Space Mono",monospace';
+    ctx.fillStyle=col;
+    ctx.shadowBlur=0;
+    ctx.fillText(cl.nodes.length+' nodi', p.x, p.y+r+30);
+    ctx.restore();
+
+    /* Pulse ring on hover */
+    if(isHov){
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,r*1.35,0,Math.PI*2);
+      ctx.strokeStyle=col+'88';
+      ctx.lineWidth=2;
+      ctx.setLineDash([6,4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  });
+
+  /* Center label */
+  ctx.save();
+  ctx.textAlign='center';
+  ctx.font='10px "Space Mono",monospace';
+  ctx.fillStyle='rgba(255,255,255,.18)';
+  ctx.fillText('CLICK cluster per espandere  ·  F per full graph', G.W/2, G.H-18);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/* ── Cluster interaction ── */
+function clusterHitTest(ex,ey){
+  var clusters = buildClusters();
+  var pos      = clusterPositions();
+  var found    = null;
+  Object.keys(clusters).forEach(function(type){
+    if(!clusters[type].nodes.length) return;
+    var p=pos[type];
+    if(!p) return;
+    var r = Math.max(32,Math.min(70,20+Math.sqrt(clusters[type].nodes.length)*5));
+    var dx=ex-p.x,dy=ey-p.y;
+    if(dx*dx+dy*dy<(r+12)*(r+12)) found=type;
+  });
+  return found;
+}
+
+function drillInto(type){
+  G.viewMode='drill';
+  G.drillType=type;
+  /* Reset positions for drill view nodes */
+  var cx2=G.W/2, cy2=G.H/2;
+  var drillNodes = G.nodes.filter(function(n){ return n.type===type; });
+  var r2=Math.min(G.W,G.H)*0.38;
+  drillNodes.forEach(function(n,i){
+    var angle=(i/drillNodes.length)*Math.PI*2;
+    n.x=cx2+Math.cos(angle)*r2*(0.3+Math.random()*0.7);
+    n.y=cy2+Math.sin(angle)*r2*(0.3+Math.random()*0.7);
+    n.vx=0; n.vy=0;
+  });
+  G.sc=1; G.tx=0; G.ty=0;
+  _buildDeg();
+  SIM.a=1; SIM.tick=0;
+  G.phys=true;
+
+  /* Update view toggle UI */
+  updateViewBadge();
+  restartSim();
+}
+
+function exitDrill(){
+  G.viewMode='cluster';
+  G.drillType=null;
+  G.nodes.forEach(function(n){ n.hidden=false; });
+  G.sc=1; G.tx=0; G.ty=0;
+  G._hovCluster=null;
+  updateViewBadge();
+  draw();
+}
+
+function toggleViewMode(){
+  if(G.viewMode==='full'){
+    G.viewMode='cluster';
+    G.drillType=null;
+    G.sc=1; G.tx=0; G.ty=0;
+  } else {
+    G.viewMode='full';
+    G.nodes.forEach(function(n){ n.hidden=!!(_hiddenTypes[n.type]||false); });
+    restartSim();
+  }
+  updateViewBadge();
+  draw();
+}
+
+function updateViewBadge(){
+  var btn=document.getElementById('btn-view-toggle');
+  if(!btn) return;
+  if(G.viewMode==='cluster') btn.textContent='⊞ Cluster';
+  else if(G.viewMode==='drill') btn.textContent='◀ '+( (CLUSTER_META[G.drillType]||{}).label||G.drillType);
+  else btn.textContent='⊟ Full';
+}
+
+
 
 /* Category palette — saturated, distinct */
 var TC={
@@ -1006,6 +1272,25 @@ function togglePhysics(){
 /* DRAW — fire glow renderer */
 function draw(){
   if(!G.W||!G.H) return;
+
+  /* Route to cluster overview or full/drill graph */
+  if(G.viewMode==='cluster'){
+    drawClusterView();
+    return;
+  }
+
+  /* In drill mode: only show nodes of drillType + connected nodes */
+  var visibleIds = null;
+  if(G.viewMode==='drill' && G.drillType){
+    visibleIds = {};
+    G.nodes.forEach(function(n){ if(n.type===G.drillType) visibleIds[n.id]=true; });
+    /* Also show directly connected nodes */
+    G.edges.forEach(function(e){
+      if(visibleIds[e.src]) visibleIds[e.tgt]=true;
+      if(visibleIds[e.tgt]) visibleIds[e.src]=true;
+    });
+    G.nodes.forEach(function(n){ n.hidden = !visibleIds[n.id]; });
+  }
 
   /* Label queue for anti-overlap second-pass rendering */
   var _labelQueue = [];
@@ -1188,7 +1473,16 @@ function draw(){
   ctx.restore();
 }
 
-function loop(){physStep();draw();if(G.phys)requestAnimationFrame(loop);else draw();}
+function loop(){
+  if(G.viewMode==='cluster'){
+    draw(); /* Cluster view is static, no physics */
+    return;
+  }
+  physStep();
+  draw();
+  if(G.phys) requestAnimationFrame(loop);
+  else draw();
+}
 _buildDeg();
 loop();
 
@@ -1203,12 +1497,30 @@ function cxy(e){
 function nAt(wx,wy){var found=null;G.nodes.forEach(function(n){var dx=n.x-wx,dy=n.y-wy;if(Math.sqrt(dx*dx+dy*dy)<(n.r||10)+5)found=n;});return found;}
 
 function onDown(e){
+  /* Cluster view: click on super-node → drill in */
+  if(G.viewMode==='cluster'){
+    var rect0=cv.getBoundingClientRect();
+    var ex=(e.clientX!==undefined?e.clientX:e.changedTouches[0].clientX)-rect0.left;
+    var ey=(e.clientY!==undefined?e.clientY:e.changedTouches[0].clientY)-rect0.top;
+    var hit=clusterHitTest(ex,ey);
+    if(hit){ drillInto(hit); return; }
+    return;
+  }
   var p=cxy(e),hit=nAt(p.x,p.y);
   if(hit&&G.mode==='conn'){if(G.cf&&G.cf.id!==hit.id){addEdge(G.cf.id,hit.id);setMode('sel');}return;}
   if(hit){G.sel=hit;G.drag=hit;G.dox=hit.x-p.x;G.doy=hit.y-p.y;showNd(hit);if(CT==='nodes')renderNL();if(!G.phys)draw();}
   else{G.sel=null;closeNd();G.pan=true;G.px=p.cx-G.tx;G.py=p.cy-G.ty;cv.classList.add('pan');}
 }
 function onMove(e){
+  if(G.viewMode==='cluster'){
+    /* Hover detection for cluster glow */
+    var rect0=cv.getBoundingClientRect();
+    var ex=(e.clientX!==undefined?e.clientX:e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].clientX:0)-rect0.left;
+    var ey=(e.clientY!==undefined?e.clientY:e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].clientY:0)-rect0.top;
+    var hit=clusterHitTest(ex,ey);
+    if(hit!==G._hovCluster){ G._hovCluster=hit; cv.style.cursor=hit?'pointer':'default'; draw(); }
+    return;
+  }
   var p=cxy(e);
   if(G.drag){G.drag.x=p.x+G.dox;G.drag.y=p.y+G.doy;G.drag.vx=0;G.drag.vy=0;if(!G.phys)draw();}
   else if(G.pan){G.tx=p.cx-G.px;G.ty=p.cy-G.py;if(!G.phys)draw();}
@@ -1586,10 +1898,15 @@ cv.addEventListener('touchend',function(e){
   }
 },{passive:true});
 
-/* J shortcut */
+/* J shortcut + F view toggle + Escape drill exit */
 document.addEventListener('keydown',function(e){
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
   if((e.key==='j'||e.key==='J')&&G.sel)openJarvis(G.sel.label);
+  if(e.key==='f'||e.key==='F') toggleViewMode();
+  if(e.key==='Escape'){
+    if(G.viewMode==='drill') exitDrill();
+    else closeJarvis();
+  }
 });
 
 
