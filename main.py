@@ -128,25 +128,61 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("KG schema init skipped: %s", e)
 
-    # ── Brain seed: populate KG immediately on startup ──────────────────────
+    # ── Startup: seed KG only if not already done (survives deploys) ─────────
     async def _startup_brain_seed():
-        import asyncio as _aio
-        await _aio.sleep(8)  # let scheduler + DB settle
+        import asyncio as _aio, aiosqlite as _asl
+        await _aio.sleep(6)
+        SEED_VERSION = "v2.0"  # bump to force re-seed
         try:
-            # Run mega-seed first for comprehensive coverage
-            from kg_mega_seed_v2 import run_mega_seed_v2
-            logger.info("Startup: running KG mega-seed v2 (3000+ nodes)…")
-            n, e = await run_mega_seed_v2()
-            logger.info("Startup KG mega-seed: +%d nodes +%d edges", n, e)
-        except Exception as _se:
-            logger.warning("Startup mega-seed: %s", _se)
+            from supabase_client import get_pool
+            from config import settings as _s
+            pool = await get_pool()
+            already_done = False
             try:
-                # Fallback to basic macro seed
+                if pool:
+                    async with pool.acquire() as conn:
+                        row = await conn.fetchrow("SELECT value FROM kg_meta WHERE key='seed_version'")
+                        if row and row["value"] == SEED_VERSION:
+                            n = await conn.fetchval("SELECT COUNT(*) FROM kg_nodes")
+                            already_done = (n or 0) > 200
+                else:
+                    async with _asl.connect(_s.db_path) as db:
+                        db.row_factory = _asl.Row
+                        async with db.execute("SELECT value FROM kg_meta WHERE key='seed_version'") as c:
+                            row = await c.fetchone()
+                        if row and row["value"] == SEED_VERSION:
+                            async with db.execute("SELECT COUNT(*) as n FROM kg_nodes") as c:
+                                r2 = await c.fetchone()
+                                already_done = (dict(r2)["n"] if r2 else 0) > 200
+            except Exception as _ce:
+                logger.debug("Seed check: %s", _ce)
+
+            if already_done:
+                logger.info("KG seed already at %s — skip", SEED_VERSION)
+                return
+
+            from kg_mega_seed_v2 import run_mega_seed_v2
+            logger.info("Startup KG mega-seed v2…")
+            n, e = await run_mega_seed_v2()
+            logger.info("Startup KG mega-seed v2: +%d nodes +%d edges", n, e)
+
+            # Mark version
+            try:
+                if pool:
+                    async with pool.acquire() as conn:
+                        await conn.execute("INSERT INTO kg_meta(key,value) VALUES('seed_version',$1) ON CONFLICT(key) DO UPDATE SET value=$1", SEED_VERSION)
+                else:
+                    async with _asl.connect(_s.db_path) as db:
+                        await db.execute("INSERT OR REPLACE INTO kg_meta(key,value) VALUES(?,?)", ("seed_version", SEED_VERSION))
+                        await db.commit()
+            except Exception as _me:
+                logger.debug("kg_meta write: %s", _me)
+        except Exception as _se:
+            logger.warning("Startup seed: %s", _se)
+            try:
                 from brain_autopop import auto_populate_from_macro
-                n, e = await auto_populate_from_macro([])
-                logger.info("Startup brain seed L2: +%d nodes +%d edges", n, e)
-            except Exception as _se2:
-                logger.warning("Startup brain seed fallback: %s", _se2)
+                await auto_populate_from_macro([])
+            except Exception: pass
 
     # ── Startup brain enrichment ──────────────────────────────────────────────
     async def _startup_brain_entries():

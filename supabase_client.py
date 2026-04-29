@@ -75,6 +75,13 @@ def is_postgres() -> bool:
 # ── Schema creation ────────────────────────────────────────────────────────────
 
 POSTGRES_SCHEMA = """
+-- Metadata / seed version tracking (survives deploys)
+CREATE TABLE IF NOT EXISTS kg_meta (
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL,
+    updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Shared knowledge graph nodes
 CREATE TABLE IF NOT EXISTS kg_nodes (
     id          BIGSERIAL PRIMARY KEY,
@@ -139,6 +146,11 @@ CREATE INDEX IF NOT EXISTS idx_kg_user_uid    ON kg_user_nodes(user_id);
 
 # SQLite fallback schema (same structure, adapted syntax)
 SQLITE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS kg_meta (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS kg_nodes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     label       TEXT NOT NULL,
