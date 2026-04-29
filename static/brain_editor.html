@@ -587,10 +587,13 @@ async function loadKGFromServer(){
       .catch(function(){});
     return;
   }
-  // Merge server nodes into G.nodes (skip already-present by id)
+  // Merge server nodes — limit to 400 most important for perf
   var existing = {};
   G.nodes.forEach(function(n){ existing[n.id]=true; });
-  data.nodes.forEach(function(n){
+  var newNodes = data.nodes.filter(function(n){ return !existing['kg_'+n.id]; });
+  // Sort by source_count desc, take top 400
+  newNodes.sort(function(a,b){ return (b.source_count||0)-(a.source_count||0); });
+  newNodes.slice(0, 400).forEach(function(n){
     var nid = 'kg_'+n.id;
     if(existing[nid]) return;
     G.nodes.push({
@@ -1212,95 +1215,107 @@ var _CLUSTER_CENTERS = {
 
 function physStep(){
   if(!G.phys||!G.W||!G.H) return;
-  var N=G.nodes.length; if(!N) return;
 
-  // Rebuild degree map periodically
+  // Only simulate VISIBLE nodes (skip hidden, limit to max 400 for perf)
+  var allVis = G.nodes.filter(function(n){ return !n.hidden; });
+  var N = allVis.length;
+  if(!N) return;
+
   if(SIM.tick%60===0) _buildDeg();
-
   SIM.tick++;
-  SIM.a = Math.max(0.004, SIM.a*0.997); /* slower decay = more organic feel */
+  SIM.a = Math.max(0.004, SIM.a*0.997);
 
-  /* Smaller k = tighter clusters, less spread */
-  var k = Math.min(70, Math.max(25, 140/Math.sqrt(N)));
-  var k2 = k*k;
-  var cut2 = (k*4)*(k*4);
-  var MV = 5;
+  var k   = Math.min(65, Math.max(20, 120/Math.sqrt(N)));
+  var k2  = k*k;
+  var MV  = 5;
 
-  G.nodes.forEach(function(n){ n.fx=0; n.fy=0; });
+  allVis.forEach(function(n){ n.fx=0; n.fy=0; });
 
-  /* Repulsion — REDUCED 30% to prevent border-pinning */
+  /* ── SPATIAL GRID for O(n·k) repulsion instead of O(n²) ──
+     Divide canvas into cells of size cellSize.
+     Only repel nodes in same cell + 8 neighbours.
+     Cuts iterations from N² to ~N*avg_per_cell (≈20-50)       */
+  var cellSize = k * 3;
+  var grid = {};
+  allVis.forEach(function(n){
+    var gx = Math.floor(n.x / cellSize);
+    var gy = Math.floor(n.y / cellSize);
+    var key = gx+'|'+gy;
+    if(!grid[key]) grid[key] = [];
+    grid[key].push(n);
+    n._gx = gx; n._gy = gy;
+  });
+
   for(var i=0;i<N;i++){
-    var ni=G.nodes[i];
-    if(ni.hidden) continue;
-    for(var j=i+1;j<N;j++){
-      var nj=G.nodes[j];
-      if(nj.hidden) continue;
-      var dx=ni.x-nj.x, dy=ni.y-nj.y, d2=dx*dx+dy*dy;
-      if(d2>cut2) continue;
-      if(d2<1){dx=(Math.random()-.5)*2;dy=(Math.random()-.5)*2;d2=1;}
-      var d=Math.sqrt(d2);
-      var rf = ni.type===nj.type ? 0.55 : 0.7; /* reduced from 0.65/1.0 */
-      var rep=k2/d*SIM.a*rf;
-      ni.fx+=dx/d*rep; ni.fy+=dy/d*rep;
-      nj.fx-=dx/d*rep; nj.fy-=dy/d*rep;
+    var ni = allVis[i];
+    // Check ni's cell and 8 neighbours
+    for(var dx=-1;dx<=1;dx++){
+      for(var dy=-1;dy<=1;dy++){
+        var neighbours = grid[(ni._gx+dx)+'|'+(ni._gy+dy)];
+        if(!neighbours) continue;
+        for(var q=0;q<neighbours.length;q++){
+          var nj = neighbours[q];
+          if(nj===ni||nj.id<=ni.id) continue; // avoid double-counting
+          var ddx=ni.x-nj.x, ddy=ni.y-nj.y, d2=ddx*ddx+ddy*ddy;
+          if(d2<1){ddx=(Math.random()-.5);ddy=(Math.random()-.5);d2=0.5;}
+          var d=Math.sqrt(d2)||0.01;
+          var rf = ni.type===nj.type ? 0.55 : 0.70;
+          var rep = k2/d*SIM.a*rf;
+          ni.fx+=ddx/d*rep; ni.fy+=ddy/d*rep;
+          nj.fx-=ddx/d*rep; nj.fy-=ddy/d*rep;
+        }
+      }
     }
   }
 
-  /* Edge attraction — STRONGER for same-type clustering */
+  /* Edge attraction */
   var nm={};
-  G.nodes.forEach(function(n){ nm[n.id]=n; });
+  allVis.forEach(function(n){ nm[n.id]=n; });
   G.edges.forEach(function(e){
-    var s=nm[e.src], t=nm[e.tgt]; if(!s||!t||s.hidden||t.hidden) return;
-    var dx=t.x-s.x, dy=t.y-s.y;
-    var d=Math.sqrt(dx*dx+dy*dy)||0.01;
-    var af = s.type===t.type ? 0.22 : 0.10; /* stronger same-type attraction */
+    var s=nm[e.src], t=nm[e.tgt]; if(!s||!t) return;
+    var ddx=t.x-s.x, ddy=t.y-s.y;
+    var d=Math.sqrt(ddx*ddx+ddy*ddy)||0.01;
+    var af = s.type===t.type ? 0.20 : 0.09;
     var att=(d-k)*af*(e.weight||1)*SIM.a;
-    s.fx+=dx/d*att; s.fy+=dy/d*att;
-    t.fx-=dx/d*att; t.fy-=dy/d*att;
+    s.fx+=ddx/d*att; s.fy+=ddy/d*att;
+    t.fx-=ddx/d*att; t.fy-=ddy/d*att;
   });
 
-  /* Hub-spoke + cluster gravity — INCREASED 50% */
-  var cx=G.W/2, cy=G.H/2;
-  G.nodes.forEach(function(n){
-    if(n.hidden) return;
+  /* Hub-spoke + cluster gravity */
+  var cxG=G.W/2, cyG=G.H/2;
+  allVis.forEach(function(n){
     var d=_deg[n.id]||0;
-    /* Hub pull stronger */
-    var hubPull = Math.min(0.04, d*0.0045) * SIM.a;
-    n.fx += (cx-n.x)*hubPull;
-    n.fy += (cy-n.y)*hubPull;
-
-    /* Cluster pull stronger (was 0.003 → 0.0055) */
+    var hubPull = Math.min(0.04, d*0.0045)*SIM.a;
+    n.fx += (cxG-n.x)*hubPull;
+    n.fy += (cyG-n.y)*hubPull;
     var cc=_CLUSTER_CENTERS[n.type]||[0.5,0.5];
-    var tcx=cc[0]*G.W, tcy=cc[1]*G.H;
-    var clPull = 0.0055 * SIM.a;
-    n.fx += (tcx-n.x)*clPull;
-    n.fy += (tcy-n.y)*clPull;
-
-    /* Boundary push — repels from canvas edges to keep nodes inside */
-    var margin = 60;
-    if(n.x < margin)         n.fx += (margin-n.x)*0.08;
-    if(n.x > G.W-margin)     n.fx -= (n.x-(G.W-margin))*0.08;
-    if(n.y < margin)         n.fy += (margin-n.y)*0.08;
-    if(n.y > G.H-margin)     n.fy -= (n.y-(G.H-margin))*0.08;
+    var clPull = 0.0045*SIM.a;
+    n.fx += (cc[0]*G.W-n.x)*clPull;
+    n.fy += (cc[1]*G.H-n.y)*clPull;
+    /* Boundary */
+    var mg=55;
+    if(n.x<mg)     n.fx+=(mg-n.x)*0.1;
+    if(n.x>G.W-mg) n.fx-=(n.x-(G.W-mg))*0.1;
+    if(n.y<mg)     n.fy+=(mg-n.y)*0.1;
+    if(n.y>G.H-mg) n.fy-=(n.y-(G.H-mg))*0.1;
   });
 
   /* Integrate */
-  G.nodes.forEach(function(n){
-    if(n===G.drag||n.hidden) return;
-    n.vx=(n.vx+n.fx)*.5; n.vy=(n.vy+n.fy)*.5;
+  allVis.forEach(function(n){
+    if(n===G.drag) return;
+    n.vx=(n.vx+n.fx)*.50; n.vy=(n.vy+n.fy)*.50;
     var spd=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
     if(spd>MV){n.vx=n.vx/spd*MV;n.vy=n.vy/spd*MV;}
     n.x=Math.max(n.r+8,Math.min(G.W-n.r-8,n.x+n.vx));
     n.y=Math.max(n.r+8,Math.min(G.H-n.r-8,n.y+n.vy));
   });
 
-  if(SIM.a<0.006&&SIM.tick>300){
+  if(SIM.a<0.006&&SIM.tick>200){
     G.phys=false;
     var bp=document.getElementById('btn-phys');
     if(bp) bp.textContent='▶ Phys';
   }
 }
-
 function restartSim(){
   G.nodes.forEach(function(n){n.vx=0;n.vy=0;});
   _buildDeg();
@@ -1385,9 +1400,9 @@ function draw(){
     var r=n.r||8;
     var isSel=G.sel&&G.sel.id===n.id;
     var isHov=G.hov&&G.hov.id===n.id;
-    var dim=FLT&&!n.label.toLowerCase().includes(FLT)&&!(n.content||'').toLowerCase().includes(FLT);
+    var dim = n.dimmed || false;  /* filterNodes sets n.hidden+n.dimmed */
 
-    if(dim){ ctx.globalAlpha=0.12; }
+    if(dim){ ctx.globalAlpha=0.18; }  /* dimmed = 1-hop neighbour */
 
     /* Outer glow ring for selected/hover */
     if(isSel||isHov){
@@ -1655,16 +1670,56 @@ function fitView(){
 }
 function focusNode(n){if(G.W>0){G.tx=G.W/2-n.x*G.sc;G.ty=G.H/2-n.y*G.sc;if(!G.phys)draw();}}
 function filterNodes(q){
-  FLT=q.trim().toLowerCase();
-  /* Auto-focus on first match if query has at least 3 chars */
-  if(FLT.length>=3){
-    var match = G.nodes.find(function(n){
-      return n.label.toLowerCase().includes(FLT);
+  FLT = q.trim().toLowerCase();
+
+  if(!FLT){
+    // Clear filter: restore all nodes
+    G.nodes.forEach(function(n){
+      n.hidden   = !!(_hiddenTypes[n.type] || (_hubsOnly && (_deg[n.id]||0)<5));
+      n.dimmed   = false;
     });
-    if(match && typeof focusNode==='function'){
-      focusNode(match);
-    }
+    draw();
+    return;
   }
+
+  // Find all matching nodes
+  var matchIds = {};
+  G.nodes.forEach(function(n){
+    if(n.label.toLowerCase().includes(FLT) ||
+       (n.content||'').toLowerCase().includes(FLT)){
+      matchIds[n.id] = true;
+    }
+  });
+
+  // Expand to 1-hop neighbours
+  var neighbourIds = {};
+  G.edges.forEach(function(e){
+    if(matchIds[e.src]) neighbourIds[e.tgt] = true;
+    if(matchIds[e.tgt]) neighbourIds[e.src] = true;
+  });
+
+  // Apply visibility
+  G.nodes.forEach(function(n){
+    if(matchIds[n.id]){
+      n.hidden = false;
+      n.dimmed = false;   // full brightness for matched
+    } else if(neighbourIds[n.id]){
+      n.hidden = false;
+      n.dimmed = true;    // slightly dimmed for neighbours
+    } else {
+      n.hidden = true;    // hide everything else
+      n.dimmed = false;
+    }
+  });
+
+  // Auto-focus on first match
+  var firstMatch = G.nodes.find(function(n){ return matchIds[n.id]; });
+  if(firstMatch && G.W > 0){
+    G.sc = Math.max(0.6, Math.min(1.5, G.sc));
+    G.tx = G.W/2 - firstMatch.x * G.sc;
+    G.ty = G.H/2 - firstMatch.y * G.sc;
+  }
+
   draw();
 }
 
