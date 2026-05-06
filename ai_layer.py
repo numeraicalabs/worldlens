@@ -909,15 +909,37 @@ async def ai_answer(question: str, context: str = "") -> Optional[str]:
     full = (context + "\n\n" + question).strip() if context else question
     return await _call_claude(full, system=system, max_tokens=500)
 
-async def ai_macro_briefing(indicators: List[Dict], events: List[Dict]) -> Optional[str]:
-    ind_text = "\n".join([i["name"] + ": " + str(i["value"]) + " " + i["unit"] for i in indicators[:8]])
-    ev_text  = "\n".join(["- " + e["title"] for e in events[:5]])
-    prompt = (
-        "Write a 4-sentence macro intelligence briefing for investors based on:\n\n"
-        "Indicators:\n" + ind_text + "\n\nRecent Events:\n" + ev_text + "\n\n"
-        "Cover: growth outlook, inflation/rates, key risks, one actionable insight."
-    )
-    return await _call_claude(prompt, max_tokens=300)
+async def ai_macro_briefing(indicators: List[Dict], events: List[Dict], lang: str = "it") -> Optional[str]:
+    ind_text = "\n".join([
+        f"• {i.get('name','')}: {i.get('value','')} {i.get('unit','')} "
+        f"({'↑' if i.get('value') and i.get('previous') and float(i.get('value',0)) > float(i.get('previous',0)) else '↓' if i.get('previous') else ''})"
+        for i in indicators[:10]
+    ])
+    ev_text = "\n".join([
+        f"- [{e.get('category','?')} | {e.get('country_name','Global')} | sev={float(e.get('severity') or 5):.0f}] {e.get('title','')}"
+        for e in events[:8]
+    ])
+    if lang == "en":
+        prompt = (
+            "Write a 300-word macro intelligence briefing for investors covering:\n"
+            "1. Overall risk posture (2 sentences)\n"
+            "2. Macro/rates outlook (2-3 sentences with specific indicator context)\n"
+            "3. Top geopolitical risk and market impact (2-3 sentences)\n"
+            "4. One actionable insight for portfolio managers\n\n"
+            f"Indicators:\n{ind_text}\n\nEvents:\n{ev_text}\n\n"
+            "Be specific. Use numbers. No generic statements."
+        )
+    else:
+        prompt = (
+            "Scrivi un briefing di intelligence macro di 300 parole per investitori che copra:\n"
+            "1. Postura di rischio complessiva (2 frasi)\n"
+            "2. Outlook macro/tassi (2-3 frasi con contesto indicatori specifici)\n"
+            "3. Principale rischio geopolitico e impatto mercati (2-3 frasi)\n"
+            "4. Un insight azionabile per i gestori di portafoglio\n\n"
+            f"Indicatori:\n{ind_text}\n\nEventi:\n{ev_text}\n\n"
+            "Sii specifico. Usa i numeri. Niente affermazioni generiche."
+        )
+    return await _call_claude(prompt, max_tokens=600)
 
 async def ai_watchlist_digest(items: List[Dict], events: List[Dict]) -> Optional[str]:
     watched  = [i.get("label") or i.get("value") for i in items[:10]]
