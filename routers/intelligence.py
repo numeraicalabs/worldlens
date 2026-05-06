@@ -364,22 +364,47 @@ async def get_early_warning(user=Depends(require_user)):
             f"- [{e.get('category','?')}] {e.get('title','')} ({e.get('country_name','Global')}, sev={e.get('severity',5):.0f})"
             for e in events[:12]
         ])
-        prompt = (
-            f"Global EW Score: {scores['global_ew_score']}/10 | "
-            f"Macro Stress: {scores['macro_stress']}/10 | "
-            f"Market Stress: {scores['market_stress']}/10 | "
-            f"Event Velocity: {scores['event_velocity']:.2f}x\n"
-            f"Crisis patterns: {pattern_txt}\n\n"
-            f"Top events (last 72h):\n{top_events_txt}\n\n"
-            f"Write a 3-paragraph intelligence assessment (150-180 words total):\n"
-            f"Para 1: Current threat level and why the EW score is {scores['global_ew_score']}/10.\n"
-            f"Para 2: The primary escalation risk to watch in the next 7 days and its trigger conditions.\n"
-            f"Para 3: One second-order effect risk managers may be underpricing, and two observable "
-            f"signals that would confirm or deny escalation.\n"
-            f"No headers, no bullets, direct prose only."
-        )
+        lang = user.get("lang", "it")
+        if lang == "en":
+            system = (
+                "You are a senior geopolitical risk analyst. Write specific, direct intelligence. "
+                "Use numbers. Name countries and leaders. No hedging, no disclaimers."
+            )
+            prompt = (
+                f"Global EW Score: {scores['global_ew_score']}/10 | "
+                f"Macro Stress: {scores['macro_stress']}/10 | "
+                f"Market Stress: {scores['market_stress']}/10 | "
+                f"Event Velocity: {scores['event_velocity']:.2f}x\n"
+                f"Crisis patterns: {pattern_txt}\n\n"
+                f"Top events (last 72h):\n{top_events_txt}\n\n"
+                f"Write a 4-paragraph intelligence assessment (250-300 words total):\n"
+                f"Para 1: Current threat level and why the EW score is {scores['global_ew_score']}/10. Name specific actors and flashpoints.\n"
+                f"Para 2: The primary escalation risk in the next 7 days. What are the specific trigger conditions?\n"
+                f"Para 3: Second-order effects risk managers may be underpricing. Two observable signals that confirm or deny escalation.\n"
+                f"Para 4: Market implications — which asset classes, ETFs, currencies, or commodities are most exposed and how.\n"
+                f"No headers, no bullets, direct prose only."
+            )
+        else:
+            system = (
+                "Sei un analista di rischio geopolitico senior. Scrivi intelligence specifica e diretta. "
+                "Usa i numeri. Nomina paesi e leader. Niente hedge, niente disclaimer."
+            )
+            prompt = (
+                f"EW Score globale: {scores['global_ew_score']}/10 | "
+                f"Stress Macro: {scores['macro_stress']}/10 | "
+                f"Stress Mercati: {scores['market_stress']}/10 | "
+                f"Velocità eventi: {scores['event_velocity']:.2f}x\n"
+                f"Pattern di crisi: {pattern_txt}\n\n"
+                f"Top eventi (ultime 72h):\n{top_events_txt}\n\n"
+                f"Scrivi una valutazione di intelligence in 4 paragrafi (250-300 parole totali):\n"
+                f"Para 1: Livello di minaccia attuale e perché il punteggio EW è {scores['global_ew_score']}/10. Nomina attori e flashpoint specifici.\n"
+                f"Para 2: Il principale rischio di escalation nei prossimi 7 giorni. Quali sono le condizioni trigger specifiche?\n"
+                f"Para 3: Effetti di secondo ordine che i risk manager potrebbero sottovalutare. Due segnali osservabili che confermano o negano l'escalation.\n"
+                f"Para 4: Implicazioni di mercato — quali asset class, ETF, valute o commodity sono più esposte e come.\n"
+                f"Niente intestazioni, niente bullet point, solo prosa diretta."
+            )
         ai_assessment = await _call_claude(
-            prompt, system=system, max_tokens=700,
+            prompt, system=system, max_tokens=900,
             user_gemini_key=_ug, user_anthropic_key=_ua
         ) or ""
 
@@ -805,45 +830,91 @@ async def macro_brief_endpoint(user=Depends(require_user)):
         async with aiosqlite.connect(settings.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
-                "SELECT id,title,severity,country_name,category,timestamp FROM events "
+                "SELECT id,title,summary,ai_summary,severity,country_name,category,timestamp "
+                "FROM events "
                 "WHERE datetime(timestamp) > datetime('now','-72 hours') "
-                "ORDER BY severity DESC LIMIT 8"
+                "ORDER BY severity DESC LIMIT 15"
             ) as cur:
                 events = [dict(r) for r in await cur.fetchall()]
+            async with db.execute(
+                "SELECT name,value,previous,unit,country FROM macro_indicators "
+                "ORDER BY updated_at DESC LIMIT 12"
+            ) as cur:
+                indicators = [dict(r) for r in await cur.fetchall()]
 
         if not events:
-            return {"brief": "No recent events found. Waiting for data refresh."}
+            return {"brief": "Nessun evento recente. In attesa di aggiornamento dati."}
 
         has_ai = ug or ua or await ai_available_async()
         if not has_ai:
             top = events[0]
             count_high = sum(1 for e in events if float(e.get("severity") or 0) >= 7)
+            macro_snap = " | ".join([
+                f"{m['name']}: {m['value']} {m.get('unit','')}"
+                for m in indicators[:4]
+            ])
             return {"brief": (
-                f"Monitoring {len(events)} events in the last 72 hours. "
-                f"Lead story: {top.get('title','—')}. "
-                f"{count_high} high-severity events detected. "
-                f"Add your Gemini API key in Profile → La tua chiave AI for full analysis."
+                f"**Monitoraggio attivo**: {len(events)} eventi nelle ultime 72 ore. "
+                f"{count_high} eventi ad alta severità rilevati.\n\n"
+                f"**Evento principale**: {top.get('title','—')} "
+                f"({top.get('country_name','Global')}, severity {float(top.get('severity',0)):.0f}/10).\n\n"
+                f"**Macro snapshot**: {macro_snap}\n\n"
+                f"Aggiungi la tua chiave Gemini in Profilo → Chiave AI per l'analisi completa."
             )}
 
-        # Build brief using user key or admin key
+        # Build structured prompt with macro + events
         ev_text = "\n".join([
-            f"- [{e.get('category','?')}] {e.get('title','')} "
-            f"({e.get('country_name','Global')}, sev={float(e.get('severity') or 5):.0f})"
-            for e in events[:8]
+            f"[{e.get('category','?')} | {e.get('country_name','Global')} | sev={float(e.get('severity') or 5):.0f}] "
+            f"{e.get('title','')}"
+            for e in events[:12]
         ])
-        prompt = (
-            "You are a senior geopolitical analyst. Write a 2-sentence macro intelligence "
-            "briefing based on these recent events. Be direct and specific.\n\n"
-            f"Events:\n{ev_text}"
-        )
+        macro_text = "\n".join([
+            f"• {m['name']} ({m.get('country','Global')}): {m.get('value','?')} {m.get('unit','')}"
+            f"{' ↑' if m.get('value') and m.get('previous') and float(m.get('value',0)) > float(m.get('previous',0)) else ' ↓' if m.get('value') and m.get('previous') else ''}"
+            for m in indicators[:8]
+        ])
+
+        lang = user.get("lang", "it")
+        if lang == "en":
+            system_msg = "You are a senior geopolitical and financial analyst. Write clear, specific, actionable intelligence. No fluff, no disclaimers."
+            prompt = (
+                f"Write a comprehensive macro intelligence briefing (400-500 words) based on current global conditions.\n\n"
+                f"MACRO INDICATORS:\n{macro_text}\n\n"
+                f"TOP EVENTS (72h):\n{ev_text}\n\n"
+                f"Structure your response as follows:\n"
+                f"**EXECUTIVE SUMMARY** (2-3 sentences: overall risk posture)\n\n"
+                f"**MACRO ENVIRONMENT** (3-4 sentences: rates, inflation, growth outlook)\n\n"
+                f"**GEOPOLITICAL RISK** (3-4 sentences: most critical hotspots and escalation paths)\n\n"
+                f"**MARKET IMPLICATIONS** (3-4 sentences: which asset classes are most affected and why)\n\n"
+                f"**WATCH LIST** (3 specific signals or events to monitor in the next 7 days)\n\n"
+                f"Write in direct prose. Be specific with numbers and countries. No generic statements."
+            )
+        else:
+            system_msg = "Sei un analista geopolitico e finanziario senior. Scrivi analisi chiare, specifiche e azionabili. Niente generalità, niente disclaimer."
+            prompt = (
+                f"Scrivi un briefing di intelligence macro completo (400-500 parole) basato sulle condizioni globali attuali.\n\n"
+                f"INDICATORI MACRO:\n{macro_text}\n\n"
+                f"EVENTI TOP (72h):\n{ev_text}\n\n"
+                f"Struttura la risposta così:\n"
+                f"**EXECUTIVE SUMMARY** (2-3 frasi: postura di rischio complessiva)\n\n"
+                f"**AMBIENTE MACRO** (3-4 frasi: tassi, inflazione, prospettive di crescita)\n\n"
+                f"**RISCHIO GEOPOLITICO** (3-4 frasi: hotspot più critici e percorsi di escalation)\n\n"
+                f"**IMPLICAZIONI DI MERCATO** (3-4 frasi: quali asset class sono più impattate e perché)\n\n"
+                f"**WATCH LIST** (3 segnali o eventi specifici da monitorare nei prossimi 7 giorni)\n\n"
+                f"Scrivi in prosa diretta. Sii specifico con numeri e paesi. Niente affermazioni generiche."
+            )
+
         brief = await _call_claude(
-            prompt, max_tokens=150,
-            user_gemini_key=ug, user_anthropic_key=ua
+            prompt,
+            system=system_msg,
+            max_tokens=900,
+            user_gemini_key=ug,
+            user_anthropic_key=ua,
         )
-        return {"brief": brief or "Intelligence briefing temporarily unavailable."}
+        return {"brief": brief or "Intelligence briefing temporaneamente non disponibile."}
     except Exception as e:
         logger.warning("macro-brief error: %s", e)
-        return {"brief": "Intelligence briefing temporarily unavailable."}
+        return {"brief": "Intelligence briefing temporaneamente non disponibile."}
 
 
 @router.get("/watchlist-digest")
@@ -867,3 +938,89 @@ async def watchlist_digest_endpoint(user=Depends(require_user)):
 
     digest = await ai_watchlist_digest(items, events)
     return {"digest": digest or ""}
+
+
+@router.get("/macro-narrative")
+async def macro_narrative_endpoint(user=Depends(require_user)):
+    """
+    Returns 6 key macro indicators with AI narrative interpretation for each.
+    Powers the new 'C — Macro Narrativa' dashboard section.
+    """
+    try:
+        ug, ua = await _get_user_ai_keys(user["id"])
+        lang   = user.get("lang", "it")
+
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT name,value,previous,unit,country,updated_at "
+                "FROM macro_indicators ORDER BY updated_at DESC LIMIT 20"
+            ) as cur:
+                indicators = [dict(r) for r in await cur.fetchall()]
+
+        # Pick top 6 most relevant indicators
+        PRIORITY = ["CPI","Inflation","Fed","Interest Rate","GDP","PMI","VIX","DXY","Unemployment","Oil","NFP","PCE"]
+        def sort_key(m):
+            name = m.get("name","").upper()
+            for i, p in enumerate(PRIORITY):
+                if p in name: return i
+            return 99
+        indicators.sort(key=sort_key)
+        top_6 = indicators[:6]
+
+        # Build narrative interpretations
+        narratives = []
+        for m in top_6:
+            val  = m.get("value","—")
+            prev = m.get("previous")
+            unit = m.get("unit","")
+            name = m.get("name","")
+            country = m.get("country","Global")
+            try:
+                arrow = "↑" if prev and float(val) > float(prev) else "↓" if prev else ""
+                delta = f"{abs(float(val)-float(prev)):.2f}{unit}" if prev else ""
+            except Exception:
+                arrow = ""
+                delta = ""
+
+            if not (ug or ua):
+                # Rule-based fallback narrative
+                if "CPI" in name or "Inflation" in name:
+                    interp = f"{'Sopra' if float(val or 0) > 2 else 'Vicino a'} target banca centrale. {'Tassi probabilmente alti ancora.' if float(val or 0) > 3 else 'Spazio per tagli.'}" if lang == "it" else f"{'Above' if float(val or 0) > 2 else 'Near'} central bank target. {'Rates likely to stay elevated.' if float(val or 0) > 3 else 'Room for cuts.'}"
+                elif "VIX" in name:
+                    v = float(val or 0)
+                    interp = f"{'Panico' if v>40 else 'Stress elevato' if v>30 else 'Nervosismo' if v>20 else 'Calma'} sui mercati (VIX {v:.0f})." if lang == "it" else f"Market {'panic' if v>40 else 'stress' if v>30 else 'nervousness' if v>20 else 'calm'} (VIX {v:.0f})."
+                elif "PMI" in name:
+                    v = float(val or 0)
+                    interp = f"Settore in {'espansione' if v>50 else 'contrazione'} ({v:.1f})." if lang == "it" else f"Sector in {'expansion' if v>50 else 'contraction'} ({v:.1f})."
+                else:
+                    interp = f"{'In aumento' if arrow=='↑' else 'In calo' if arrow=='↓' else 'Stabile'}." if lang == "it" else f"{'Rising' if arrow=='↑' else 'Falling' if arrow=='↓' else 'Stable'}."
+            else:
+                if lang == "it":
+                    p_txt = (f"Indicatore: {name} ({country}) = {val} {unit} {arrow}\n"
+                             f"Precedente: {prev or 'N/A'}\n"
+                             f"Scrivi UNA frase di interpretazione per investitori (max 25 parole). "
+                             f"Sii specifico su cosa significa per tassi/mercati/economia. No disclaimer.")
+                else:
+                    p_txt = (f"Indicator: {name} ({country}) = {val} {unit} {arrow}\n"
+                             f"Previous: {prev or 'N/A'}\n"
+                             f"Write ONE sentence of interpretation for investors (max 25 words). "
+                             f"Be specific about what this means for rates/markets/economy. No disclaimers.")
+                interp = await _call_claude(p_txt, max_tokens=80, user_gemini_key=ug, user_anthropic_key=ua) or ""
+
+            narratives.append({
+                "name": name,
+                "country": country,
+                "value": str(val),
+                "previous": str(prev) if prev else None,
+                "unit": unit,
+                "arrow": arrow,
+                "delta": delta,
+                "interpretation": interp.strip() if interp else "",
+                "updated_at": m.get("updated_at",""),
+            })
+
+        return {"indicators": narratives, "lang": lang}
+    except Exception as e:
+        logger.warning("macro-narrative error: %s", e)
+        return {"indicators": [], "error": str(e)}
