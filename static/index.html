@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v49">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v49">
-<link rel="stylesheet" href="/static/finance.bundle.css?v49">
+<link rel="stylesheet" href="/static/core.bundle.css?v51">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v51">
+<link rel="stylesheet" href="/static/finance.bundle.css?v51">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -35,6 +35,7 @@
     .view { display: none !important; width: 100%; }
     .view.on { display: flex !important; }
     body { background: #060B12; color: #F0F6FF; margin: 0; overflow: hidden; }
+    body.landing-mode { overflow-y: auto; overflow-x: hidden; }
     #loader { position: fixed; inset: 0; background: #060B12; display: flex;
               flex-direction: column; align-items: center; justify-content: center;
               z-index: 9999; }
@@ -275,6 +276,7 @@
       <span class="mob-dot" data-card="2"></span>
       <span class="mob-dot" data-card="3"></span>
       <span class="mob-dot" data-card="4"></span>
+      <span class="mob-dot" data-card="5"></span>
     </div>
 
     <!-- SWIPE TRACK -->
@@ -424,6 +426,27 @@
         <!-- agents-grid content is mirrored here by 34_swipe_dash.js -->
         <div id="msc-agents" class="msc-agents"></div>
         <div class="msc-swipe-hint">← EW</div>
+      </div>
+
+      <!-- CARD 5: MACRO NARRATIVE + JARVIS -->
+      <div class="mob-swipe-card" data-card="5" id="msc-5">
+        <div class="msc-overline">
+          <span>📊 MACRO INTELLIGENCE</span>
+          <button class="msc-view-all" onclick="loadMacroNarrative()">↻</button>
+        </div>
+        <div class="msc-title">Indicatori + AI</div>
+        <div id="msc-macro-narrative" class="msc-macro-row">
+          <div class="msc-macro-item"><div class="msc-macro-name">Caricamento…</div></div>
+        </div>
+        <div style="margin-top:12px">
+          <div class="msc-section-head" style="margin-bottom:6px">CHIEDI A JARVIS</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            <button class="msc-view-all" onclick="openJarvisForEvent('Market brief equity globale')">📈 Brief</button>
+            <button class="msc-view-all" onclick="openJarvisForEvent('Risk geopolitico')">⚠️ Risk</button>
+            <button class="msc-view-all" onclick="openJarvisForEvent('VWCE IBGL portafoglio')">💼 Portfolio</button>
+          </div>
+        </div>
+        <div class="msc-swipe-hint">← Agenti</div>
       </div>
 
     </div><!-- mob-swipe-track -->
@@ -3155,10 +3178,10 @@
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v49"></script>
-<script src="/static/finance.bundle.js?v49"></script>
-<script src="/static/map.bundle.js?v49"></script>
-<script src="/static/dashboard.bundle.js?v49"></script>
+<script src="/static/core.bundle.js?v51"></script>
+<script src="/static/finance.bundle.js?v51"></script>
+<script src="/static/map.bundle.js?v51"></script>
+<script src="/static/dashboard.bundle.js?v51"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
@@ -3687,5 +3710,33 @@
     </div>
   </div>
 </div>
+<script>
+// If no token, body should scroll for landing page
+(function(){
+  var tok = null;
+  try { tok = localStorage.getItem('wl_tok'); } catch(e) {}
+  if (!tok) {
+    document.body.classList.add('landing-mode');
+  }
+})();
+</script>
 </body>
 </html>
+  <!-- ═══ C — MACRO NARRATIVA ═══ -->
+  <section class="fire-section" id="section-macro-narrative">
+    <div class="fire-section-head">
+      <div class="fire-section-head-l">
+        <div class="fire-overline">/ 01b — MACRO INTELLIGENCE</div>
+        <h2 class="fire-title">Indicatori chiave + interpretazione AI</h2>
+      </div>
+      <button class="fire-link" onclick="loadMacroNarrative()" style="border:none;background:none;cursor:pointer">↻ AGGIORNA</button>
+    </div>
+    <div id="macro-narrative-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:16px">
+      <!-- Populated by loadMacroNarrative() -->
+      <div class="mn-card mn-loading"><div class="mn-skeleton"></div></div>
+      <div class="mn-card mn-loading"><div class="mn-skeleton"></div></div>
+      <div class="mn-card mn-loading"><div class="mn-skeleton"></div></div>
+    </div>
+  </section>
+
+

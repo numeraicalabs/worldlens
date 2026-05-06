@@ -132,8 +132,16 @@ function rq(url, opts) {
       resolve(data || {});
     }).catch(function(e) {
       clearTimeout(tid);
-      console.error('[rq] network error:', url, e);
-      resolve({ _network: true, detail: 'Network error: ' + (e && e.message || 'unknown') });
+      // AbortError = intentional timeout abort — not a real network error
+      if (e && e.name === 'AbortError') {
+        // Already resolved as _timeout above — ignore
+        return;
+      }
+      if (e && e.message && e.message.indexOf('Failed to fetch') > -1) {
+        resolve({ _network: true, detail: 'Server non raggiungibile' });
+      } else {
+        resolve({ _network: true, detail: e && e.message || 'Network error' });
+      }
     });
   });
 }
@@ -209,7 +217,9 @@ window.addEventListener('DOMContentLoaded', function() {
     });
   } else {
     clearTimeout(safetyTimer);
-    setTimeout(rmLoader, 400);
+    // No token — show landing page in scrollable mode
+    document.body.classList.add('landing-mode');
+    setTimeout(rmLoader, 200);
   }
 });
 
@@ -278,18 +288,26 @@ function doLogin() {
     if (btn) { btn.textContent = btn._origText || 'Sign in'; btn.disabled = false; }
 
     if (!r || r._timeout) {
-      el('ler').textContent = 'Server in avvio — attendi e riprova';
+      el('ler').textContent = '⏳ Server in avvio — aspetta 15s e riprova';
       var hint = document.getElementById('cold-start-hint');
       if (hint) hint.style.display = 'block';
       return;
     }
-    if (Object.keys(r).length === 0) {
-      el('ler').textContent = 'Errore di rete — controlla la connessione';
+    if (r._network) {
+      el('ler').textContent = '⚠ ' + (r.detail || 'Errore di rete — controlla la connessione');
+      return;
+    }
+    if (r._status === 401 || r._status === 403) {
+      el('ler').textContent = 'Email o password non corretti';
+      return;
+    }
+    if (r._status && r._status >= 500) {
+      el('ler').textContent = 'Errore server (' + r._status + ') — riprova tra poco';
       return;
     }
     if (r.detail) { el('ler').textContent = r.detail; return; }
     if (!r.access_token) {
-      el('ler').textContent = r.error || r.message || 'Login fallito — risposta non valida';
+      el('ler').textContent = r.error || r.message || 'Login fallito';
       return;
     }
 
@@ -356,6 +374,8 @@ function logout() {
 
 // ── ENTER APP ─────────────────────────────────────────
 function enterApp() {
+  document.body.classList.remove('landing-mode');
+  document.body.style.overflow = 'hidden';
   rmLoader();
   el('landing').classList.add('hidden');
   el('shell').classList.add('on');

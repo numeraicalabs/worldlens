@@ -2133,3 +2133,78 @@
   .gs-val   { font-size: 18px; }
   .grc-summary { font-size: 10px; }
 }
+
+/* ── Macro Narrative Cards ── */
+@keyframes pulse {
+  0%, 100% { opacity: .4; }
+  50% { opacity: .9; }
+}
+#section-macro-narrative { margin-top: 32px; }
+.mn-card {
+  background: var(--bg1);
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  padding: 16px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.mn-card:hover {
+  border-color: rgba(124,58,237,.4);
+  box-shadow: 0 4px 20px rgba(124,58,237,.1);
+}
+.mn-loading { animation: pulse 1.4s ease-in-out infinite; }
+.mn-skeleton { height: 60px; background: var(--bd); border-radius: 6px; }
+.mn-val { font-size: 28px; font-weight: 800; font-family: var(--fm); }
+.mn-unit { font-size: 13px; color: var(--t3); }
+.mn-interp {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--t2);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bd);
+}
+
+/* ── Brief full display — no truncation ── */
+.fire-risk-brief-body {
+  overflow: visible !important;
+  max-height: none !important;
+}
+#d-brief-txt {
+  overflow: visible !important;
+  max-height: none !important;
+}
+#d-brief-txt p { margin: 8px 0; }
+#d-brief-txt strong { display: block; font-size: 11px; letter-spacing: .08em; opacity: .7; text-transform: uppercase; margin-top: 14px; margin-bottom: 4px; }
+
+/* ── EW assessment text full display ── */
+.ew-score-desc, #ew-assess {
+  overflow: visible !important;
+  max-height: none !important;
+  white-space: normal !important;
+  line-height: 1.75 !important;
+}
+
+/* ── Mobile: brief card scrollable ── */
+.msc-brief-wrap { overflow-y: auto; max-height: 230px; }
+#msc-brief { font-size: 12px !important; line-height: 1.7 !important; }
+
+/* ── Event expand arrow ── */
+.ev-expand-arrow { transition: transform .15s; }
+.dash-crisis-item { align-items: flex-start !important; flex-wrap: wrap; }
+
+/* ── Mobile card 5 (new Macro) ── */
+.msc-macro-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.msc-macro-item {
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.msc-macro-name { font-size: 8px; letter-spacing: .08em; color: var(--t3); text-transform: uppercase; }
+.msc-macro-val  { font-size: 16px; font-weight: 700; font-family: var(--fm); margin: 2px 0; }
+.msc-macro-interp { font-size: 9px; line-height: 1.5; color: var(--t2); }

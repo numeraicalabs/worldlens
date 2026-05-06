@@ -176,7 +176,7 @@ function sv(name, btn) {
     var tryLoad = function() {
       if (typeof loadEarlyWarning === 'function') {
         try { loadEarlyWarning(); }
-        catch (e) { console.error('[EW] loadEarlyWarning failed:', e); }
+        catch (e) { if(e && e.name !== 'AbortError') console.warn('[EW] loadEarlyWarning:', e && e.message || e); }
       } else if (attempt++ < 10) {
         setTimeout(tryLoad, 200);
       } else {
@@ -3343,23 +3343,27 @@ function renderExtendedBrief(text) {
   var el = document.getElementById('d-brief-txt');
   if (!el || !text || text.length < 20) return;
 
-  var sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-  var chunks = [];
-  var current = '';
-  sentences.forEach(function(s, i) {
-    current += s.trim() + ' ';
-    if ((i + 1) % 2 === 0 || i === sentences.length - 1) {
-      chunks.push(current.trim());
-      current = '';
+  // Render full markdown for structured briefing
+  // Parse structured markdown from AI brief
+  var html = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong style="color:var(--fire-text);font-family:var(--fire-sans);display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:14px;margin-bottom:4px;opacity:.7">$1</strong>')
+    .replace(/\*([^*]+)\*/g,'<strong style="color:var(--fire-text)">$1</strong>')
+    .replace(/↑/g,'<span style="color:#10B981">↑</span>')
+    .replace(/↓/g,'<span style="color:#EF4444">↓</span>');
+  // Split into paragraphs
+  var parts = html.split(/\n\n+/);
+  html = parts.map(function(p){
+    p = p.replace(/\n/g,' ').trim();
+    if(!p) return '';
+    // Bullet/numbered items
+    if(/^[\-•\d]/.test(p)){
+      return '<div style="padding:3px 0 3px 14px;position:relative"><span style="position:absolute;left:2px;color:var(--fire-ember)">•</span>'+p.replace(/^[\-•\d\.\s]+/,'')+'</div>';
     }
-  });
-
-  el.innerHTML = chunks.map(function(chunk, i) {
-    var style = i === 0
-      ? 'margin:0 0 8px;font-family:var(--fire-sans);font-style:normal;font-weight:600;font-size:14px;color:var(--fire-text)'
-      : 'margin:0 0 8px;';
-    return '<p style="' + style + '">' + _esc(chunk) + '</p>';
+    return '<p style="margin:8px 0">'+p+'</p>';
   }).join('');
+
+  el.innerHTML = '<div style="font-size:13px;line-height:1.75;color:var(--fire-text-mid)"><p style="margin:0 0 10px">' + html + '</p></div>';
 
   // Update timestamp
   var timeEl = document.getElementById('db-brief-time');
@@ -3550,14 +3554,14 @@ function _syncCard0() {
     if (dstRiskL && srcRiskL) { dstRiskL.textContent = srcRiskL.textContent; dstRiskL.style.color = col; }
   }
 
-  // AI brief — take first 2 sentences from d-brief-txt
+  // AI brief — show full text on mobile (scrollable), strip heavy HTML
   var srcBrief = _el('d-brief-txt');
   var dstBrief = _el('msc-brief');
   if (srcBrief && dstBrief) {
-    var full = (srcBrief.textContent || srcBrief.innerText || '').trim();
-    if (full && full.length > 10 && !full.includes('Caricamento')) {
-      var sents = full.match(/[^.!?]+[.!?]+/g) || [full];
-      dstBrief.textContent = sents.slice(0, 4).join(' ').trim();
+    var full = (srcBrief.innerHTML || '').replace(/<strong[^>]*>/gi,'<strong>').replace(/<\/strong>/gi,'</strong>');
+    var plain = (srcBrief.textContent || srcBrief.innerText || '').trim();
+    if (plain && plain.length > 10 && !plain.includes('Caricamento')) {
+      dstBrief.innerHTML = '<div style="font-size:12px;line-height:1.7;color:var(--fire-text-mid);overflow-y:auto;max-height:220px">' + full + '</div>';
     }
   }
 
@@ -4143,3 +4147,134 @@ if (document.readyState === 'loading') {
 }
 
 })();
+
+
+
+/* ═══════════════════════════════════════════════════════
+   C — MACRO NARRATIVE: indicator cards with AI interpretation
+   ═══════════════════════════════════════════════════════ */
+function loadMacroNarrative(){
+  var grid = document.getElementById('macro-narrative-grid');
+  if(!grid||!window.G||!G.token) return;
+
+  // Show loading
+  grid.innerHTML = [0,1,2,3,4,5].map(function(){
+    return '<div style="background:var(--bg1);border:1px solid var(--bd);border-radius:12px;padding:16px;min-height:100px;animation:pulse 1.4s ease-in-out infinite"><div style="height:10px;width:40%;background:var(--bd);border-radius:4px;margin-bottom:10px"></div><div style="height:24px;width:60%;background:var(--bd);border-radius:4px;margin-bottom:10px"></div><div style="height:10px;width:90%;background:var(--bd);border-radius:4px"></div></div>';
+  }).join('');
+
+  rq('/api/intelligence/macro-narrative').then(function(r){
+    if(!r||!r.indicators||!r.indicators.length){
+      grid.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:20px">Nessun dato macro disponibile</div>';
+      return;
+    }
+
+    // Also sync to mobile card 5
+    var mobGrid = document.getElementById('msc-macro-narrative');
+    if(mobGrid && r.indicators && r.indicators.length){
+      mobGrid.innerHTML = r.indicators.slice(0,6).map(function(m){
+        var arrowCol = m.arrow==='↑'?'#10B981':m.arrow==='↓'?'#EF4444':'#94A3B8';
+        return '<div class="msc-macro-item">'
+          +'<div class="msc-macro-name">'+_esc(m.name)+'</div>'
+          +'<div class="msc-macro-val" style="color:'+arrowCol+'">'+_esc(m.value)+'<span style="font-size:10px;color:var(--t3)"> '+_esc(m.unit)+'</span></div>'
+          +(m.interpretation?'<div class="msc-macro-interp">'+_esc(m.interpretation.slice(0,60))+(m.interpretation.length>60?'…':'')+'</div>':'')
+          +'</div>';
+      }).join('');
+    }
+
+    var COLORS = {
+      '↑': '#10B981', '↓': '#EF4444', '': '#94A3B8'
+    };
+
+    grid.innerHTML = r.indicators.map(function(m){
+      var arrowCol = COLORS[m.arrow||'']||'#94A3B8';
+      var deltaHtml = m.delta ? '<span style="font-size:10px;color:'+arrowCol+';margin-left:4px">'+m.arrow+' '+m.delta+'</span>' : '';
+      var interpHtml = m.interpretation
+        ? '<div style="font-size:12px;line-height:1.65;color:var(--t2);margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)">'+_esc(m.interpretation)+'</div>'
+        : '';
+      return '<div style="background:var(--bg1);border:1px solid var(--bd);border-radius:12px;padding:16px;transition:border-color .2s" onmouseover="this.style.borderColor=\'var(--via)\'" onmouseout="this.style.borderColor=\'var(--bd)\'">'
+        +'<div style="font-size:9px;font-family:var(--fm);letter-spacing:.1em;color:var(--t3);text-transform:uppercase;margin-bottom:6px">'+_esc(m.name)+' · '+_esc(m.country)+'</div>'
+        +'<div style="display:flex;align-items:baseline;gap:4px">'
+        +'<span style="font-size:28px;font-weight:800;font-family:var(--fm);color:var(--fire-text)">'+_esc(m.value)+'</span>'
+        +'<span style="font-size:13px;color:var(--t3)">'+_esc(m.unit)+'</span>'
+        +deltaHtml
+        +'</div>'
+        +interpHtml
+        +'</div>';
+    }).join('');
+  });
+}
+
+/* Auto-load macro narrative when dashboard becomes visible */
+(function(){
+  var _mnLoaded = false;
+  var dash = document.getElementById('view-dash');
+  if(!dash) return;
+  var obs = new MutationObserver(function(){
+    if(dash.classList.contains('on') && !_mnLoaded && window.G && G.token){
+      _mnLoaded = true;
+      setTimeout(loadMacroNarrative, 800);
+    }
+  });
+  obs.observe(dash, {attributes:true, attributeFilter:['class']});
+  // Also run if already visible on load
+  if(dash.classList.contains('on')){
+    setTimeout(function(){if(window.G && G.token){loadMacroNarrative();}}, 2000);
+  }
+})();
+
+/* ═══════════════════════════════════════════════════════
+   B — Event summary expansion (accordion)
+   Clicking a crisis event shows full summary inline
+   ═══════════════════════════════════════════════════════ */
+function expandEventSummary(el, evId){
+  var detail = document.getElementById('ev-detail-'+evId);
+  if(!detail) return;
+  var isOpen = detail.style.display !== 'none';
+  detail.style.display = isOpen ? 'none' : 'block';
+  var arrow = el.querySelector('.ev-expand-arrow');
+  if(arrow) arrow.textContent = isOpen ? '▸' : '▾';
+}
+
+/* Patch renderFeed to add summaries to crisis events */
+var _origRenderFeed = window.renderFeed;
+window.renderFeed = function(){
+  if(_origRenderFeed) _origRenderFeed.apply(this, arguments);
+  setTimeout(patchEventSummaries, 300);
+};
+
+function patchEventSummaries(){
+  // Find all event rows in crisis section and add expandable summary
+  var crisisEls = document.querySelectorAll('#dash-crisis-list .dash-crisis-item, .dash-ev-row');
+  if(!crisisEls.length) return;
+  crisisEls.forEach(function(row){
+    if(row.dataset.summaryPatched) return;
+    row.dataset.summaryPatched = '1';
+    var evId = row.dataset.evId || row.dataset.id;
+    var sumText = row.dataset.summary || row.dataset.aiSummary;
+    if(!sumText || sumText.length < 20) return;
+    // Add expandable summary
+    var detail = document.createElement('div');
+    detail.id = 'ev-detail-'+ evId;
+    detail.style.cssText = 'display:none;font-size:11px;line-height:1.7;color:var(--t2);padding:8px 10px;background:rgba(255,255,255,.03);border-radius:0 0 8px 8px;margin-top:-4px;border:1px solid var(--bd);border-top:none';
+    detail.textContent = sumText;
+    row.style.cursor = 'pointer';
+    row.onclick = function(){ expandEventSummary(row, evId); };
+    if(!row.querySelector('.ev-expand-arrow')){
+      var arrow = document.createElement('span');
+      arrow.className = 'ev-expand-arrow';
+      arrow.style.cssText = 'margin-left:auto;font-size:10px;color:var(--t3);flex-shrink:0';
+      arrow.textContent = '▸';
+      row.appendChild(arrow);
+    }
+    row.parentNode.insertBefore(detail, row.nextSibling);
+  });
+}
+
+/* F — Jarvis connection: click event → open Jarvis with event title */
+function openJarvisForEvent(title){
+  if(typeof openJarvisInSidebar === 'function'){
+    openJarvisInSidebar(title);
+  } else if(typeof openJarvis === 'function'){
+    openJarvis(title);
+  }
+}
