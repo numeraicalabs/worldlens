@@ -799,6 +799,22 @@ def start():
         misfire_grace_time=3600,
     )
 
+    # ── Global dashboard cache (06:45 UTC — before daily brief) ─────────────
+    async def _global_cache_job():
+        try:
+            from global_cache import generate_global_cache
+            logger.info("Scheduler: generating global dashboard cache…")
+            await generate_global_cache(force=True)
+        except Exception as e:
+            logger.warning("global_cache_job: %s", e)
+
+    _scheduler.add_job(
+        _global_cache_job, "cron",
+        hour=6, minute=45,
+        id="global_cache",
+        misfire_grace_time=3600,
+    )
+
     # ── Brain entries enrichment (every 15 min) ──────────────────────────────
     async def _brain_entries_cycle():
         try:

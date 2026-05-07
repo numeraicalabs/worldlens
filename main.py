@@ -199,6 +199,19 @@ async def lifespan(app: FastAPI):
 
     import asyncio as _asyncio
     _asyncio.create_task(_startup_brain_entries())
+
+    # ── Startup: generate global dashboard cache ──────────────────────────────
+    async def _startup_global_cache():
+        import asyncio as _aio
+        await _aio.sleep(22)
+        try:
+            from global_cache import get_global_cache
+            logger.info("Startup: generating global dashboard cache…")
+            await get_global_cache()
+        except Exception as _ce:
+            logger.warning("Startup global cache: %s", _ce)
+
+    _asyncio.create_task(_startup_global_cache())
     # Init tradgentic tables
     try:
         from routers.tradgentic.portfolio import ensure_tables as tg_init
