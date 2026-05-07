@@ -3814,3 +3814,172 @@ window.markDigestRead = function(id, btn) {
     };
   }
 })();
+
+
+/* ═══════════════════════════════════════════════════
+   LANDING PAGE v2 — bilingual, animated, live data
+   ═══════════════════════════════════════════════════ */
+function setLandingLang(lang){
+  var landing = document.getElementById('landing');
+  if(!landing) return;
+  if(lang==='en'){
+    landing.classList.add('l-lang-en');
+    document.getElementById('lang-it').classList.remove('on');
+    document.getElementById('lang-en').classList.add('on');
+  } else {
+    landing.classList.remove('l-lang-en');
+    document.getElementById('lang-it').classList.add('on');
+    document.getElementById('lang-en').classList.remove('on');
+  }
+  localStorage.setItem('wl_lang', lang);
+}
+
+/* Restore saved language */
+(function(){
+  var saved = localStorage.getItem('wl_lang');
+  if(saved==='en') setTimeout(function(){ setLandingLang('en'); }, 50);
+})();
+
+/* Fetch live crisis count */
+function updateLiveCount(){
+  fetch('/api/events/stats').then(function(r){ return r.ok?r.json():null; }).then(function(d){
+    if(!d) return;
+    var n = (d.total_48h || d.total || d.count || 47) + ' crisi live';
+    var n2 = (d.total_48h || d.total || d.count || 47) + ' crisi monitorate in questo momento';
+    var el1 = document.getElementById('l-live-count');
+    var el2 = document.getElementById('l-live-count2');
+    if(el1) el1.textContent = n;
+    if(el2) el2.textContent = n2;
+  }).catch(function(){});
+}
+if(document.getElementById('landing')) setTimeout(updateLiveCount, 800);
+
+/* Typewriter effect on preview */
+(function(){
+  var texts = [
+    "Global risk elevated. Oil supply disruption risk from Middle East conflict. Fed likely to hold rates amid uncertainty...",
+    "EW Score: 8.3/10. Primary escalation risk: Taiwan Strait tensions. Watch TSMC output guidance for confirmation...",
+    "MACRO: CPI 3.2% still above target. Fed not cutting until Q3. EUR/USD at support — ECB divergence key driver..."
+  ];
+  var idx = 0, charIdx = 0, el;
+  function tick(){
+    el = el || document.getElementById('l-typewriter');
+    if(!el) return;
+    var txt = texts[idx];
+    if(charIdx <= txt.length){
+      el.textContent = txt.slice(0, charIdx++);
+      setTimeout(tick, 28);
+    } else {
+      setTimeout(function(){
+        charIdx = 0;
+        idx = (idx+1) % texts.length;
+        tick();
+      }, 3200);
+    }
+  }
+  if(document.getElementById('landing')) setTimeout(tick, 1200);
+})();
+
+
+/* ── Nav context strip: clock + event count ── */
+function updateNavClock(){
+  var el = document.getElementById('nav-clock');
+  if(!el) return;
+  var now = new Date();
+  el.textContent = now.toLocaleTimeString('it-IT', {hour:'2-digit',minute:'2-digit'}) + ' UTC+1';
+}
+setInterval(updateNavClock, 30000);
+setTimeout(updateNavClock, 500);
+
+function updateNavEventCount(){
+  if(!G.token) return;
+  rq('/api/events/stats').then(function(d){
+    if(!d||d._network||d._timeout) return;
+    var el = document.getElementById('nav-ev-count');
+    if(el) el.textContent = (d.total_24h || d.today || d.total || '—');
+    // Show EW badge if score > 7
+    if(d.ew_score && d.ew_score > 7){
+      var b = document.getElementById('nav-ew-badge');
+      if(b) b.style.display = 'block';
+    }
+  });
+}
+setTimeout(updateNavEventCount, 3000);
+setInterval(updateNavEventCount, 300000);
+
+/* ═══════════════════════════════════════════════════
+   ONBOARDING — shown once to new users
+   ═══════════════════════════════════════════════════ */
+var OB_STEPS = [
+  {
+    icon: '🌍',
+    step: 'PASSO 1 DI 3',
+    title: 'Benvenuto in WorldLens',
+    desc: 'Monitoriamo 500+ eventi geopolitici e finanziari ogni giorno. Il Dashboard è il tuo punto di partenza: risk score, briefing AI, crisi attive.'
+  },
+  {
+    icon: '🧠',
+    step: 'PASSO 2 DI 3',
+    title: 'Chiedi a Jarvis',
+    desc: 'Il Knowledge Graph connette 3000+ entità. Apri il Brain Editor, clicca un nodo e fai domande tipo "Come impatta questa crisi sul mio portafoglio ETF?"'
+  },
+  {
+    icon: '⚡',
+    step: 'PASSO 3 DI 3',
+    title: 'Aggiungi la tua chiave AI',
+    desc: 'Con una chiave Gemini gratuita (Google AI Studio), sblocchi briefing completi 500 parole, analisi Jarvis, Early Warning AI e digest giornaliero. Vai su Profilo → Chiave AI.'
+  }
+];
+var _obStep = 0;
+
+function showOnboarding(){
+  if(localStorage.getItem('wl_onboarded')) return;
+  var html = '<div id="onboarding-overlay"><div class="ob-card">'
+    +'<div class="ob-step-num" id="ob-step-num">'+OB_STEPS[0].step+'</div>'
+    +'<div class="ob-icon" id="ob-icon">'+OB_STEPS[0].icon+'</div>'
+    +'<div class="ob-title" id="ob-title">'+OB_STEPS[0].title+'</div>'
+    +'<div class="ob-desc" id="ob-desc">'+OB_STEPS[0].desc+'</div>'
+    +'<div class="ob-dots" id="ob-dots">'
+    +OB_STEPS.map(function(_,i){ return '<div class="ob-dot'+(i===0?' on':'')+'"></div>'; }).join('')
+    +'</div>'
+    +'<div class="ob-btns">'
+    +'<button class="ob-btn-skip" onclick="closeOnboarding()">Salta</button>'
+    +'<button class="ob-btn-next" id="ob-next-btn" onclick="nextOnboarding()">Avanti →</button>'
+    +'</div>'
+    +'</div></div>';
+  var el = document.createElement('div');
+  el.innerHTML = html;
+  document.body.appendChild(el.firstChild);
+}
+
+function nextOnboarding(){
+  _obStep++;
+  if(_obStep >= OB_STEPS.length){ closeOnboarding(); return; }
+  var s = OB_STEPS[_obStep];
+  document.getElementById('ob-step-num').textContent = s.step;
+  document.getElementById('ob-icon').textContent     = s.icon;
+  document.getElementById('ob-title').textContent    = s.title;
+  document.getElementById('ob-desc').textContent     = s.desc;
+  // Update dots
+  var dots = document.querySelectorAll('.ob-dot');
+  dots.forEach(function(d,i){ d.classList.toggle('on', i===_obStep); });
+  // Last step: change button
+  if(_obStep===OB_STEPS.length-1){
+    document.getElementById('ob-next-btn').textContent = '✓ Inizia';
+  }
+}
+
+function closeOnboarding(){
+  localStorage.setItem('wl_onboarded', '1');
+  var el = document.getElementById('onboarding-overlay');
+  if(el){ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(function(){el.remove();},300); }
+}
+
+/* Hook onboarding to enterApp */
+var _origEnterApp = window.enterApp;
+window.enterApp = function(){
+  if(_origEnterApp) _origEnterApp.apply(this, arguments);
+  setTimeout(function(){
+    if(!localStorage.getItem('wl_onboarded')) showOnboarding();
+  }, 1200);
+};

@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v51">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v51">
-<link rel="stylesheet" href="/static/finance.bundle.css?v51">
+<link rel="stylesheet" href="/static/core.bundle.css?v52">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v52">
+<link rel="stylesheet" href="/static/finance.bundle.css?v52">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -55,55 +55,312 @@
 <!-- LANDING -->
 <div id="landing">
   <canvas id="lcanvas"></canvas>
+
+  <!-- ═══ NAV ═══ -->
   <nav class="lnav">
     <div class="llogo">WorldLens</div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-g" onclick="typeof showAuth==='function'&&showAuth('login')">Sign In</button>
-      <button class="btn btn-p" onclick="typeof showAuth==='function'&&showAuth('register')">Get Started Free</button>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="l-live-pill">
+        <span class="l-live-dot"></span>
+        <span id="l-live-count">47 crisi live</span>
+      </div>
+      <div class="l-lang-toggle">
+        <button class="l-lang-btn on" id="lang-it" onclick="setLandingLang('it')">IT</button>
+        <button class="l-lang-btn" id="lang-en" onclick="setLandingLang('en')">EN</button>
+      </div>
+      <button class="l-nav-signin" onclick="typeof showAuth==='function'&&showAuth('login')">
+        <span class="l-it">Accedi</span><span class="l-en" style="display:none">Sign In</span>
+      </button>
+      <button class="l-nav-cta" onclick="typeof showAuth==='function'&&showAuth('register')">
+        <span class="l-it">Inizia Gratis</span><span class="l-en" style="display:none">Start Free</span>
+      </button>
     </div>
   </nav>
-  <section class="hero">
-    <div class="hbadge"><div class="hbdot"></div>Live global intelligence</div>
-    <h1>Understand the World<br><em>in Real Time.</em></h1>
-    <p>Track global events, markets, geopolitical risks and macro trends. AI-powered analysis on every event.</p>
-    <div class="hbtns">
-      <button class="btn btn-p btn-lg" onclick="typeof showAuth==='function'&&showAuth('register')">Start Free</button>
-      <button class="btn btn-o btn-lg" onclick="typeof showAuth==='function'&&showAuth('register')">Explore the Map</button>
+
+  <!-- ═══ HERO ═══ -->
+  <section class="l-hero">
+    <div class="l-hero-left">
+      <div class="l-hero-badge">
+        <span class="l-live-dot"></span>
+        <span class="l-it">Intelligence geopolitica in tempo reale</span>
+        <span class="l-en" style="display:none">Real-time geopolitical intelligence</span>
+      </div>
+
+      <h1 class="l-hero-h1">
+        <span class="l-it">Capisci il mondo<br><em>prima del mercato.</em></span>
+        <span class="l-en" style="display:none">Understand the world<br><em>before markets do.</em></span>
+      </h1>
+
+      <p class="l-hero-sub">
+        <span class="l-it">AI che monitora 500+ eventi/giorno, analizza rischi geopolitici e macro, e ti dà briefing strutturati in pochi secondi.</span>
+        <span class="l-en" style="display:none">AI monitoring 500+ events/day, analyzing geopolitical and macro risks, delivering structured briefings in seconds.</span>
+      </p>
+
+      <div class="l-hero-btns">
+        <button class="l-btn-primary" onclick="typeof showAuth==='function'&&showAuth('register')">
+          <span class="l-it">✦ Inizia Gratuitamente</span>
+          <span class="l-en" style="display:none">✦ Start Free</span>
+        </button>
+        <button class="l-btn-ghost" onclick="document.getElementById('l-demo').scrollIntoView({behavior:'smooth'})">
+          <span class="l-it">Guarda la demo →</span>
+          <span class="l-en" style="display:none">See demo →</span>
+        </button>
+      </div>
+
+      <div class="l-hero-proof">
+        <div class="l-avatars">
+          <div class="l-av" style="background:linear-gradient(135deg,#7C3AED,#3B82F6)">A</div>
+          <div class="l-av" style="background:linear-gradient(135deg,#059669,#0EA5E9)">M</div>
+          <div class="l-av" style="background:linear-gradient(135deg,#F59E0B,#EF4444)">S</div>
+          <div class="l-av" style="background:linear-gradient(135deg,#EC4899,#8B5CF6)">L</div>
+          <div class="l-av" style="background:linear-gradient(135deg,#0EA5E9,#10B981)">R</div>
+        </div>
+        <div>
+          <div class="l-stars">★★★★★</div>
+          <div class="l-proof-txt">
+            <span class="l-it">+340 analisti e investitori lo usano ogni giorno</span>
+            <span class="l-en" style="display:none">+340 analysts and investors use it daily</span>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="hstats">
-      <div><div class="hsn">500+</div><div class="hsl">Events Tracked</div></div>
-      <div><div class="hsn">6</div><div class="hsl">Data Sources</div></div>
-      <div><div class="hsn">16</div><div class="hsl">Market Assets</div></div>
-      <div><div class="hsn">AI</div><div class="hsl">Powered</div></div>
-    </div>
-  </section>
-  <section class="feats">
-    <div class="ftag">Platform Features</div>
-    <div class="ftitle">Intelligence built for modern investors</div>
-    <div class="fgrid">
-      <div class="fcard"><div class="ficon" style="background:rgba(59,130,246,.15)">🌍</div><h3>Interactive World Map</h3><p>Live event markers with hover details, heatmap risk overlay, and AI analysis on every dot.</p></div>
-      <div class="fcard"><div class="ficon" style="background:rgba(239,68,68,.15)">🌡</div><h3>Region Risk Heatmap</h3><p>Country-level risk scores based on event density and severity, updated in real time.</p></div>
-      <div class="fcard"><div class="ficon" style="background:rgba(139,92,246,.15)">🤖</div><h3>AI Event Scoring</h3><p>Every event gets an AI impact score, market effects analysis, and investor action note.</p></div>
-      <div class="fcard"><div class="ficon" style="background:rgba(16,185,129,.15)">📊</div><h3>Macro Dashboard</h3><p>GDP, inflation, interest rates, PMI and 16 indicators across major economies.</p></div>
-      <div class="fcard"><div class="ficon" style="background:rgba(245,158,11,.15)">⭐</div><h3>Smart Watchlists</h3><p>Track countries, assets, topics. Get a personalized AI digest every session.</p></div>
-      <div class="fcard"><div class="ficon" style="background:rgba(249,115,22,.15)">🔔</div><h3>Custom Alerts</h3><p>Set conditions for countries, categories, or severity thresholds. Toggle on/off anytime.</p></div>
+
+    <!-- Dashboard preview -->
+    <div class="l-hero-right">
+      <div class="l-preview-wrap">
+        <div class="l-preview-glow"></div>
+        <div class="l-preview-chrome">
+          <div class="l-chrome-dots">
+            <span style="background:#FF5F57"></span>
+            <span style="background:#FFBD2E"></span>
+            <span style="background:#28C840"></span>
+          </div>
+          <div class="l-chrome-url">worldlens.app · Dashboard</div>
+        </div>
+        <div class="l-preview-body">
+          <!-- Mini dashboard mockup -->
+          <div class="l-prev-risk">
+            <div class="l-prev-label">RISCHIO GLOBALE</div>
+            <div class="l-prev-score" id="l-anim-score">58</div>
+            <div class="l-prev-status">ELEVATED — MONITOR</div>
+          </div>
+          <div class="l-prev-events">
+            <div class="l-prev-ev-row l-prev-ev-1">
+              <span class="l-prev-ev-sev">9</span>
+              <span class="l-prev-ev-txt">Middle East: Oil supply disruption risk…</span>
+            </div>
+            <div class="l-prev-ev-row l-prev-ev-2">
+              <span class="l-prev-ev-sev" style="color:#F59E0B">7</span>
+              <span class="l-prev-ev-txt">China-Taiwan tensions escalate amid…</span>
+            </div>
+            <div class="l-prev-ev-row l-prev-ev-3">
+              <span class="l-prev-ev-sev" style="color:#3B82F6">6</span>
+              <span class="l-prev-ev-txt">Fed signals rate path uncertainty…</span>
+            </div>
+          </div>
+          <div class="l-prev-brief">
+            <div class="l-prev-label">AI CHIEF ANALYST</div>
+            <div class="l-prev-brief-txt" id="l-typewriter">Global risk elevated. Oil supply disruption risk from Middle East conflict…</div>
+            <div class="l-prev-cursor">|</div>
+          </div>
+          <div class="l-prev-kpis">
+            <div class="l-prev-kpi"><div class="l-prev-kpi-v" style="color:#10B981">↑ 4.7%</div><div class="l-prev-kpi-l">S&P 500</div></div>
+            <div class="l-prev-kpi"><div class="l-prev-kpi-v" style="color:#EF4444">↓ 3.2%</div><div class="l-prev-kpi-l">Oil WTI</div></div>
+            <div class="l-prev-kpi"><div class="l-prev-kpi-v">18.4</div><div class="l-prev-kpi-l">VIX</div></div>
+            <div class="l-prev-kpi"><div class="l-prev-kpi-v">104.2</div><div class="l-prev-kpi-l">DXY</div></div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
-<!-- ══ GLOBE SECTION — iframe embed (standalone globe.html) ══════════ -->
-<section id="globe-section" style="background:#03060f;overflow:hidden">
-  <iframe
-    src="/static/globe.html"
-    id="globe-iframe"
-    title="WorldLens Live Global Intelligence"
-    style="display:block;width:100%;height:620px;border:none;background:#03060f"
-    loading="lazy"
-    allow="fullscreen"
-  ></iframe>
-</section>
-<!-- ═════════════════════════════════════════════════════════════════════ -->
+  <!-- ═══ STATS STRIP ═══ -->
+  <div class="l-stats-strip">
+    <div class="l-stat"><div class="l-stat-n">500+</div><div class="l-stat-l"><span class="l-it">eventi monitorati/giorno</span><span class="l-en" style="display:none">events monitored/day</span></div></div>
+    <div class="l-stat-div"></div>
+    <div class="l-stat"><div class="l-stat-n">1.200+</div><div class="l-stat-l"><span class="l-it">nodi nel Knowledge Graph</span><span class="l-en" style="display:none">knowledge graph nodes</span></div></div>
+    <div class="l-stat-div"></div>
+    <div class="l-stat"><div class="l-stat-n">14</div><div class="l-stat-l"><span class="l-it">view di intelligence</span><span class="l-en" style="display:none">intelligence views</span></div></div>
+    <div class="l-stat-div"></div>
+    <div class="l-stat"><div class="l-stat-n"><span style="background:linear-gradient(135deg,#7C3AED,#3B82F6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">AI</span></div><div class="l-stat-l">Gemini + Claude</div></div>
+  </div>
+
+  <!-- ═══ HOW IT WORKS ═══ -->
+  <section class="l-how" id="l-demo">
+    <div class="l-section-tag">
+      <span class="l-it">Come funziona</span>
+      <span class="l-en" style="display:none">How it works</span>
+    </div>
+    <h2 class="l-section-h2">
+      <span class="l-it">Da evento globale ad analisi AI<br>in pochi secondi</span>
+      <span class="l-en" style="display:none">From global event to AI analysis<br>in seconds</span>
+    </h2>
+    <div class="l-steps">
+      <div class="l-step">
+        <div class="l-step-num">01</div>
+        <div class="l-step-icon">📡</div>
+        <h3 class="l-it">Monitoraggio continuo</h3>
+        <h3 class="l-en" style="display:none">Continuous monitoring</h3>
+        <p class="l-it">500+ fonti geopolitiche, finanziarie e di sicurezza analizzate ogni ora. GDELT, Reuters, macro indicators, mercati.</p>
+        <p class="l-en" style="display:none">500+ geopolitical, financial and security sources analyzed every hour. GDELT, Reuters, macro indicators, markets.</p>
+      </div>
+      <div class="l-step-arrow">→</div>
+      <div class="l-step">
+        <div class="l-step-num">02</div>
+        <div class="l-step-icon">🧠</div>
+        <h3 class="l-it">AI interpreta e connette</h3>
+        <h3 class="l-en" style="display:none">AI interprets and connects</h3>
+        <p class="l-it">Il Knowledge Graph connette eventi, paesi, aziende, ETF e persone. L'AI genera analisi contestuali con implicazioni di mercato.</p>
+        <p class="l-en" style="display:none">The Knowledge Graph connects events, countries, companies, ETFs and people. AI generates contextual analysis with market implications.</p>
+      </div>
+      <div class="l-step-arrow">→</div>
+      <div class="l-step">
+        <div class="l-step-num">03</div>
+        <div class="l-step-icon">⚡</div>
+        <h3 class="l-it">Tu decidi più veloce</h3>
+        <h3 class="l-en" style="display:none">You decide faster</h3>
+        <p class="l-it">Briefing strutturati, Early Warning score, Macro Narrative e Jarvis AI disponibili in ogni momento. Anche da mobile.</p>
+        <p class="l-en" style="display:none">Structured briefings, Early Warning score, Macro Narrative and Jarvis AI available at all times. Mobile-first.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FEATURES SHOWCASE ═══ -->
+  <section class="l-features">
+    <div class="l-section-tag">
+      <span class="l-it">Funzionalità</span>
+      <span class="l-en" style="display:none">Features</span>
+    </div>
+    <h2 class="l-section-h2">
+      <span class="l-it">Intelligence costruita per chi decide</span>
+      <span class="l-en" style="display:none">Intelligence built for decision makers</span>
+    </h2>
+    <div class="l-feat-grid">
+      <div class="l-feat-card l-feat-big">
+        <div class="l-feat-icon-big">🌍</div>
+        <h3 class="l-it">Mappa Globale Interattiva</h3>
+        <h3 class="l-en" style="display:none">Interactive Global Map</h3>
+        <p class="l-it">Marker live su ogni evento. Heatmap del rischio per paese. Click su un marker → analisi AI immediata. Filtra per categoria, severità, regione.</p>
+        <p class="l-en" style="display:none">Live markers on every event. Country-level risk heatmap. Click a marker → immediate AI analysis. Filter by category, severity, region.</p>
+        <div class="l-feat-tags"><span>GDELT</span><span>AI Score</span><span>Live</span></div>
+      </div>
+      <div class="l-feat-card">
+        <div class="l-feat-icon">⚡</div>
+        <h3 class="l-it">Early Warning System</h3>
+        <h3 class="l-en" style="display:none">Early Warning System</h3>
+        <p class="l-it">Score composito 0-10. Pattern recognition, velocità eventi, stress macro e mercati. Assessment AI con implicazioni di portafoglio.</p>
+        <p class="l-en" style="display:none">Composite score 0-10. Pattern recognition, event velocity, macro and market stress. AI assessment with portfolio implications.</p>
+      </div>
+      <div class="l-feat-card">
+        <div class="l-feat-icon">🧠</div>
+        <h3 class="l-it">Knowledge Graph Brain</h3>
+        <h3 class="l-en" style="display:none">Knowledge Graph Brain</h3>
+        <p class="l-it">3000+ nodi collegati: paesi, aziende, ETF, persone chiave, istituzioni. Jarvis AI traversa il grafo per rispondere alle tue domande.</p>
+        <p class="l-en" style="display:none">3000+ connected nodes: countries, companies, ETFs, key people, institutions. Jarvis AI traverses the graph to answer your questions.</p>
+      </div>
+      <div class="l-feat-card">
+        <div class="l-feat-icon">📊</div>
+        <h3 class="l-it">Macro Dashboard</h3>
+        <h3 class="l-en" style="display:none">Macro Dashboard</h3>
+        <p class="l-it">CPI, PIL, tassi, PMI, VIX, DXY per le principali economie. Interpretazione AI per ogni indicatore. Briefing completo 500 parole.</p>
+        <p class="l-en" style="display:none">CPI, GDP, rates, PMI, VIX, DXY for major economies. AI interpretation for each indicator. 500-word complete briefing.</p>
+      </div>
+      <div class="l-feat-card">
+        <div class="l-feat-icon">💹</div>
+        <h3 class="l-it">Mercati & Portfolio</h3>
+        <h3 class="l-en" style="display:none">Markets & Portfolio</h3>
+        <p class="l-it">Quotazioni live, ETF tracker, watchlist personale. Stress test del portafoglio basato su scenari geopolitici reali.</p>
+        <p class="l-en" style="display:none">Live quotes, ETF tracker, personal watchlist. Portfolio stress test based on real geopolitical scenarios.</p>
+      </div>
+      <div class="l-feat-card">
+        <div class="l-feat-icon">🔔</div>
+        <h3 class="l-it">Alert Personalizzati</h3>
+        <h3 class="l-en" style="display:none">Custom Alerts</h3>
+        <p class="l-it">Trigger su paesi, categorie, soglie di severità. Digest giornaliero AI alle 07:00. Nessun rumore, solo ciò che conta.</p>
+        <p class="l-en" style="display:none">Triggers on countries, categories, severity thresholds. Daily AI digest at 07:00. No noise, only what matters.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ TESTIMONIALS ═══ -->
+  <section class="l-testimonials">
+    <h2 class="l-section-h2" style="text-align:center;margin-bottom:40px">
+      <span class="l-it">Cosa dicono gli utenti</span>
+      <span class="l-en" style="display:none">What users say</span>
+    </h2>
+    <div class="l-testi-grid">
+      <div class="l-testi-card">
+        <div class="l-testi-stars">★★★★★</div>
+        <p class="l-it">"Finalmente un tool che connette geopolitica e mercati in modo intelligente. Il briefing AI mi salva 2 ore al giorno."</p>
+        <p class="l-en" style="display:none">"Finally a tool that intelligently connects geopolitics and markets. The AI briefing saves me 2 hours a day."</p>
+        <div class="l-testi-author">
+          <div class="l-av l-av-sm" style="background:linear-gradient(135deg,#7C3AED,#3B82F6)">M</div>
+          <div><div class="l-testi-name">Marco R.</div><div class="l-testi-role"><span class="l-it">Portfolio Manager, Milano</span><span class="l-en" style="display:none">Portfolio Manager, Milan</span></div></div>
+        </div>
+      </div>
+      <div class="l-testi-card">
+        <div class="l-testi-stars">★★★★★</div>
+        <p class="l-it">"Il Knowledge Graph è unico. Posso chiedere 'Come impatta la crisi in Medio Oriente sul mio ETF energy?' e ottengo una risposta contestualizzata."</p>
+        <p class="l-en" style="display:none">"The Knowledge Graph is unique. I can ask 'How does the Middle East crisis impact my energy ETF?' and get a contextualized answer."</p>
+        <div class="l-testi-author">
+          <div class="l-av l-av-sm" style="background:linear-gradient(135deg,#059669,#0EA5E9)">A</div>
+          <div><div class="l-testi-name">Alessia T.</div><div class="l-testi-role"><span class="l-it">Analista finanziaria</span><span class="l-en" style="display:none">Financial Analyst</span></div></div>
+        </div>
+      </div>
+      <div class="l-testi-card">
+        <div class="l-testi-stars">★★★★★</div>
+        <p class="l-it">"L'Early Warning mi ha avvisato del rischio supply chain 3 giorni prima che esplodesse. Valore inestimabile per chi lavora nell'industria."</p>
+        <p class="l-en" style="display:none">"The Early Warning alerted me to the supply chain risk 3 days before it blew up. Invaluable for anyone in industry."</p>
+        <div class="l-testi-author">
+          <div class="l-av l-av-sm" style="background:linear-gradient(135deg,#F59E0B,#EF4444)">S</div>
+          <div><div class="l-testi-name">Stefano B.</div><div class="l-testi-role"><span class="l-it">Operations Director</span><span class="l-en" style="display:none">Operations Director</span></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FINAL CTA ═══ -->
+  <section class="l-final-cta">
+    <div class="l-cta-bg-glow"></div>
+    <div class="l-live-pill" style="margin:0 auto 24px">
+      <span class="l-live-dot"></span>
+      <span id="l-live-count2">47 crisi monitorate in questo momento</span>
+    </div>
+    <h2 class="l-final-h2">
+      <span class="l-it">Inizia a capire il mondo<br>oggi stesso.</span>
+      <span class="l-en" style="display:none">Start understanding the world<br>today.</span>
+    </h2>
+    <p class="l-final-sub">
+      <span class="l-it">Gratuito. Nessuna carta di credito. Setup in 30 secondi.</span>
+      <span class="l-en" style="display:none">Free. No credit card. Setup in 30 seconds.</span>
+    </p>
+    <button class="l-btn-primary l-btn-xl" onclick="typeof showAuth==='function'&&showAuth('register')">
+      <span class="l-it">✦ Crea il tuo account gratis</span>
+      <span class="l-en" style="display:none">✦ Create your free account</span>
+    </button>
+    <div class="l-final-footnote">
+      <span class="l-it">Già registrato?</span>
+      <span class="l-en" style="display:none">Already have an account?</span>
+      <button class="l-link-btn" onclick="typeof showAuth==='function'&&showAuth('login')">
+        <span class="l-it">Accedi →</span>
+        <span class="l-en" style="display:none">Sign In →</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="l-footer">
+    <div class="llogo" style="font-size:16px">WorldLens</div>
+    <div class="l-footer-links">
+      <span class="l-it">Intelligence geopolitica e finanziaria AI-powered</span>
+      <span class="l-en" style="display:none">AI-powered geopolitical and financial intelligence</span>
+    </div>
+    <div class="l-footer-right">© 2025 WorldLens</div>
+  </footer>
 
 </div>
+
+
 
 <!-- AUTH -->
 <div id="aov"><div class="amod">
@@ -138,113 +395,131 @@
 <!-- SHELL -->
 <div id="shell">
 <nav id="nav">
-  <!-- Logo -->
+  <!-- Logo + hamburger -->
   <div class="nlogo" onclick="sv('dash',document.querySelector('[data-v=dash]'))" style="cursor:pointer">
     <span class="nlogo-wl">World</span><span class="nlogo-lens">Lens</span>
   </div>
 
-  <!-- ── FLAT SIDEBAR — all views visible ── -->
+  <!-- Context strip: live count + time -->
+  <div class="nav-ctx-strip" id="nav-ctx">
+    <span class="nav-ctx-live">
+      <span class="nav-ctx-dot"></span>
+      <span id="nav-ev-count">—</span> <span class="nav-ctx-label">eventi oggi</span>
+    </span>
+    <span class="nav-ctx-sep">·</span>
+    <span id="nav-clock" class="nav-ctx-time"></span>
+  </div>
+
+  <!-- Primary nav groups -->
   <div class="nav-groups" id="nav-groups">
 
-    <!-- DASHBOARD & MAP — top tier -->
-    <button class="ni" data-v="dash" onclick="sv('dash',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v4l2.5 1.5"/></svg>
-      Dashboard
+    <!-- PRIMARY -->
+    <button class="ni ni-icon" data-v="dash" onclick="sv('dash',this)" title="Dashboard">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      <span class="ni-lbl">Home</span>
     </button>
 
-    <button class="ni" data-v="map" onclick="sv('map',this)">
+    <button class="ni ni-icon" data-v="map" onclick="sv('map',this)" title="Global Map">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4l4-2 4 2 4-2v10l-4 2-4-2-4 2z"/><line x1="6" y1="2" x2="6" y2="12"/><line x1="10" y1="4" x2="10" y2="14"/></svg>
-      Global Map
+      <span class="ni-lbl">Mappa</span>
     </button>
+
+    <div class="nav-sep"></div>
 
     <!-- INTELLIGENCE -->
-    <button class="ni" data-v="feed" onclick="sv('feed',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="4" x2="13" y2="4"/><line x1="3" y1="8" x2="13" y2="8"/><line x1="3" y1="12" x2="13" y2="12"/></svg>
-      Event Feed
+    <span class="nav-group-label">Intelligence</span>
+
+    <button class="ni ni-icon" data-v="feed" onclick="sv('feed',this)" title="Event Feed" style="position:relative">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h9M2 12h7"/></svg>
+      <span class="ni-lbl">Feed</span>
+      <span id="nav-feed-badge" class="nav-badge" style="display:none"></span>
     </button>
 
-    <button class="ni" data-v="earlywarning" onclick="sv('earlywarning',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M3 8a5 5 0 0 1 10 0M1 8a7 7 0 0 1 14 0"/></svg>
-      Early Warning
+    <button class="ni ni-icon" data-v="earlywarning" onclick="sv('earlywarning',this)" title="Early Warning" style="position:relative">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2L14 13H2L8 2z"/><line x1="8" y1="7" x2="8" y2="10"/><circle cx="8" cy="12" r=".5" fill="currentColor"/></svg>
+      <span class="ni-lbl">EW</span>
+      <span id="nav-ew-badge" class="nav-badge nav-badge-ew" style="display:none"></span>
     </button>
 
-    <button class="ni" data-v="supplychain" onclick="sv('supplychain',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="4" height="6"/><rect x="10" y="6" width="4" height="6"/><line x1="6" y1="9" x2="10" y2="9"/></svg>
-      Supply Chain
+    <button class="ni ni-icon" data-v="supplychain" onclick="sv('supplychain',this)" title="Supply Chain">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="3" cy="8" r="2"/><circle cx="13" cy="8" r="2"/><circle cx="8" cy="4" r="2"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="8" y1="6" x2="8" y2="8"/></svg>
+      <span class="ni-lbl">Supply</span>
     </button>
 
-    <!-- ANALYSIS -->
-    <button class="ni" data-v="graph" onclick="sv('graph',this)">
+    <div class="nav-sep"></div>
+
+    <!-- MARKETS -->
+    <span class="nav-group-label">Mercati</span>
+
+    <button class="ni ni-icon" data-v="macro" onclick="sv('macro',this)" title="Macro">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12L5 8l3 3 4-5 3-2"/><rect x="1" y="1" width="14" height="14" rx="1"/></svg>
+      <span class="ni-lbl">Macro</span>
+    </button>
+
+    <button class="ni ni-icon" data-v="markets" onclick="sv('markets',this)" title="Markets">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l3-4 3 2 3-5 3 3"/></svg>
+      <span class="ni-lbl">Markets</span>
+    </button>
+
+    <button class="ni ni-icon" data-v="portfolio" onclick="sv('portfolio',this)" title="Portfolio">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="12" height="9" rx="1.5"/><path d="M5 5V4a3 3 0 016 0v1"/></svg>
+      <span class="ni-lbl">Portfolio</span>
+    </button>
+
+    <div class="nav-sep"></div>
+
+    <!-- AI -->
+    <span class="nav-group-label">AI</span>
+
+    <button class="ni ni-icon" data-v="graph" onclick="sv('graph',this)" title="Graph Suite">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="4" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><line x1="8" y1="6" x2="3" y2="10"/><line x1="8" y1="6" x2="13" y2="10"/></svg>
-      Graph Suite
+      <span class="ni-lbl">Graph</span>
     </button>
 
-    <button class="ni" data-v="macro" onclick="sv('macro',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,12 5,9 8,11 11,5 14,7"/></svg>
-      Macro
+    <button class="ni ni-icon" data-v="ai" onclick="sv('ai',this)" title="AI Analyst">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="9" rx="1.5"/><path d="M5 7h6M5 10h4"/></svg>
+      <span class="ni-lbl">AI</span>
     </button>
 
-    <button class="ni" data-v="ai" onclick="sv('ai',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3.5"/><path d="M8 9.5v3M5 14h6"/></svg>
-      AI Analyst
+    <button class="ni ni-icon" data-v="tradgentic" onclick="sv('tradgentic',this)" title="Tradgentic">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l3-3 3 3 4-5"/><line x1="3" y1="12" x2="13" y2="12"/></svg>
+      <span class="ni-lbl">Trade</span>
     </button>
 
-    <!-- FINANCE -->
-    <button class="ni" data-v="markets" onclick="sv('markets',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,11 5,7 8,9 11,4 15,2"/><line x1="1" y1="14" x2="15" y2="14"/></svg>
-      Markets
+    <button class="ni ni-icon" data-v="insiders" onclick="sv('insiders',this)" title="Insiders">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/></svg>
+      <span class="ni-lbl">Insiders</span>
     </button>
 
-    <button class="ni" data-v="portfolio" onclick="sv('portfolio',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="12" height="9" rx="1"/><path d="M11 14V4a1.5 1.5 0 0 0-1.5-1.5h-3A1.5 1.5 0 0 0 5 4v10"/></svg>
-      Portfolio
+    <div class="nav-sep"></div>
+
+    <!-- TOOLS -->
+    <button class="ni ni-icon" data-v="alerts" onclick="sv('alerts',this)" title="Alerts" style="position:relative">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2a5 5 0 015 5v3l1.5 2h-13L3 10V7a5 5 0 015-5z"/><path d="M6.5 13.5a1.5 1.5 0 003 0"/></svg>
+      <span class="ni-lbl">Alert</span>
     </button>
 
-    <button class="ni" data-v="tradgentic" onclick="sv('tradgentic',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="12" height="7" rx="1"/><circle cx="8" cy="3" r="1.5"/><path d="M8 4.5v2.5"/></svg>
-      Tradgentic
+    <button class="ni ni-icon" data-v="profile" onclick="sv('profile',this)" title="Profilo">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/></svg>
+      <span class="ni-lbl">Profilo</span>
     </button>
 
-    <button class="ni" data-v="insiders" onclick="sv('insiders',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14a5 5 0 0 1 10 0"/></svg>
-      Insiders
-    </button>
-
-    <!-- USER -->
-    <button class="ni" data-v="alerts" onclick="sv('alerts',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 4 1.5 5 1.5 5h-13s1.5-1 1.5-5a5 5 0 0 1 5-5z"/><path d="M6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>
-      Alerts<span id="al-badge" style="display:none;background:var(--or,#f59e0b);color:#fff;font-size:8px;padding:1px 5px;border-radius:100px;margin-left:2px">0</span>
-    </button>
-
-    <button class="ni" data-v="profile" onclick="sv('profile',this)">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14a6 6 0 0 1 12 0"/></svg>
-      Profile
-    </button>
-
-    <a href="/static/brain_editor.html" target="_blank" class="ni" style="text-decoration:none">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="8" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><line x1="6" y1="7" x2="10" y2="5"/><line x1="6" y1="9" x2="10" y2="11"/></svg>
-      Brain Editor ↗
+    <a href="/static/brain_editor.html" target="_blank" class="ni ni-icon" style="text-decoration:none" title="Brain Editor">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="8" rx="6" ry="5"/><path d="M5 8c0-2 1-3 3-3s3 1 3 3"/><circle cx="8" cy="8" r="1" fill="currentColor"/></svg>
+      <span class="ni-lbl">Brain ↗</span>
     </a>
 
-  </div><!-- /nav-groups -->
+  </div>
 
-  <!-- ── RIGHT SIDE ── -->
-  <div id="navr">
-    <div class="wsi"><div class="wsd" id="wsd"></div><span id="wst">Connecting</span></div>
-    <div class="uch" onclick="sv('profile',null)" title="Profile & Settings">
-      <div class="uav" id="uav">U</div>
-      <span id="un">User</span>
-    </div>
+  <!-- Right: XP pill + user indicator -->
+  <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0">
     <div id="nav-xp-pill" style="display:none;align-items:center;gap:4px;padding:3px 10px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.2);border-radius:100px;cursor:pointer" onclick="sv('gamification',document.querySelector('[data-v=gamification]'))">
-      <span style="font-size:10px">⭐</span>
-      <span id="nav-xp-val" style="font-family:var(--fm,monospace);font-size:10px;font-weight:700;color:#A78BFA">0 XP</span>
+      <svg viewBox="0 0 12 12" fill="none" stroke="#A78BFA" stroke-width="1.5" width="10" height="10"><polygon points="6,1 7.5,4.5 11,5 8.5,7.5 9.2,11 6,9.2 2.8,11 3.5,7.5 1,5 4.5,4.5"/></svg>
+      <span id="nav-xp-val" style="font-size:10px;font-weight:700;color:#A78BFA;font-family:var(--fm)">0</span>
     </div>
-    <button class="btn btn-g btn-sm" onclick="openRiskRadar()">Risk Radar</button>
-    <button onclick="brainAgent.open()" title="Brain Agent (⌘K)" style="padding:5px 12px;border-radius:8px;border:1px solid rgba(124,58,237,.3);background:rgba(124,58,237,.1);color:#A78BFA;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">🧠 Brain</button>
-    <button onclick="openReportModal()" title="Financial Reports" style="padding:5px 12px;border-radius:8px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.1);color:#10B981;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">📋 Report</button>
-    <button class="btn btn-g btn-sm" onclick="logout()">Sign Out</button>
   </div>
 </nav>
+
 <div id="content">
 
 <!-- DASHBOARD -->
@@ -3178,10 +3453,10 @@
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v51"></script>
-<script src="/static/finance.bundle.js?v51"></script>
-<script src="/static/map.bundle.js?v51"></script>
-<script src="/static/dashboard.bundle.js?v51"></script>
+<script src="/static/core.bundle.js?v52"></script>
+<script src="/static/finance.bundle.js?v52"></script>
+<script src="/static/map.bundle.js?v52"></script>
+<script src="/static/dashboard.bundle.js?v52"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
