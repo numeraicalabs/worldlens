@@ -1024,3 +1024,46 @@ async def macro_narrative_endpoint(user=Depends(require_user)):
     except Exception as e:
         logger.warning("macro-narrative error: %s", e)
         return {"indicators": [], "error": str(e)}
+
+
+# ── Global dashboard cache endpoints ─────────────────────────────────────────
+
+@router.get("/dashboard-cache")
+async def get_dashboard_cache(user=Depends(require_user)):
+    """
+    Returns pre-generated global dashboard cache.
+    Generated once daily at 07:00 UTC for ALL users.
+    No personal AI key needed — uses admin Gemini key.
+    Personal key adds extra personalization on top.
+    """
+    from global_cache import get_global_cache
+    ug, ua = await _get_user_ai_keys(user["id"])
+    lang = user.get("lang", "it")
+
+    cache = await get_global_cache()
+    if not cache:
+        return {"error": "Cache not yet generated", "retry_after": 30}
+
+    # If user has personal key and cache is rule-based, generate enhanced version
+    if (ug or ua) and not cache.get("ai_enhanced"):
+        try:
+            from global_cache import generate_global_cache
+            cache = await generate_global_cache(force=True)
+        except Exception:
+            pass  # Use existing cache
+
+    return cache
+
+
+@router.post("/dashboard-cache/refresh")
+async def refresh_dashboard_cache(
+    background_tasks: BackgroundTasks,
+    user=Depends(require_user),
+):
+    """Manually trigger cache refresh (admin or personal key users)."""
+    async def _run():
+        from global_cache import generate_global_cache
+        await generate_global_cache(force=True)
+
+    background_tasks.add_task(_run)
+    return {"ok": True, "message": "Cache refresh started"}
