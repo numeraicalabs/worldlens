@@ -447,6 +447,12 @@ function enterApp() {
       loadLayout();
     });
   });
+  // Post-login hooks (consolidated here to avoid window.enterApp override chain bugs)
+  setTimeout(function(){
+    if(!localStorage.getItem('wl_onboarded')) showOnboarding();
+    if(typeof injectTriggerBtn === 'function') injectTriggerBtn();
+    if(typeof loadBrainDigest === 'function') loadBrainDigest();
+  }, 1000);
 }
 
 // ── DATA ──────────────────────────────────────────────
@@ -3519,20 +3525,7 @@ function injectTriggerBtn() {
   document.body.appendChild(btn);
 }
 
-// Inject trigger after login
-var _origEnterAppBA = window.enterApp;
-if (typeof _origEnterAppBA === 'function') {
-  window.enterApp = function() {
-    _origEnterAppBA.apply(this, arguments);
-    setTimeout(injectTriggerBtn, 500);
-  };
-} else {
-  document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
-      if (G && G.token) injectTriggerBtn();
-    }, 1500);
-  });
-}
+// injectTriggerBtn called inside enterApp directly
 
 })(); // end IIFE
 
@@ -3798,27 +3791,9 @@ window.markDigestRead = function(id, btn) {
   });
 };
 
-// Load digest after login
-(function() {
-  var _orig = window.enterApp;
-  if (typeof _orig === 'function') {
-    window.enterApp = function() {
-      _orig.apply(this, arguments);
-      setTimeout(function() {
-        loadBrainDigest();
-        // Trigger digest generation if brain has enough entries
-        if (G.brainStats && G.brainStats.total_entries >= 10) {
-          rq('/api/brain/digest/trigger', { method: 'POST' });
-        }
-      }, 3000);
-    };
-  }
-})();
+// Load digest after login (handled inside enterApp)
 
 
-/* ═══════════════════════════════════════════════════
-   LANDING PAGE v2 — bilingual, animated, live data
-   ═══════════════════════════════════════════════════ */
 function setLandingLang(lang){
   var landing = document.getElementById('landing');
   if(!landing) return;
@@ -3976,10 +3951,4 @@ function closeOnboarding(){
 }
 
 /* Hook onboarding to enterApp */
-var _origEnterApp = window.enterApp;
-window.enterApp = function(){
-  if(_origEnterApp) _origEnterApp.apply(this, arguments);
-  setTimeout(function(){
-    if(!localStorage.getItem('wl_onboarded')) showOnboarding();
-  }, 1200);
-};
+// Onboarding now called inside enterApp directly
