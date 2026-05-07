@@ -4114,6 +4114,23 @@ function init() {
     }).observe(agGrid, { childList: true, subtree: true });
   }
 
+  // Card 5 (Macro): load when scrolled into view
+  var _macroLoaded = false;
+  _track.addEventListener('scroll', function() {
+    if (_macroLoaded) return;
+    var card5 = _el('msc-5');
+    if (!card5) return;
+    var rect = card5.getBoundingClientRect();
+    var trackRect = _track.getBoundingClientRect();
+    // Card 5 is visible when it enters the track viewport
+    if (rect.left < trackRect.right + 50) {
+      _macroLoaded = true;
+      if (typeof loadMacroNarrative === 'function') {
+        loadMacroNarrative();
+      }
+    }
+  }, { passive: true });
+
   // Re-sync when dashboard EW signals update
   var ewSigs = _el('dash-ew-signals');
   if (ewSigs) {
@@ -4138,6 +4155,13 @@ function init() {
       _fetchEWDirect();
     }
   }, 2000);
+
+  // Pre-load macro narrative after 4s (so card 5 is ready when user swipes there)
+  setTimeout(function() {
+    if (_isPhone() && window.G && G.token && typeof loadMacroNarrative === 'function') {
+      loadMacroNarrative();
+    }
+  }, 4000);
 }
 
 if (document.readyState === 'loading') {
@@ -4278,3 +4302,212 @@ function openJarvisForEvent(title){
     openJarvis(title);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   INTELLIGENCE HUB — 6 cards from global cache
+   ═══════════════════════════════════════════════════════════════ */
+
+var _intelCache = null;
+var _modalEvents = {};
+
+function refreshIntelCards(){
+  _intelCache = null;
+  loadIntelCards();
+}
+
+function loadIntelCards(){
+  if(!window.G||!G.token) return;
+  if(_intelCache){ _renderIntelCards(_intelCache); return; }
+
+  rq('/api/intelligence/dashboard-cache').then(function(data){
+    if(!data||data.error) return;
+    _intelCache = data;
+    _renderIntelCards(data);
+  });
+}
+
+function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function _renderIntelCards(data){
+  var events  = data.top_events      || [];
+  var macro   = data.macro_narrative || [];
+  var kg      = data.kg_connections  || [];
+  var msnap   = data.market_snapshot || [];
+  var ewText  = data.ew_assessment   || '';
+
+  // Deduplicate events by card_slot
+  var bySlot = {};
+  events.forEach(function(ev){
+    var slot = ev.card_slot || 'crisis';
+    if(!bySlot[slot]) bySlot[slot] = ev;
+  });
+  var critical = bySlot.critical || events[0];
+  var geo      = bySlot.crisis   || events.find(function(e){
+    return (e.category||'').match(/security|conflict|military|politics/i);
+  }) || events[1];
+  var macroEv  = bySlot.macro    || null;
+
+  // Card 1: Critical
+  if(critical){
+    _modalEvents['critical'] = critical;
+    var el = document.getElementById('ic-critical-title');
+    if(el) el.textContent = critical.title || '';
+    var sum = document.getElementById('ic-critical-summary');
+    if(sum) sum.textContent = (critical.rich_summary||critical.ai_summary||critical.summary||'').slice(0,160);
+    var ctr = document.getElementById('ic-critical-country');
+    if(ctr) ctr.textContent = (critical.country_name||'Global').toUpperCase()+' · SEV '+(critical.severity||'?');
+    var tim = document.getElementById('ic-critical-time');
+    if(tim&&critical.timestamp) tim.textContent = _tAgo(critical.timestamp);
+  }
+
+  // Card 2: Macro Flash
+  var macroGrid = document.getElementById('ic-macro-kpis');
+  if(macroGrid && macro.length){
+    macroGrid.innerHTML = macro.slice(0,4).map(function(m){
+      var col = m.arrow==='↑'?'#10B981':m.arrow==='↓'?'#EF4444':'#94A3B8';
+      return '<div class="ic-kpi-item">'
+        +'<div class="ic-kpi-name">'+_esc(m.name)+'</div>'
+        +'<div class="ic-kpi-val" style="color:'+col+'">'+_esc(m.value)+' <span style="font-size:10px">'+_esc(m.unit||'')+'</span></div>'
+        +'</div>';
+    }).join('');
+    var interp = document.getElementById('ic-macro-interp');
+    if(interp && macro[0] && macro[0].interpretation){
+      interp.textContent = macro[0].interpretation.slice(0,120);
+    }
+  }
+
+  // Card 3: Geo
+  if(geo){
+    _modalEvents['geo'] = geo;
+    var gt = document.getElementById('ic-geo-title');
+    if(gt) gt.textContent = geo.title||'';
+    var gs = document.getElementById('ic-geo-summary');
+    if(gs) gs.textContent = (geo.rich_summary||geo.summary||'').slice(0,150);
+    var gc = document.getElementById('ic-geo-country');
+    if(gc) gc.textContent = (geo.country_name||'Global').toUpperCase();
+  }
+
+  // Card 4: Markets
+  var mkRow = document.getElementById('ic-market-row');
+  if(mkRow && msnap.length){
+    mkRow.innerHTML = msnap.slice(0,4).map(function(m){
+      var v = parseFloat(m.value||0);
+      var p = parseFloat(m.previous||v);
+      var col = v>p?'#10B981':v<p?'#EF4444':'#94A3B8';
+      var arr = v>p?'↑':v<p?'↓':'→';
+      return '<div class="ic-mkt-item">'
+        +'<span class="ic-mkt-name">'+_esc((m.name||'').slice(0,8))+'</span>'
+        +'<span class="ic-mkt-val" style="color:'+col+'">'+arr+' '+_esc(m.value||'')+'</span>'
+        +'</div>';
+    }).join('');
+    // Show macro event in markets title
+    var mktTitle = document.getElementById('ic-markets-title');
+    if(mktTitle&&macroEv) mktTitle.textContent = macroEv.title ? macroEv.title.slice(0,80) : '';
+  }
+
+  // Card 5: KG Connections
+  var kgCon = document.getElementById('ic-kg-connections');
+  if(kgCon && kg.length){
+    kgCon.innerHTML = kg.slice(0,5).map(function(c){
+      return '<div class="ic-kg-row">'
+        +'<span class="ic-kg-node" onclick="openJarvisForEvent(\''+_esc(c.src)+'\')">'+_esc(c.src)+'</span>'
+        +'<span class="ic-kg-rel">→ '+_esc(c.relation)+' →</span>'
+        +'<span class="ic-kg-node" onclick="openJarvisForEvent(\''+_esc(c.tgt)+'\')">'+_esc(c.tgt)+'</span>'
+        +'</div>';
+    }).join('');
+  }
+
+  // Card 6: EW
+  var ewScore = document.getElementById('ic-ew-score');
+  var ewScoreEl = document.getElementById('dash-ew-score') || document.getElementById('ew-score');
+  if(ewScore && ewScoreEl) ewScore.textContent = ewScoreEl.textContent || '—';
+  var ewTxt = document.getElementById('ic-ew-text');
+  if(ewTxt && ewText) ewTxt.textContent = ewText.slice(0, 280) + (ewText.length > 280 ? '…' : '');
+}
+
+/* ── Event detail modal ── */
+var _currentModalEvent = null;
+window._currentModalEvent = null;
+
+function openEventModal(slot){
+  var ev = _modalEvents[slot];
+  if(!ev) return;
+  _currentModalEvent = ev;
+  window._currentModalEvent = ev;
+
+  document.getElementById('em-tag').textContent = (ev.category||'EVENT').toUpperCase()+' · WORLDLENS INTELLIGENCE';
+  document.getElementById('em-title').textContent = ev.title||'';
+  document.getElementById('em-country').textContent = ev.country_name||'Global';
+
+  var sev = parseFloat(ev.severity||0);
+  var sevEl = document.getElementById('em-severity');
+  if(sevEl){
+    sevEl.textContent = 'Severity '+sev.toFixed(0)+'/10';
+    sevEl.style.background = sev>=8?'rgba(239,68,68,.2)':sev>=6?'rgba(249,115,22,.2)':'rgba(59,130,246,.15)';
+    sevEl.style.color = sev>=8?'#EF4444':sev>=6?'#F97316':'#93C5FD';
+  }
+
+  var ts = ev.timestamp ? _tAgo(ev.timestamp) : '';
+  document.getElementById('em-time').textContent = ts;
+
+  var summary = ev.rich_summary||ev.ai_summary||ev.summary||ev.title||'';
+  document.getElementById('em-summary').textContent = summary;
+
+  // Source link
+  var srcLink = document.getElementById('em-source-link');
+  if(srcLink) srcLink.href = ev.source_url||ev.url||'#';
+
+  // KG nodes from cache
+  if(_intelCache && _intelCache.kg_connections && _intelCache.kg_connections.length){
+    var related = _intelCache.kg_connections.filter(function(c){
+      var title = (ev.title||'').toLowerCase();
+      return title.includes((c.src||'').toLowerCase()) || title.includes((c.tgt||'').toLowerCase());
+    }).slice(0,4);
+    var kgSec = document.getElementById('em-kg-section');
+    var kgNodes = document.getElementById('em-kg-nodes');
+    if(related.length && kgSec && kgNodes){
+      kgSec.style.display = 'block';
+      kgNodes.innerHTML = related.map(function(c){
+        return '<div style="font-size:10px;font-family:var(--fm);color:var(--t2);padding:3px 0">'
+          +'<span style="color:#A78BFA;cursor:pointer" onclick="openJarvisForEvent(\''+_esc(c.src)+'\')">'+_esc(c.src)+'</span>'
+          +' <span style="color:rgba(255,255,255,.2)">→ '+_esc(c.relation)+' →</span> '
+          +'<span style="color:#A78BFA;cursor:pointer" onclick="openJarvisForEvent(\''+_esc(c.tgt)+'\')">'+_esc(c.tgt)+'</span>'
+          +'</div>';
+      }).join('');
+    }
+  }
+
+  var overlay = document.getElementById('event-modal-overlay');
+  if(overlay){ overlay.style.display='flex'; requestAnimationFrame(function(){ overlay.classList.add('visible'); }); }
+}
+
+function closeEventModal(){
+  var overlay = document.getElementById('event-modal-overlay');
+  if(overlay){ overlay.style.display='none'; overlay.classList.remove('visible'); }
+}
+
+function _tAgo(ts){
+  try{
+    var d = new Date(ts);
+    var diff = Math.floor((Date.now()-d.getTime())/60000);
+    if(diff<60) return diff+'m fa';
+    if(diff<1440) return Math.floor(diff/60)+'h fa';
+    return Math.floor(diff/1440)+'g fa';
+  }catch(e){ return ''; }
+}
+
+/* ── Auto-load on dashboard open ── */
+(function(){
+  var dash = document.getElementById('view-dash');
+  if(!dash) return;
+  var _loaded = false;
+  new MutationObserver(function(){
+    if(dash.classList.contains('on') && !_loaded && window.G && G.token){
+      _loaded = true;
+      setTimeout(loadIntelCards, 1200);
+    }
+  }).observe(dash, {attributes:true, attributeFilter:['class']});
+  if(dash.classList.contains('on')){
+    setTimeout(function(){if(window.G&&G.token) loadIntelCards();}, 2500);
+  }
+})();
