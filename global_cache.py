@@ -533,7 +533,31 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
         else:
             ev["card_slot"] = "crisis"
 
-    # Save to DB
+    # Save to DB — try Postgres first, then SQLite
+    from supabase_client import get_pool as _gp
+    _pool = await _gp()
+    if _pool:
+        try:
+            async with _pool.acquire() as conn:
+                await conn.execute(
+                    "INSERT INTO global_cache "
+                    "(cache_date, global_brief, macro_narrative, ew_assessment, "
+                    "top_events, kg_connections, market_snapshot, ai_enhanced) "
+                    "VALUES ($1,$2,$3,$4,$5,$6,$7,$8) "
+                    "ON CONFLICT(cache_date) DO UPDATE SET "
+                    "global_brief=EXCLUDED.global_brief, macro_narrative=EXCLUDED.macro_narrative, "
+                    "ew_assessment=EXCLUDED.ew_assessment, top_events=EXCLUDED.top_events, "
+                    "kg_connections=EXCLUDED.kg_connections, market_snapshot=EXCLUDED.market_snapshot, "
+                    "ai_enhanced=EXCLUDED.ai_enhanced",
+                    today, brief, json.dumps(macro_cards), ew_text,
+                    json.dumps(deduped_events[:10]), json.dumps(kg_conn),
+                    json.dumps(market_snap), int(has_ai)
+                )
+                logger.info("Global cache saved to PostgreSQL")
+        except Exception as _e:
+            logger.warning("global_cache PG save: %s", _e)
+    
+    # Also save to SQLite as local cache
     async with aiosqlite.connect(settings.db_path) as db:
         await db.executescript(CACHE_SCHEMA)
         await db.execute(
@@ -564,6 +588,24 @@ async def get_global_cache(force_refresh: bool = False) -> Optional[Dict]:
     """Get today's cache, generating it if missing."""
     today = date.today().isoformat()
     try:
+        # Try Postgres first
+        from supabase_client import get_pool as _gp
+        _pool = await _gp()
+        if _pool:
+            try:
+                async with _pool.acquire() as conn:
+                    row = await conn.fetchrow(
+                        "SELECT * FROM global_cache WHERE cache_date=$1", today
+                    )
+                    if row and row["global_brief"]:
+                        d = dict(row)
+                        d["top_events"]      = json.loads(d.get("top_events") or "[]")
+                        d["macro_narrative"] = json.loads(d.get("macro_narrative") or "[]")
+                        d["kg_connections"]  = json.loads(d.get("kg_connections") or "[]")
+                        d["market_snapshot"] = json.loads(d.get("market_snapshot") or "[]")
+                        return d
+            except Exception: pass
+        # SQLite fallback
         async with aiosqlite.connect(settings.db_path) as db:
             await db.executescript(CACHE_SCHEMA)
             await db.commit()

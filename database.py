@@ -1,5 +1,6 @@
 """World Lens — Database schema v3 with user preferences"""
 from __future__ import annotations
+from db import ensure_full_schema
 import aiosqlite
 import logging
 from config import settings
@@ -14,6 +15,8 @@ DB      = settings.db_path
 
 
 async def init_db():
+    # Ensure all tables exist on Postgres if configured
+    await ensure_full_schema()
     async with aiosqlite.connect(DB) as db:
         await db.executescript("""
         CREATE TABLE IF NOT EXISTS users (

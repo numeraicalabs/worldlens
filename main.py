@@ -115,6 +115,14 @@ async def _load_ai_settings():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # ── Ensure full schema on Postgres (all 20+ tables) ─────────────────
+    try:
+        from db import ensure_full_schema
+        await ensure_full_schema()
+        logger.info("Full Postgres schema ensured")
+    except Exception as _dbe:
+        logger.warning("ensure_full_schema: %s", _dbe)
+
     await init_db()
     await _seed_admin()
     await _load_ai_settings()
@@ -203,7 +211,7 @@ async def lifespan(app: FastAPI):
     # ── Startup: generate global dashboard cache ──────────────────────────────
     async def _startup_global_cache():
         import asyncio as _aio
-        await _aio.sleep(22)
+        await _aio.sleep(8)  # after seed, generate cache quickly
         try:
             from global_cache import get_global_cache
             logger.info("Startup: generating global dashboard cache…")
