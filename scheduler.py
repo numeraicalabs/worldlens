@@ -799,6 +799,33 @@ def start():
         misfire_grace_time=3600,
     )
 
+
+    # ── Daily portfolio snapshots ──────────────────────────────────────────────
+    async def _daily_portfolio_snapshots():
+        try:
+            import aiosqlite
+            from routers.finance_hub import save_daily_snapshot
+            async with aiosqlite.connect(settings.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute("SELECT id FROM etf_portfolios") as c:
+                    portfolios = [row["id"] for row in await c.fetchall()]
+            for pid in portfolios:
+                try:
+                    await save_daily_snapshot(pid)
+                except Exception as _e:
+                    logger.debug("snapshot portfolio %d: %s", pid, _e)
+            if portfolios:
+                logger.info("Portfolio snapshots saved: %d portfolios", len(portfolios))
+        except Exception as e:
+            logger.warning("daily_portfolio_snapshots: %s", e)
+
+    _scheduler.add_job(
+        _daily_portfolio_snapshots, "cron",
+        hour=18, minute=0,
+        id="daily_portfolio_snapshots",
+        misfire_grace_time=3600,
+    )
+
     # ── Global dashboard cache (06:45 UTC — before daily brief) ─────────────
     async def _global_cache_job():
         try:

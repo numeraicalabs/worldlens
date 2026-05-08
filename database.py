@@ -132,6 +132,57 @@ async def init_db():
             updated_at TEXT DEFAULT (datetime('now'))
         );
 
+        
+        CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            portfolio_id    INTEGER NOT NULL,
+            snap_date       TEXT NOT NULL,
+            total_value     REAL NOT NULL DEFAULT 0,
+            total_cost      REAL NOT NULL DEFAULT 0,
+            total_return_pct REAL NOT NULL DEFAULT 0,
+            day_return_pct  REAL DEFAULT 0,
+            sharpe_ratio    REAL DEFAULT NULL,
+            volatility_pct  REAL DEFAULT NULL,
+            max_drawdown_pct REAL DEFAULT NULL,
+            geo_risk_score  REAL DEFAULT NULL,
+            currency        TEXT NOT NULL DEFAULT 'EUR',
+            created_at      TEXT DEFAULT (datetime('now')),
+            UNIQUE(portfolio_id, snap_date),
+            FOREIGN KEY (portfolio_id) REFERENCES etf_portfolios(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS holding_prices (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            holding_id      INTEGER NOT NULL,
+            price_date      TEXT NOT NULL,
+            price_usd       REAL NOT NULL,
+            price_eur       REAL NOT NULL,
+            value_eur       REAL NOT NULL,
+            UNIQUE(holding_id, price_date),
+            FOREIGN KEY (holding_id) REFERENCES etf_holdings(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS fx_rates (
+            pair            TEXT PRIMARY KEY,
+            rate            REAL NOT NULL,
+            updated_at      TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS etf_portfolios_meta (
+            portfolio_id    INTEGER PRIMARY KEY,
+            base_currency   TEXT NOT NULL DEFAULT 'EUR',
+            benchmark_ticker TEXT DEFAULT 'VWCE',
+            description     TEXT DEFAULT '',
+            color           TEXT DEFAULT '#7C3AED',
+            icon            TEXT DEFAULT '💼',
+            is_public       INTEGER DEFAULT 0,
+            updated_at      TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (portfolio_id) REFERENCES etf_portfolios(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ps_pid  ON portfolio_snapshots(portfolio_id, snap_date DESC);
+        CREATE INDEX IF NOT EXISTS idx_hp_hid  ON holding_prices(holding_id, price_date DESC);
+
         CREATE INDEX IF NOT EXISTS idx_ev_ts ON events(timestamp DESC);
         CREATE INDEX IF NOT EXISTS idx_ev_cat ON events(category);
         CREATE INDEX IF NOT EXISTS idx_ev_cc ON events(country_code);

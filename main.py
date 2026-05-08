@@ -281,6 +281,7 @@ app.include_router(intelligence_router)
 app.include_router(markets_router)
 app.include_router(admin_router)
 app.include_router(insiders_router)
+app.include_router(finance_hub_router)
 app.include_router(dependency_router)
 app.include_router(track_router)
 app.include_router(ml_router)
@@ -302,6 +303,7 @@ from routers.financial_reports import router as fin_reports_router
 app.include_router(fin_reports_router)
 
 from routers.jarvis import router as jarvis_router
+from routers.finance_hub import router as finance_hub_router
 app.include_router(jarvis_router)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
