@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v55">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v55">
-<link rel="stylesheet" href="/static/finance.bundle.css?v55">
+<link rel="stylesheet" href="/static/core.bundle.css?v57">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v57">
+<link rel="stylesheet" href="/static/finance.bundle.css?v57">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3531,10 +3531,10 @@
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v55"></script>
-<script src="/static/finance.bundle.js?v55"></script>
-<script src="/static/map.bundle.js?v55"></script>
-<script src="/static/dashboard.bundle.js?v55"></script>
+<script src="/static/core.bundle.js?v57"></script>
+<script src="/static/finance.bundle.js?v57"></script>
+<script src="/static/map.bundle.js?v57"></script>
+<script src="/static/dashboard.bundle.js?v57"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
@@ -3642,6 +3642,12 @@
 <div id="wl-more-drawer">
   <div class="more-drawer-handle"></div>
   <div class="more-drawer-grid">
+
+    <div class="more-drawer-item" onclick="mobileNav('markets',null)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M2 12l3-4 3 2 3-5 3 3"/>
+      </svg><span>Markets</span>
+    </div>
 
     <div class="more-drawer-item" onclick="mobileNav('macro',null)">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">

@@ -269,6 +269,11 @@ function renderDash() {
   var risk = st.global_risk_index || 0;
   var rc   = risk>60?'var(--re)':risk>35?'var(--am)':'var(--gr)';
 
+  // Trigger intel cards load when dashboard renders with events
+  if(typeof loadIntelCards === 'function' && !_intelCache){
+    setTimeout(loadIntelCards, 800);
+  }
+
   // Greeting time-of-day
   var hr = new Date().getHours();
   var greet = hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
@@ -4320,10 +4325,83 @@ function loadIntelCards(){
   if(_intelCache){ _renderIntelCards(_intelCache); return; }
 
   rq('/api/intelligence/dashboard-cache').then(function(data){
-    if(!data||data.error) return;
+    if(!data || data.error){
+      // Cache not yet generated — build from live events immediately
+      _buildIntelCardsFromLiveData();
+      // Retry after 30s when cache should be ready
+      setTimeout(function(){
+        _intelCache = null;
+        if(window.G&&G.token) loadIntelCards();
+      }, 30000);
+      return;
+    }
     _intelCache = data;
     _renderIntelCards(data);
   });
+}
+
+function _buildIntelCardsFromLiveData(){
+  /* Fallback: populate cards directly from G.events and existing DOM data */
+  var events = (window.G && G.events) ? G.events.slice().sort(function(a,b){
+    return (b.severity||0)-(a.severity||0);
+  }) : [];
+
+  if(!events.length){
+    // Events not loaded yet — show helpful placeholder
+    ['ic-critical-title','ic-geo-title'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.textContent = 'Dati in caricamento…';
+    });
+    var hint = document.getElementById('ic-critical-summary');
+    if(hint) hint.textContent = 'Il sistema sta raccogliendo gli eventi. Ricarica tra 30 secondi.';
+    return;
+  }
+
+  // Build minimal cache from live data
+  var bySlot = {};
+  events.forEach(function(ev){
+    var cat = (ev.category||'').toLowerCase();
+    var sev = parseFloat(ev.severity||0);
+    var slot = sev>=8?'critical':
+               cat.match(/security|conflict|military|politic/)? 'crisis':
+               cat.match(/economy|finance|trade/)? 'macro': 'crisis';
+    if(!bySlot[slot]) bySlot[slot]=ev;
+  });
+
+  var fakeCache = {
+    top_events: events.slice(0,10).map(function(ev){
+      ev.rich_summary = ev.ai_summary||ev.summary||ev.title||'';
+      ev.card_slot = parseFloat(ev.severity||0)>=8?'critical':'crisis';
+      return ev;
+    }),
+    macro_narrative: [],
+    kg_connections: [],
+    market_snapshot: [],
+    ew_assessment: ''
+  };
+
+  // Try to get EW score from DOM
+  var ewEl = document.getElementById('dash-ew-score')||document.getElementById('ew-score');
+  if(ewEl) {
+    var scoreEl = document.getElementById('ic-ew-score');
+    if(scoreEl) scoreEl.textContent = ewEl.textContent||'—';
+  }
+
+  // Try to get macro from existing DOM (macro narrative card)
+  var macroGrid = document.getElementById('macro-narrative-grid');
+  if(macroGrid && macroGrid.children.length > 0){
+    var macroCard = document.getElementById('ic-macro');
+    var macroKpis = document.getElementById('ic-macro-kpis');
+    if(macroKpis) macroKpis.innerHTML = '<div style="font-size:11px;color:var(--t2);padding:4px 0">Vedi sezione Macro Narrative sopra ↑</div>';
+  }
+
+  _renderIntelCards(fakeCache);
+
+  // Show subtle loading message on empty cards
+  var ewTxt = document.getElementById('ic-ew-text');
+  if(ewTxt && !ewTxt.textContent.trim()) {
+    ewTxt.textContent = 'Analisi EW in caricamento. Usa il bottone ↻ per aggiornare.';
+  }
 }
 
 function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -4417,12 +4495,28 @@ function _renderIntelCards(data){
     }).join('');
   }
 
-  // Card 6: EW
+  // Card 6: EW — sync from live DOM or cache
   var ewScore = document.getElementById('ic-ew-score');
   var ewScoreEl = document.getElementById('dash-ew-score') || document.getElementById('ew-score');
-  if(ewScore && ewScoreEl) ewScore.textContent = ewScoreEl.textContent || '—';
+  if(ewScore){
+    var liveScore = ewScoreEl ? ewScoreEl.textContent.trim() : '';
+    ewScore.textContent = liveScore || '—';
+    // Color by score
+    var sc = parseFloat(liveScore)||0;
+    ewScore.style.color = sc>=8?'#EF4444':sc>=6?'#F59E0B':'#10B981';
+  }
   var ewTxt = document.getElementById('ic-ew-text');
-  if(ewTxt && ewText) ewTxt.textContent = ewText.slice(0, 280) + (ewText.length > 280 ? '…' : '');
+  if(ewTxt){
+    if(ewText && ewText.length>10){
+      ewTxt.textContent = ewText.slice(0, 300) + (ewText.length > 300 ? '…' : '');
+    } else {
+      // Try to pull from live EW assess DOM element
+      var liveEw = document.getElementById('ew-assess') || document.getElementById('ew-score-desc');
+      if(liveEw && liveEw.textContent.length > 20){
+        ewTxt.textContent = liveEw.textContent.slice(0, 300);
+      }
+    }
+  }
 }
 
 /* ── Event detail modal ── */
