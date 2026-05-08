@@ -4197,6 +4197,21 @@ function loadMacroNarrative(){
       return;
     }
 
+    // Also push to Intel Hub macro card
+    if(r.indicators && r.indicators.length){
+      var kpisEl = document.getElementById('ic-macro-kpis');
+      if(kpisEl && !kpisEl.children.length || (kpisEl && kpisEl.innerHTML.indexOf('Vedi sezione')>-1)){
+        kpisEl.innerHTML = r.indicators.slice(0,4).map(function(m){
+          var col = m.arrow==='↑'?'#10B981':m.arrow==='↓'?'#EF4444':'#94A3B8';
+          return '<div class="ic-kpi-item"><div class="ic-kpi-name">'+m.name+'</div>'
+            +'<div class="ic-kpi-val" style="color:'+col+'">'+m.value+' <span style="font-size:9px">'+( m.unit||'')+'</span></div></div>';
+        }).join('');
+        var interpEl = document.getElementById('ic-macro-interp');
+        if(interpEl && r.indicators[0] && r.indicators[0].interpretation){
+          interpEl.textContent = r.indicators[0].interpretation.slice(0,100);
+        }
+      }
+    }
     // Also sync to mobile card 5
     var mobGrid = document.getElementById('msc-macro-narrative');
     if(mobGrid && r.indicators && r.indicators.length){
@@ -4320,21 +4335,26 @@ function refreshIntelCards(){
   loadIntelCards();
 }
 
+var _intelLoadAttempts = 0;
 function loadIntelCards(){
   if(!window.G||!G.token) return;
   if(_intelCache){ _renderIntelCards(_intelCache); return; }
 
   rq('/api/intelligence/dashboard-cache').then(function(data){
-    if(!data || data.error){
-      // Cache not yet generated — build from live events immediately
+    if(!data || data.error || data._timeout || data._network){
+      _intelLoadAttempts++;
+      // Build from live data immediately (non-blocking)
       _buildIntelCardsFromLiveData();
-      // Retry after 30s when cache should be ready
-      setTimeout(function(){
-        _intelCache = null;
-        if(window.G&&G.token) loadIntelCards();
-      }, 30000);
+      // Retry with exponential backoff (10s, 30s, 60s)
+      var delay = _intelLoadAttempts === 1 ? 10000 : _intelLoadAttempts === 2 ? 30000 : 60000;
+      if(_intelLoadAttempts <= 3){
+        setTimeout(function(){
+          if(window.G&&G.token){ _intelCache=null; loadIntelCards(); }
+        }, delay);
+      }
       return;
     }
+    _intelLoadAttempts = 0;
     _intelCache = data;
     _renderIntelCards(data);
   });
@@ -4347,13 +4367,21 @@ function _buildIntelCardsFromLiveData(){
   }) : [];
 
   if(!events.length){
-    // Events not loaded yet — show helpful placeholder
-    ['ic-critical-title','ic-geo-title'].forEach(function(id){
-      var el = document.getElementById(id);
-      if(el) el.textContent = 'Dati in caricamento…';
+    // G.events not ready yet — fetch directly from API
+    rq('/api/events?limit=15&sort=severity').then(function(r){
+      var evs = (r&&(r.events||r.items||r)) || [];
+      if(Array.isArray(evs) && evs.length){
+        if(!window.G) window.G = {};
+        G.events = evs;
+        _buildIntelCardsFromLiveData();
+      } else {
+        // Final fallback: show message
+        var critTitle = document.getElementById('ic-critical-title');
+        if(critTitle && critTitle.textContent==='Caricamento…') critTitle.textContent='Nessun evento recente';
+        var geoTitle = document.getElementById('ic-geo-title');
+        if(geoTitle && geoTitle.textContent==='Caricamento…') geoTitle.textContent='Feed in aggiornamento…';
+      }
     });
-    var hint = document.getElementById('ic-critical-summary');
-    if(hint) hint.textContent = 'Il sistema sta raccogliendo gli eventi. Ricarica tra 30 secondi.';
     return;
   }
 
@@ -4605,3 +4633,503 @@ function _tAgo(ts){
     setTimeout(function(){if(window.G&&G.token) loadIntelCards();}, 2500);
   }
 })();
+
+/* ═══════════════════════════════════════════════════════════════
+   FINANCE HUB — JavaScript
+   ═══════════════════════════════════════════════════════════════ */
+
+var _fhCurrentPortfolioId = null;
+var _fhPortfolios = [];
+var _fhHistory = [];
+var _fhSelectedIcon = '💼';
+
+/* ── Tab switching ── */
+function fhTab(name, btn){
+  document.querySelectorAll('.fh-tab').forEach(function(b){ b.classList.remove('on'); });
+  if(btn) btn.classList.add('on');
+  document.querySelectorAll('.fh-panel').forEach(function(p){ p.classList.remove('on'); });
+  var panel = document.getElementById('fh-panel-'+name);
+  if(panel) panel.classList.add('on');
+  if(name==='markets') loadFHMarkets();
+  if(name==='watchlist') loadFHWatchlist();
+}
+
+/* ── Portfolio list ── */
+function loadFHPortfolios(){
+  if(!window.G||!G.token) return;
+  rq('/api/finance/portfolios').then(function(r){
+    if(!r||r._network) return;
+    _fhPortfolios = r.portfolios || [];
+    renderFHPortfolioList();
+    if(_fhPortfolios.length > 0 && !_fhCurrentPortfolioId){
+      selectFHPortfolio(_fhPortfolios[0].id);
+    }
+  });
+}
+
+function renderFHPortfolioList(){
+  var list = document.getElementById('fh-port-list');
+  if(!list) return;
+  if(!_fhPortfolios.length){
+    list.innerHTML = '<div style="padding:12px;font-size:11px;color:var(--t3)">Nessun portafoglio. Crea il primo! →</div>';
+    return;
+  }
+  list.innerHTML = _fhPortfolios.map(function(p){
+    var retPct = p.total_return_pct || 0;
+    var retCol = retPct >= 0 ? '#10B981' : '#EF4444';
+    var retSign = retPct >= 0 ? '+' : '';
+    var isActive = p.id === _fhCurrentPortfolioId;
+    return '<div class="fh-port-card'+(isActive?' active':'')+'" onclick="selectFHPortfolio('+p.id+')">'
+      +'<div class="fh-port-icon">'+(p.icon||'💼')+'</div>'
+      +'<div class="fh-port-name">'+_esc(p.name)+'</div>'
+      +'<div class="fh-port-val">'+(p.total_value?fmtCurrency(p.total_value,p.base_currency||'EUR'):'—')+'</div>'
+      +'<div class="fh-port-ret" style="color:'+retCol+'">'
+      +(p.total_value?retSign+retPct.toFixed(2)+'%':'Aggiungi posizioni')+'</div>'
+      +'</div>';
+  }).join('') + '<div class="fh-port-card" onclick="openNewPortfolioModal()" style="border-style:dashed;opacity:.5;align-items:center;justify-content:center;display:flex;flex-direction:column;gap:4px"><div style="font-size:22px">＋</div><div style="font-size:10px;color:var(--t3)">Nuovo</div></div>';
+}
+
+function selectFHPortfolio(pid){
+  _fhCurrentPortfolioId = pid;
+  renderFHPortfolioList();  // update active state
+
+  var detail = document.getElementById('fh-port-detail');
+  if(detail) detail.style.display = 'block';
+
+  // Show loading state
+  ['fh-total-value','fh-total-return','fh-today-return','fh-ytd-return',
+   'fh-sharpe','fh-vol','fh-maxdd','fh-geo-score'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.textContent = '…';
+  });
+
+  rq('/api/finance/portfolios/'+pid).then(function(r){
+    if(!r||r._network) return;
+    renderFHPortfolioDetail(r);
+  });
+
+  // Load history
+  rq('/api/finance/portfolios/'+pid+'/history?days=90').then(function(r){
+    if(r && r.history){ _fhHistory = r.history; drawFHChart(r.history); }
+  });
+}
+
+function renderFHPortfolioDetail(p){
+  var cur = p.base_currency || p.currency || 'EUR';
+  var retPct = p.total_return_pct || 0;
+  var todayPct = p.today_return_pct || 0;
+  var ytdPct = p.ytd_return_pct;
+  var retCol = retPct >= 0 ? '#10B981' : '#EF4444';
+  var todayCol = todayPct >= 0 ? '#10B981' : '#EF4444';
+
+  setText('fh-total-value', fmtCurrency(p.total_value||0, cur));
+  setText('fh-currency', cur);
+
+  var retEl = document.getElementById('fh-total-return');
+  if(retEl){ retEl.textContent = (retPct>=0?'+':'')+retPct.toFixed(2)+'%'; retEl.style.color=retCol; }
+
+  var todayEl = document.getElementById('fh-today-return');
+  if(todayEl){ todayEl.textContent = (todayPct>=0?'+':'')+todayPct.toFixed(2)+'%'; todayEl.style.color=todayCol; }
+
+  if(ytdPct !== null && ytdPct !== undefined){
+    var ytdEl = document.getElementById('fh-ytd-return');
+    if(ytdEl){ ytdEl.textContent = (ytdPct>=0?'+':'')+ytdPct.toFixed(1)+'%'; ytdEl.style.color=ytdPct>=0?'#10B981':'#EF4444'; }
+  }
+
+  setText('fh-sharpe', p.sharpe_ratio ? p.sharpe_ratio.toFixed(2) : '—');
+  setText('fh-vol', p.volatility_pct ? p.volatility_pct.toFixed(1)+'%' : '—');
+  setText('fh-maxdd', p.max_drawdown_pct ? p.max_drawdown_pct.toFixed(1)+'%' : '—');
+
+  // Geo risk
+  if(p.geo_risk){
+    var gs = p.geo_risk.geo_risk_score || 0;
+    var gEl = document.getElementById('fh-geo-score');
+    if(gEl){ gEl.textContent = gs.toFixed(1)+'/10'; }
+    var alert = document.getElementById('fh-geo-alert');
+    var gTxt = document.getElementById('fh-geo-text');
+    if(alert && gs >= 5){ alert.style.display='flex'; if(gTxt) gTxt.textContent=p.geo_risk.interpretation||''; }
+  }
+
+  // Holdings
+  renderFHHoldings(p.holdings || []);
+}
+
+function renderFHHoldings(holdings){
+  var list = document.getElementById('fh-holdings-list');
+  if(!list) return;
+  if(!holdings.length){
+    list.innerHTML = '<div class="fh-loading">Nessuna posizione. Aggiungi il primo ETF o azione.</div>';
+    return;
+  }
+  list.innerHTML = holdings.map(function(h){
+    var retPct = h.return_pct || 0;
+    var retCol = retPct >= 0 ? '#10B981' : '#EF4444';
+    var retSign = retPct >= 0 ? '+' : '';
+    var todayPct = h.change_pct_today || 0;
+    var todayCol = todayPct >= 0 ? '#10B981' : '#EF4444';
+    return '<div class="fh-holding-row">'
+      +'<div>'
+        +'<div class="fh-h-top">'
+          +'<div>'
+            +'<div class="fh-h-ticker">'+_esc(h.ticker)+'</div>'
+            +'<div class="fh-h-name">'+_esc(h.name||h.ticker)+'</div>'
+          +'</div>'
+          +'<div>'
+            +'<div class="fh-h-value">'+fmtCurrency(h.current_value||0,'EUR')+'</div>'
+            +'<div class="fh-h-return" style="color:'+retCol+'">'+retSign+retPct.toFixed(2)+'%</div>'
+          +'</div>'
+        +'</div>'
+        +'<div class="fh-h-meta">'
+          +'<span>'+h.shares+' quote</span>'
+          +'<span>·</span>'
+          +'<span>avg '+fmtPrice(h.avg_price||0)+'</span>'
+          +'<span>·</span>'
+          +'<span>'+h.weight_pct+'% portafoglio</span>'
+          +'<span style="color:'+todayCol+';margin-left:4px">'+(todayPct>=0?'+':'')+todayPct.toFixed(2)+'% oggi</span>'
+        +'</div>'
+      +'</div>'
+      +'<div class="fh-h-actions"><button class="fh-h-del" onclick="deleteHolding('+h.id+',event)">✕</button></div>'
+      +'</div>';
+  }).join('');
+}
+
+/* ── Portfolio history chart ── */
+function fhChartRange(days, btn){
+  document.querySelectorAll('.fh-chart-tab').forEach(function(b){ b.classList.remove('on'); });
+  if(btn) btn.classList.add('on');
+  if(_fhCurrentPortfolioId){
+    rq('/api/finance/portfolios/'+_fhCurrentPortfolioId+'/history?days='+days).then(function(r){
+      if(r&&r.history) drawFHChart(r.history);
+    });
+  }
+}
+
+function drawFHChart(history){
+  var canvas = document.getElementById('fh-chart');
+  var empty  = document.getElementById('fh-chart-empty');
+  if(!canvas) return;
+  if(!history || history.length < 2){
+    canvas.style.display='none';
+    if(empty) empty.style.display='block';
+    return;
+  }
+  canvas.style.display='block';
+  if(empty) empty.style.display='none';
+
+  var ctx = canvas.getContext('2d');
+  var W = canvas.offsetWidth || 300;
+  var H = 120;
+  canvas.width = W * (window.devicePixelRatio||1);
+  canvas.height = H * (window.devicePixelRatio||1);
+  ctx.scale(window.devicePixelRatio||1, window.devicePixelRatio||1);
+
+  var vals = history.map(function(s){ return parseFloat(s.total_value||0); });
+  var minV = Math.min.apply(null, vals);
+  var maxV = Math.max.apply(null, vals);
+  var range = maxV - minV || 1;
+  var last = vals[vals.length-1];
+  var first = vals[0];
+  var isPositive = last >= first;
+  var lineColor = isPositive ? '#10B981' : '#EF4444';
+
+  ctx.clearRect(0,0,W,H);
+
+  // Gradient fill
+  var grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, isPositive ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  // Draw
+  ctx.beginPath();
+  vals.forEach(function(v,i){
+    var x = (i/(vals.length-1))*W;
+    var y = H - ((v-minV)/range)*(H-16) - 8;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  var lastX = W;
+  var lastY = H - ((vals[vals.length-1]-minV)/range)*(H-16) - 8;
+  ctx.lineTo(lastX, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  vals.forEach(function(v,i){
+    var x = (i/(vals.length-1))*W;
+    var y = H - ((v-minV)/range)*(H-16) - 8;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+/* ── Markets tab ── */
+function loadFHMarkets(){
+  if(!window.G||!G.token) return;
+  var grid = document.getElementById('fh-markets-grid');
+  if(!grid) return;
+
+  // Use data from existing finance view if available
+  var existingMkts = document.querySelectorAll('.fin-card, .market-card');
+  if(existingMkts.length > 0){
+    grid.innerHTML = '<div style="font-size:11px;color:var(--t2);padding:8px">Usa il tab <strong>Markets</strong> per quotazioni complete.</div>';
+    return;
+  }
+
+  rq('/api/finance/quote/VWCE').then(function(r){
+    if(!r||r._network) return;
+    // Show major tickers from finance_cache
+    var tickers = ['VWCE','SPY','QQQ','GLD','TLT','EURUSD=X','AAPL','MSFT','NVDA'];
+    Promise.all(tickers.map(function(t){ return rq('/api/finance/quote/'+t); }))
+      .then(function(results){
+        grid.innerHTML = results.filter(Boolean).map(function(q){
+          if(!q||!q.price) return '';
+          var chg = q.change_pct||0;
+          var col = chg>=0?'#10B981':'#EF4444';
+          var sign = chg>=0?'+':'';
+          return '<div class="fh-mkt-card">'
+            +'<div class="fh-mkt-ticker">'+_esc(q.ticker)+'</div>'
+            +'<div class="fh-mkt-name">'+_esc(q.name||q.ticker)+'</div>'
+            +'<div class="fh-mkt-price" style="color:'+col+'">'+fmtPrice(q.price)+'</div>'
+            +'<div class="fh-mkt-chg" style="color:'+col+'">'+sign+chg.toFixed(2)+'%</div>'
+            +'</div>';
+        }).join('');
+      });
+  });
+}
+
+/* ── Watchlist tab ── */
+function loadFHWatchlist(){
+  if(!window.G||!G.token) return;
+  rq('/api/watchlist').then(function(r){
+    var items = (r&&r.items)||[];
+    var el = document.getElementById('fh-watchlist-items');
+    if(!el) return;
+    var tickers = items.filter(function(i){ return i.type==='ticker'||i.type==='etf'; });
+    if(!tickers.length){
+      el.innerHTML = '<div class="fh-loading">Aggiungi ticker dalla barra sopra</div>';
+      return;
+    }
+    Promise.all(tickers.map(function(i){ return rq('/api/finance/quote/'+(i.value||i.label)); }))
+      .then(function(quotes){
+        el.innerHTML = tickers.map(function(item, idx){
+          var q = quotes[idx];
+          var price = q && q.price ? fmtPrice(q.price) : '—';
+          var chg = q ? (q.change_pct||0) : 0;
+          var col = chg>=0?'#10B981':'#EF4444';
+          return '<div class="fh-wl-item">'
+            +'<div class="fh-wl-ticker">'+_esc(item.value||item.label)+'</div>'
+            +'<div class="fh-wl-price" style="color:'+col+'">'+price+'</div>'
+            +'<span class="fh-wl-chg" style="color:'+col+'">'+(chg>=0?'+':'')+chg.toFixed(2)+'%</span>'
+            +'<button class="fh-wl-del" onclick="removeFromWatchlist('+item.id+')">✕</button>'
+            +'</div>';
+        }).join('');
+      });
+  });
+}
+
+function addToWatchlist(){
+  var inp = document.getElementById('fh-wl-inp');
+  var ticker = inp ? inp.value.trim().toUpperCase() : '';
+  if(!ticker || !G.token) return;
+  rq('/api/watchlist', {method:'POST', body:{type:'ticker',value:ticker,label:ticker}})
+    .then(function(){ if(inp) inp.value=''; loadFHWatchlist(); });
+}
+
+function removeFromWatchlist(id){
+  if(!G.token) return;
+  rq('/api/watchlist/'+id, {method:'DELETE'}).then(loadFHWatchlist);
+}
+
+/* ── Portfolio modals ── */
+function openNewPortfolioModal(){
+  var m = document.getElementById('fh-new-portfolio-modal');
+  if(m) m.style.display='flex';
+}
+function closePortfolioModal(){
+  var m = document.getElementById('fh-new-portfolio-modal');
+  if(m) m.style.display='none';
+}
+function pickIcon(el, icon){
+  document.querySelectorAll('.fh-icon-pick').forEach(function(e){ e.classList.remove('on'); });
+  el.classList.add('on');
+  _fhSelectedIcon = icon;
+  var inp = document.getElementById('fh-pm-icon');
+  if(inp) inp.value = icon;
+}
+async function saveNewPortfolio(){
+  var name = (document.getElementById('fh-pm-name')||{}).value||'';
+  var currency = (document.getElementById('fh-pm-currency')||{}).value||'EUR';
+  var bench = (document.getElementById('fh-pm-bench')||{}).value||'VWCE';
+  if(!name.trim()){toast('Inserisci un nome','err');return;}
+  var r = await rq('/api/finance/portfolios',{method:'POST',body:{name:name,base_currency:currency,benchmark_ticker:bench,icon:_fhSelectedIcon}});
+  if(r && r.id){
+    closePortfolioModal();
+    toast('Portafoglio "'+name+'" creato!','ok');
+    loadFHPortfolios();
+    setTimeout(function(){ selectFHPortfolio(r.id); }, 500);
+  }
+}
+
+function openAddHoldingModal(){
+  var m = document.getElementById('fh-add-holding-modal');
+  if(m) m.style.display='flex';
+}
+function closeHoldingModal(){
+  var m = document.getElementById('fh-add-holding-modal');
+  if(m) m.style.display='none';
+}
+async function saveNewHolding(){
+  var ticker = ((document.getElementById('fh-hm-ticker')||{}).value||'').trim().toUpperCase();
+  var shares = parseFloat((document.getElementById('fh-hm-shares')||{}).value||0);
+  var price  = parseFloat((document.getElementById('fh-hm-price')||{}).value||0);
+  var cur    = (document.getElementById('fh-hm-currency')||{}).value||'USD';
+  var cls    = (document.getElementById('fh-hm-class')||{}).value||'equity';
+  if(!ticker||!shares||!price){toast('Compila tutti i campi','err');return;}
+  var r = await rq('/api/finance/portfolios/'+_fhCurrentPortfolioId+'/holdings',{
+    method:'POST',body:{ticker,shares,avg_price:price,currency:cur,asset_class:cls}
+  });
+  if(r && r.id){
+    closeHoldingModal();
+    toast(ticker+' aggiunto!','ok');
+    selectFHPortfolio(_fhCurrentPortfolioId);
+  } else {
+    toast('Errore aggiunta holding','err');
+  }
+}
+
+async function deleteHolding(hid, event){
+  event && event.stopPropagation();
+  if(!confirm('Rimuovere questa posizione?')) return;
+  await rq('/api/finance/holdings/'+hid, {method:'DELETE'});
+  toast('Posizione rimossa','inf');
+  selectFHPortfolio(_fhCurrentPortfolioId);
+}
+
+/* ── Ticker search suggest ── */
+var _tickerSearchTimeout;
+function searchTickerSuggest(q){
+  clearTimeout(_tickerSearchTimeout);
+  var sug = document.getElementById('fh-ticker-suggest');
+  if(!q || q.length < 2){ if(sug) sug.style.display='none'; return; }
+  _tickerSearchTimeout = setTimeout(function(){
+    rq('/api/finance/search/'+encodeURIComponent(q)).then(function(r){
+      if(!r||!r.results||!sug) return;
+      if(!r.results.length){ sug.style.display='none'; return; }
+      sug.innerHTML = r.results.slice(0,8).map(function(t){
+        return '<div onclick="selectTickerSuggest(\''+_esc(t.ticker)+'\')" '
+          +'style="padding:8px 12px;cursor:pointer;font-size:11px;border-bottom:1px solid rgba(255,255,255,.05)">'
+          +'<strong>'+_esc(t.ticker)+'</strong> <span style="color:var(--t3)">'+_esc(t.name||'')+'</span>'
+          +' <span style="float:right;color:var(--via)">'+fmtPrice(t.price||0)+'</span>'
+          +'</div>';
+      }).join('');
+      sug.style.display='block';
+    });
+  }, 300);
+}
+function selectTickerSuggest(ticker){
+  var inp = document.getElementById('fh-hm-ticker');
+  if(inp) inp.value = ticker;
+  var sug = document.getElementById('fh-ticker-suggest');
+  if(sug) sug.style.display='none';
+}
+
+/* ── Lab simulations ── */
+function runLabSim(type){
+  if(type==='paper'){
+    // Navigate to tradgentic view
+    sv('tradgentic', document.querySelector('[data-v=tradgentic]'));
+    return;
+  }
+  var resultEl = document.getElementById('fh-lab-result');
+  if(!resultEl) return;
+  resultEl.style.display='block';
+  resultEl.innerHTML = '<div style="padding:16px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.7">'
+    +'⏳ Simulazione '+type+' in corso con Jarvis AI…'
+    +'</div>';
+  if(!_fhCurrentPortfolioId){ resultEl.innerHTML='<div style="padding:16px;color:var(--t3)">Seleziona prima un portafoglio.</div>'; return; }
+  var prompts = {
+    backtest: 'Fai un backtest storico del mio portafoglio negli ultimi 3 anni. Calcola rendimento annualizzato, volatilità e Sharpe ratio stimati.',
+    stress: 'Stress test del mio portafoglio: se si verificasse una crisi tipo GFC 2008 o COVID 2020, qual sarebbe l\'impatto stimato? Suggerisci coperture.',
+    optimize: 'Analizza il mio portafoglio e suggerisci un ribilanciamento per massimizzare il Sharpe ratio mantenendo il profilo di rischio attuale.',
+  };
+  var prompt = prompts[type] || 'Analizza il mio portafoglio.';
+  rq('/api/brain/agent/ask', {method:'POST', body:{query:prompt, session_id:'lab_'+type}})
+    .then(function(r){
+      var ans = (r&&(r.answer||r.response||r.detail))||'Nessuna risposta. Configura una chiave AI.';
+      resultEl.innerHTML='<div style="padding:16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.75;white-space:pre-wrap">'+_esc(ans)+'</div>';
+    });
+}
+
+/* ── Utilities ── */
+function fmtCurrency(val, currency){
+  var sym = currency==='USD'?'$':currency==='GBP'?'£':'€';
+  if(val >= 1000000) return sym+(val/1000000).toFixed(2)+'M';
+  if(val >= 1000) return sym+(val/1000).toFixed(1)+'k';
+  return sym+val.toFixed(2);
+}
+function fmtPrice(val){
+  if(val >= 1000) return val.toFixed(0);
+  if(val >= 10)   return val.toFixed(2);
+  return val.toFixed(4);
+}
+function setText(id, txt){ var e=document.getElementById(id); if(e) e.textContent=txt; }
+
+/* ── Auto-init on Finance Hub view ── */
+(function(){
+  var view = document.getElementById('view-portfolio');
+  if(!view) return;
+  new MutationObserver(function(){
+    if(view.classList.contains('on') && window.G && G.token){
+      loadFHPortfolios();
+    }
+  }).observe(view, {attributes:true, attributeFilter:['class']});
+})();
+
+
+/* ── Intel Cards DOM Sync — runs after each dashboard data load ── */
+function syncIntelCardsFromDOM(){
+  if(!document.getElementById('section-intel-cards')) return;
+
+  // EW Score from live DOM
+  var ewScoreEl = document.getElementById('dash-ew-score') || document.getElementById('ew-score');
+  var icEwScore = document.getElementById('ic-ew-score');
+  if(ewScoreEl && icEwScore && ewScoreEl.textContent.trim() && ewScoreEl.textContent.trim()!=='—'){
+    var sc = parseFloat(ewScoreEl.textContent)||0;
+    icEwScore.textContent = sc.toFixed(1)+'/10';
+    icEwScore.style.color = sc>=8?'#EF4444':sc>=6?'#F59E0B':'#10B981';
+  }
+
+  // EW text from live DOM
+  var ewAssess = document.getElementById('ew-assess') || document.querySelector('.ew-assess-text');
+  var icEwTxt = document.getElementById('ic-ew-text');
+  if(ewAssess && icEwTxt && ewAssess.textContent.length>20 && icEwTxt.textContent.includes('corso')){
+    icEwTxt.textContent = ewAssess.textContent.slice(0,280)+'…';
+  }
+
+  // Crisis events from DOM
+  var crisisList = document.getElementById('d-evlist');
+  var icCritTitle = document.getElementById('ic-critical-title');
+  if(crisisList && icCritTitle && icCritTitle.textContent==='Caricamento…'){
+    var firstEv = crisisList.querySelector('.fire-ev-row, .dash-crisis-item, .ev-row');
+    if(firstEv){
+      var titleEl = firstEv.querySelector('.fire-ev-title, .ev-title, [class*=title]');
+      if(titleEl) icCritTitle.textContent = titleEl.textContent.slice(0,90);
+    }
+  }
+}
+
+// Hook syncIntelCardsFromDOM to renderDash
+var _origRenderDash = window.renderDash;
+if(typeof renderDash === 'function' && !window._syncHooked){
+  window._syncHooked = true;
+  var _rdOrig = renderDash;
+  window.renderDash = renderDash = function(){
+    _rdOrig.apply(this, arguments);
+    setTimeout(syncIntelCardsFromDOM, 1500);
+    setTimeout(syncIntelCardsFromDOM, 4000);
+  };
+}

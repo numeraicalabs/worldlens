@@ -8520,14 +8520,16 @@ body {
   .mob-swipe-card {
     flex-shrink: 0 !important;
     width: 100vw !important;
+    min-width: 100vw !important;
     scroll-snap-align: start !important;
-    padding: 16px 20px 80px !important; /* bottom: nav bar clearance */
+    padding: 16px 20px 100px !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
     display: flex !important;
     flex-direction: column !important;
     gap: 0 !important;
     box-sizing: border-box !important;
+    /* No min-height/height — content dictates size, track scrolls */
   }
 
   /* ── Overline ── */
@@ -9951,3 +9953,114 @@ body {
   transition: transform .15s;
 }
 .ob-btn-next:hover { transform: translateY(-1px); }
+
+
+/* ═══ LANDING PAGE v2 — Visual Fixes ═══ */
+
+/* Full-page gradient background */
+#landing {
+  background: linear-gradient(135deg, #05070F 0%, #0A0E1A 40%, #0D1120 100%) !important;
+  position: relative !important;
+  isolation: isolate !important;
+}
+
+/* Animated radial glow behind hero */
+#landing::before {
+  content: '';
+  position: fixed;
+  top: -200px;
+  right: -200px;
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(ellipse, rgba(124,58,237,.12) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  animation: l-glow-drift 8s ease-in-out infinite alternate;
+}
+#landing::after {
+  content: '';
+  position: fixed;
+  bottom: -200px;
+  left: -100px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(ellipse, rgba(59,130,246,.08) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+  animation: l-glow-drift 10s ease-in-out infinite alternate-reverse;
+}
+@keyframes l-glow-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(30px, 20px) scale(1.1); }
+}
+
+/* Ensure all landing content is above the glow */
+#landing > * { position: relative; z-index: 1; }
+
+/* Nav glassmorphism stronger */
+.lnav {
+  background: rgba(5,7,15,.92) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.06), 0 4px 24px rgba(0,0,0,.3) !important;
+}
+
+/* Hero H1 gradient stronger */
+.l-hero-h1 em {
+  background: linear-gradient(135deg, #A78BFA 0%, #7C3AED 25%, #6366F1 50%, #3B82F6 75%, #22D3EE 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  background-size: 200% 200% !important;
+  animation: gradient-shift 5s ease infinite !important;
+}
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Dashboard preview: stronger glow */
+.l-preview-wrap {
+  box-shadow: 0 32px 80px rgba(0,0,0,.8), 0 0 0 1px rgba(124,58,237,.2),
+              0 0 80px rgba(124,58,237,.08) !important;
+}
+
+/* Primary button: shimmer animation */
+.l-btn-primary {
+  background-size: 200% 200% !important;
+  animation: btn-shimmer 3s ease infinite !important;
+}
+@keyframes btn-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Steps: hover lift */
+.l-step:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(124,58,237,.4) !important;
+  background: rgba(124,58,237,.06) !important;
+}
+
+/* Feature cards: gradient border on hover */
+.l-feat-card:hover {
+  background: linear-gradient(135deg, rgba(124,58,237,.06), rgba(59,130,246,.04)) !important;
+}
+
+/* Testimonial cards: subtle top border */
+.l-testi-card {
+  border-top: 1px solid rgba(124,58,237,.2) !important;
+}
+
+/* Stats strip: stronger numbers */
+.l-stat-n {
+  background: linear-gradient(135deg, #F1F5F9, #A78BFA) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+/* Landing page scroll fix — ensure smooth scroll on iOS */
+#landing {
+  -webkit-overflow-scrolling: touch !important;
+}

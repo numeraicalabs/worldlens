@@ -3519,7 +3519,7 @@ function injectTriggerBtn() {
   btn.title = 'Brain Agent (⌘K)';
   btn.innerHTML = '🧠';
   btn.onclick = function() { brainAgent.toggle(); };
-  btn.style.cssText = 'position:fixed;bottom:80px;right:16px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#6D28D9);border:none;color:#fff;font-size:22px;cursor:pointer;z-index:4000;box-shadow:0 4px 20px rgba(124,58,237,.5);display:flex;align-items:center;justify-content:center;transition:transform .2s';
+  btn.style.cssText = 'position:fixed;bottom:88px;right:16px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#6D28D9);border:2px solid rgba(255,255,255,.15);color:#fff;font-size:24px;cursor:pointer;z-index:9500;box-shadow:0 4px 24px rgba(124,58,237,.6),0 0 0 4px rgba(124,58,237,.15);display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s';
   btn.onmouseover = function(){ this.style.transform='scale(1.1)'; };
   btn.onmouseout  = function(){ this.style.transform='scale(1)'; };
   document.body.appendChild(btn);
@@ -3952,3 +3952,23 @@ function closeOnboarding(){
 
 /* Hook onboarding to enterApp */
 // Onboarding now called inside enterApp directly
+
+function doLogout() {
+  if(!confirm('Disconnettersi da WorldLens?')) return;
+  localStorage.removeItem('wl_tok');
+  localStorage.removeItem('wl_user');
+  // Clear global state
+  if(window.G){ G.token = null; G.user = null; }
+  // Show landing
+  var shell = document.getElementById('shell');
+  var landing = document.getElementById('landing');
+  if(shell){ shell.classList.remove('on'); shell.style.display='none'; }
+  if(landing){ landing.style.display='block'; }
+  document.body.classList.add('landing-mode');
+  document.body.style.overflow = 'auto';
+  // Scroll to top
+  window.scrollTo(0,0);
+  // Restore login button visibility
+  var loginModal = document.getElementById('auth-overlay');
+  if(loginModal) loginModal.style.display='none';
+}

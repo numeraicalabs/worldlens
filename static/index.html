@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v57">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v57">
-<link rel="stylesheet" href="/static/finance.bundle.css?v57">
+<link rel="stylesheet" href="/static/core.bundle.css?v59">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v59">
+<link rel="stylesheet" href="/static/finance.bundle.css?v59">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -2466,84 +2466,222 @@
 
 <!-- PORTFOLIO -->
 <div class="view" id="view-portfolio">
-<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:16px;width:100%">
-  <div><div class="vtit">AI Portfolio Generator</div><div class="vsub">Build a personalized investment portfolio powered by AI</div></div>
-  <div class="card" style="background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(6,182,212,.05));border-color:var(--bdb)">
-    <div class="card-tit">Configure Your Portfolio</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      <div>
-        <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Risk Profile</div>
-        <div style="display:flex;flex-direction:column;gap:6px" id="risk-btns">
-          <button id="risk-Conservative" onclick="selectRisk('Conservative')" class="btn btn-g" style="justify-content:flex-start;gap:10px"><span>🛡</span><div style="text-align:left"><div style="font-weight:600;font-size:12px">Conservative</div><div style="font-size:10px;opacity:.7">4-6% target return</div></div></button>
-          <button id="risk-Moderate" onclick="selectRisk('Moderate')" class="btn btn-o" style="justify-content:flex-start;gap:10px"><span>⚖</span><div style="text-align:left"><div style="font-weight:600;font-size:12px">Moderate</div><div style="font-size:10px;opacity:.7">7-10% target return</div></div></button>
-          <button id="risk-Aggressive" onclick="selectRisk('Aggressive')" class="btn btn-g" style="justify-content:flex-start;gap:10px"><span>🚀</span><div style="text-align:left"><div style="font-weight:600;font-size:12px">Aggressive</div><div style="font-size:10px;opacity:.7">10-15% target return</div></div></button>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div>
-          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Amount (USD)</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
-            <button class="btn btn-g btn-sm" onclick="document.getElementById('port-amount').value=5000">$5K</button>
-            <button class="btn btn-g btn-sm" onclick="document.getElementById('port-amount').value=10000">$10K</button>
-            <button class="btn btn-g btn-sm" onclick="document.getElementById('port-amount').value=50000">$50K</button>
-            <button class="btn btn-g btn-sm" onclick="document.getElementById('port-amount').value=100000">$100K</button>
-          </div>
-          <input class="fi" type="number" id="port-amount" value="10000" style="font-size:13px">
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Horizon</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <button class="btn btn-g btn-sm" id="hor-1" onclick="selHorizon('Short-term (1 year)',this)">1 Year</button>
-            <button class="btn btn-o btn-sm" id="hor-3" onclick="selHorizon('Medium-term (3-5 years)',this)">3-5 Years</button>
-            <button class="btn btn-g btn-sm" id="hor-10" onclick="selHorizon('Long-term (10+ years)',this)">10+ Years</button>
-          </div>
-        </div>
-      </div>
+<!-- ════════════════════════════════════════
+     FINANCE HUB — Unified Portfolio + Markets
+     ════════════════════════════════════════ -->
+<div id="fh-root" style="display:flex;flex-direction:column;height:100%;overflow:hidden">
+
+  <!-- Top bar -->
+  <div class="fh-topbar">
+    <div class="fh-logo">💹 Finance Hub</div>
+    <div class="fh-tabs">
+      <button class="fh-tab on" onclick="fhTab('portfolios',this)">Portafogli</button>
+      <button class="fh-tab" onclick="fhTab('markets',this)">Mercati</button>
+      <button class="fh-tab" onclick="fhTab('watchlist',this)">Watchlist</button>
+      <button class="fh-tab" onclick="fhTab('lab',this)">Lab AI</button>
     </div>
-    <div style="margin-top:12px">
-      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:7px">Focus Areas</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="focus-chips">
-        <div class="fc" data-focus="Technology" onclick="togFocus(this)">Technology</div>
-        <div class="fc" data-focus="ESG" onclick="togFocus(this)">ESG</div>
-        <div class="fc" data-focus="Emerging Markets" onclick="togFocus(this)">Emerging Markets</div>
-        <div class="fc" data-focus="Dividend Income" onclick="togFocus(this)">Dividend Income</div>
-        <div class="fc" data-focus="Real Estate" onclick="togFocus(this)">Real Estate</div>
-        <div class="fc" data-focus="Commodities" onclick="togFocus(this)">Commodities</div>
-        <div class="fc" data-focus="Crypto" onclick="togFocus(this)">Crypto</div>
-        <div class="fc" data-focus="Healthcare" onclick="togFocus(this)">Healthcare</div>
-      </div>
-      <input class="fi" type="text" id="port-goals" placeholder="Investment goals (e.g. retirement, passive income...)" style="font-size:12px">
+    <button class="fh-add-btn" id="fh-new-portfolio-btn" onclick="openNewPortfolioModal()" title="Nuovo portafoglio">＋</button>
+  </div>
+
+  <!-- ══ TAB: PORTFOLIOS ══ -->
+  <div id="fh-panel-portfolios" class="fh-panel on" style="overflow-y:auto;flex:1">
+
+    <!-- Portfolio selector -->
+    <div class="fh-port-list" id="fh-port-list">
+      <div class="fh-loading">Caricamento portafogli…</div>
     </div>
-    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
-      <button class="btn btn-ai" style="padding:11px 28px;font-size:13px" onclick="generatePortfolio()">Generate AI Portfolio</button>
-      <div id="port-status" style="font-size:11px;color:var(--t3)"></div>
+
+    <!-- Active portfolio detail -->
+    <div id="fh-port-detail" style="display:none">
+
+      <!-- P&L hero -->
+      <div class="fh-pnl-hero" id="fh-pnl-hero">
+        <div>
+          <div class="fh-pnl-label">VALORE TOTALE</div>
+          <div class="fh-pnl-value" id="fh-total-value">—</div>
+          <div class="fh-pnl-currency" id="fh-currency">EUR</div>
+        </div>
+        <div class="fh-pnl-returns">
+          <div class="fh-return-item">
+            <div class="fh-return-val" id="fh-total-return">—</div>
+            <div class="fh-return-lbl">Rendimento totale</div>
+          </div>
+          <div class="fh-return-item">
+            <div class="fh-return-val" id="fh-today-return">—</div>
+            <div class="fh-return-lbl">Oggi</div>
+          </div>
+          <div class="fh-return-item">
+            <div class="fh-return-val" id="fh-ytd-return">—</div>
+            <div class="fh-return-lbl">YTD</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics strip -->
+      <div class="fh-metrics-strip" id="fh-metrics-strip">
+        <div class="fh-metric"><div class="fh-metric-v" id="fh-sharpe">—</div><div class="fh-metric-l">Sharpe</div></div>
+        <div class="fh-metric"><div class="fh-metric-v" id="fh-vol">—</div><div class="fh-metric-l">Volatilità</div></div>
+        <div class="fh-metric"><div class="fh-metric-v" id="fh-maxdd">—</div><div class="fh-metric-l">Max DD</div></div>
+        <div class="fh-metric fh-metric-geo" id="fh-geo-metric">
+          <div class="fh-metric-v" id="fh-geo-score">—</div>
+          <div class="fh-metric-l">Rischio Geo</div>
+        </div>
+      </div>
+
+      <!-- Geo risk bar -->
+      <div id="fh-geo-alert" style="display:none" class="fh-geo-alert">
+        <div class="fh-geo-icon">🌍</div>
+        <div id="fh-geo-text"></div>
+        <button class="fh-geo-jarvis" onclick="openJarvisForEvent('portfolio geopolitical risk')">Analizza →</button>
+      </div>
+
+      <!-- Holdings list -->
+      <div class="fh-holdings-header">
+        <span>POSIZIONI</span>
+        <button class="fh-add-holding-btn" onclick="openAddHoldingModal()">＋ Aggiungi</button>
+      </div>
+      <div id="fh-holdings-list" class="fh-holdings-list"></div>
+
+      <!-- Sparkline chart area -->
+      <div class="fh-chart-section">
+        <div class="fh-section-title">ANDAMENTO</div>
+        <div class="fh-chart-tabs">
+          <button class="fh-chart-tab on" onclick="fhChartRange(30,this)">1M</button>
+          <button class="fh-chart-tab" onclick="fhChartRange(90,this)">3M</button>
+          <button class="fh-chart-tab" onclick="fhChartRange(180,this)">6M</button>
+          <button class="fh-chart-tab" onclick="fhChartRange(365,this)">1A</button>
+        </div>
+        <canvas id="fh-chart" height="120" style="width:100%;border-radius:8px"></canvas>
+        <div id="fh-chart-empty" style="text-align:center;padding:30px;color:var(--t3);font-size:12px">
+          Nessun dato storico. Torna domani per vedere l'andamento.
+        </div>
+      </div>
     </div>
   </div>
-  <div id="port-result" style="display:none">
-    <div class="card" style="border-color:var(--bdg)">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-        <div><div class="vtit" id="port-name" style="font-size:16px"></div><div style="font-size:12px;color:var(--t2);margin-top:4px" id="port-strategy"></div></div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <div style="text-align:center;background:var(--bg2);border-radius:var(--r8);padding:8px 14px"><div style="font-family:var(--fh);font-size:18px;font-weight:700;color:var(--gr)" id="port-return">—</div><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em">Return</div></div>
-          <div style="text-align:center;background:var(--bg2);border-radius:var(--r8);padding:8px 14px"><div style="font-family:var(--fh);font-size:18px;font-weight:700;color:var(--am)" id="port-riskscore">—</div><div style="font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em">Risk Score</div></div>
+
+  <!-- ══ TAB: MARKETS (reuses existing #view-markets data) ══ -->
+  <div id="fh-panel-markets" class="fh-panel" style="overflow-y:auto;flex:1;padding:16px">
+    <div class="fh-section-title">QUOTAZIONI LIVE</div>
+    <div id="fh-markets-grid" class="fh-markets-grid"></div>
+  </div>
+
+  <!-- ══ TAB: WATCHLIST ══ -->
+  <div id="fh-panel-watchlist" class="fh-panel" style="overflow-y:auto;flex:1;padding:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="fh-section-title">WATCHLIST</div>
+      <div style="display:flex;gap:6px">
+        <input id="fh-wl-inp" class="fi" placeholder="Aggiungi ticker…" style="font-size:11px;width:120px"
+          onkeydown="if(event.key==='Enter')addToWatchlist()">
+        <button class="fh-add-holding-btn" onclick="addToWatchlist()">＋</button>
+      </div>
+    </div>
+    <div id="fh-watchlist-items"></div>
+  </div>
+
+  <!-- ══ TAB: LAB AI (Tradgentic simplified) ══ -->
+  <div id="fh-panel-lab" class="fh-panel" style="overflow-y:auto;flex:1;padding:16px">
+    <div class="fh-section-title">LAB AI — Simulazioni</div>
+    <div style="display:grid;gap:12px">
+      <div class="fh-lab-card" onclick="runLabSim('backtest')">
+        <div class="fh-lab-icon">📊</div>
+        <div>
+          <div class="fh-lab-title">Backtest storico</div>
+          <div class="fh-lab-desc">Simula il rendimento del tuo portafoglio negli ultimi 1-5 anni</div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:start">
-        <canvas id="port-donut" width="180" height="180"></canvas>
-        <div id="port-alloc-list"></div>
+      <div class="fh-lab-card" onclick="runLabSim('stress')">
+        <div class="fh-lab-icon">⚡</div>
+        <div>
+          <div class="fh-lab-title">Stress test geopolitico</div>
+          <div class="fh-lab-desc">Impatto simulato di una crisi tipo 2008 o COVID sul portafoglio</div>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
-        <div style="background:var(--bg2);border-radius:var(--r12);padding:12px"><div style="font-size:9px;color:var(--am);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Geopolitical Considerations</div><div style="font-size:11px;color:var(--t2);line-height:1.6" id="port-geo"></div></div>
-        <div style="background:var(--bg2);border-radius:var(--r12);padding:12px"><div style="font-size:9px;color:var(--b4);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Macro Outlook</div><div style="font-size:11px;color:var(--t2);line-height:1.6" id="port-macro"></div></div>
+      <div class="fh-lab-card" onclick="runLabSim('optimize')">
+        <div class="fh-lab-icon">🎯</div>
+        <div>
+          <div class="fh-lab-title">Ottimizzazione AI</div>
+          <div class="fh-lab-desc">Suggerisce ribilanciamento per massimizzare Sharpe ratio</div>
+        </div>
       </div>
-      <div style="margin-top:12px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.18);border-radius:var(--r12);padding:12px"><div style="font-size:9px;color:var(--re);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Key Risks</div><div id="port-risks" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
+      <div class="fh-lab-card" onclick="runLabSim('paper')">
+        <div class="fh-lab-icon">🤖</div>
+        <div>
+          <div class="fh-lab-title">Tradgentic Paper Trading</div>
+          <div class="fh-lab-desc">Bot AI virtuali in gara — zero rischio reale</div>
+        </div>
+      </div>
+    </div>
+    <div id="fh-lab-result" style="margin-top:16px;display:none"></div>
+  </div>
+
+</div>
+
+<!-- New Portfolio Modal -->
+<div id="fh-new-portfolio-modal" class="fh-modal-overlay" onclick="if(event.target===this)closePortfolioModal()" style="display:none">
+  <div class="fh-modal">
+    <div class="fh-modal-title">Nuovo Portafoglio</div>
+    <div class="fh-modal-field"><label>Nome</label><input id="fh-pm-name" class="fi" placeholder="es. ETF Core" maxlength="60"></div>
+    <div class="fh-modal-field"><label>Valuta base</label>
+      <select id="fh-pm-currency" class="fi" style="cursor:pointer">
+        <option value="EUR">EUR €</option>
+        <option value="USD">USD $</option>
+        <option value="GBP">GBP £</option>
+      </select>
+    </div>
+    <div class="fh-modal-field"><label>Benchmark</label><input id="fh-pm-bench" class="fi" placeholder="VWCE" value="VWCE"></div>
+    <div class="fh-modal-field"><label>Icona</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="fh-icon-pick on" onclick="pickIcon(this,'💼')">💼</span>
+        <span class="fh-icon-pick" onclick="pickIcon(this,'📈')">📈</span>
+        <span class="fh-icon-pick" onclick="pickIcon(this,'🏦')">🏦</span>
+        <span class="fh-icon-pick" onclick="pickIcon(this,'🌍')">🌍</span>
+        <span class="fh-icon-pick" onclick="pickIcon(this,'🔮')">🔮</span>
+        <span class="fh-icon-pick" onclick="pickIcon(this,'⚡')">⚡</span>
+      </div>
+      <input id="fh-pm-icon" type="hidden" value="💼">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="fi" style="flex:1;cursor:pointer;border:1px solid var(--bd)" onclick="closePortfolioModal()">Annulla</button>
+      <button class="fire-btn-primary" style="flex:1;font-size:13px" onclick="saveNewPortfolio()">Crea →</button>
     </div>
   </div>
-  <div class="card"><div class="card-tit">Portfolio History <a onclick="loadPortfolios()">Refresh</a></div><div id="port-history"></div></div>
+</div>
+
+<!-- Add Holding Modal -->
+<div id="fh-add-holding-modal" class="fh-modal-overlay" onclick="if(event.target===this)closeHoldingModal()" style="display:none">
+  <div class="fh-modal">
+    <div class="fh-modal-title">Aggiungi Posizione</div>
+    <div class="fh-modal-field">
+      <label>Ticker</label>
+      <input id="fh-hm-ticker" class="fi" placeholder="es. VWCE, AAPL, NVDA" oninput="searchTickerSuggest(this.value)">
+      <div id="fh-ticker-suggest" style="display:none;position:absolute;z-index:100;background:var(--bg1);border:1px solid var(--bd);border-radius:8px;max-height:150px;overflow-y:auto;width:calc(100% - 32px)"></div>
+    </div>
+    <div class="fh-modal-field"><label>Quantità (quote)</label><input id="fh-hm-shares" class="fi" type="number" min="0.001" step="0.001" placeholder="es. 10.5"></div>
+    <div class="fh-modal-field"><label>Prezzo medio acquisto</label><input id="fh-hm-price" class="fi" type="number" min="0" step="0.01" placeholder="es. 98.50"></div>
+    <div class="fh-modal-field"><label>Valuta acquisto</label>
+      <select id="fh-hm-currency" class="fi">
+        <option value="USD">USD $</option>
+        <option value="EUR">EUR €</option>
+        <option value="GBP">GBP £</option>
+      </select>
+    </div>
+    <div class="fh-modal-field"><label>Tipo asset</label>
+      <select id="fh-hm-class" class="fi">
+        <option value="etf">ETF / Fondo</option>
+        <option value="equity">Azione</option>
+        <option value="bond">Obbligazione</option>
+        <option value="commodity">Commodity</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="fi" style="flex:1;cursor:pointer;border:1px solid var(--bd)" onclick="closeHoldingModal()">Annulla</button>
+      <button class="fire-btn-primary" style="flex:1;font-size:13px" onclick="saveNewHolding()">Aggiungi →</button>
+    </div>
+  </div>
 </div>
 </div>
 
-<!-- ACHIEVEMENTS -->
+<!-- ACHIEVEMENTS <!-- ACHIEVEMENTS -->
 <div class="view" id="view-gamification">
 <div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:14px;width:100%">
   <div style="background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(59,130,246,.12));border:1px solid rgba(139,92,246,.3);border-radius:var(--r16);padding:20px">
@@ -2724,6 +2862,18 @@
         <button class="btn btn-p btn-sm" onclick="quickAlert()">+ Alert</button>
       </div>
     </div>
+  </div>
+
+  <!-- Sign Out -->
+  <div style="margin-top:8px;padding:0 4px">
+    <button onclick="doLogout()" style="width:100%;padding:13px;border-radius:12px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.07);color:#EF4444;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s"
+      onmouseover="this.style.background='rgba(239,68,68,.15)'" onmouseout="this.style.background='rgba(239,68,68,.07)'">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6"/>
+      </svg>
+      Disconnetti
+    </button>
+    <div style="text-align:center;margin-top:8px;font-size:10px;color:var(--t3)">WorldLens v58</div>
   </div>
 </div>
 </div>
@@ -3531,10 +3681,10 @@
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v57"></script>
-<script src="/static/finance.bundle.js?v57"></script>
-<script src="/static/map.bundle.js?v57"></script>
-<script src="/static/dashboard.bundle.js?v57"></script>
+<script src="/static/core.bundle.js?v59"></script>
+<script src="/static/finance.bundle.js?v59"></script>
+<script src="/static/map.bundle.js?v59"></script>
+<script src="/static/dashboard.bundle.js?v59"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
