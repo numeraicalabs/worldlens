@@ -15,6 +15,7 @@ from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 
 import aiosqlite
+from db import db_execute, db_fetchall, db_fetchone, db_fetchval
 from fastapi import APIRouter, Depends, Body, HTTPException, BackgroundTasks
 from auth import require_user, require_admin
 from config import settings
@@ -123,6 +124,25 @@ async def brain_ingest(
     context: dict = None,
     db: Optional[aiosqlite.Connection] = None,
 ) -> bool:
+# ── Postgres write (persistent across deploys) ──────────────────────────
+    from supabase_client import get_pool as _gp
+    _pool = await _gp()
+    if _pool:
+        try:
+            import json as _j
+            ctx_s = json.dumps(context) if isinstance(context, dict) else (context or '{}')
+            async with _pool.acquire() as _conn:
+                _row = await _conn.fetchrow(
+                    "INSERT INTO brain_entries (user_id, content, source, topic, weight, context) "
+                    "VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
+                    user_id, content, source, topic, weight, ctx_s
+                )
+                if _row:
+                    logger.debug("brain_ingest→PG id=%s", _row['id'])
+                    return _row['id']
+        except Exception as _pe:
+            logger.debug("brain_ingest PG: %s", _pe)
+    # ── SQLite fallback ───────────────────────────────────────────────────
     """Add a piece of knowledge to the user's brain. Deduplicates automatically."""
     if not content or len(content.strip()) < 15:
         return False
