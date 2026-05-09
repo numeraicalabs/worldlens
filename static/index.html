@@ -516,6 +516,12 @@
       <span class="ni-lbl">Trade</span>
     </button>
 
+    <button class="ni ni-icon" data-v="opportunity" onclick="sv('opportunity',this)" title="Opportunità" id="opp-nav-btn" style="position:relative">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="8,2 10,6 14,6.5 11,9.5 11.8,13.5 8,11.5 4.2,13.5 5,9.5 2,6.5 6,6"/></svg>
+      <span class="ni-lbl">Opport.</span>
+      <span id="opp-nav-badge" style="display:none;position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:#F59E0B;border:1.5px solid var(--bg0)"></span>
+    </button>
+
     <button class="ni ni-icon" data-v="insiders" onclick="sv('insiders',this)" title="Insiders">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/></svg>
       <span class="ni-lbl">Insiders</span>
@@ -3011,6 +3017,68 @@
 </div>
 </div>
 
+
+<!-- OPPORTUNITY ENGINE -->
+<div class="view" id="view-opportunity">
+<div style="display:flex;flex-direction:column;overflow-y:auto;padding:18px;gap:14px;width:100%">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div>
+      <div class="vtit">⚡ Opportunity Engine</div>
+      <div class="vsub">Trade ideas generate automaticamente da eventi globali + anomalie di mercato</div>
+    </div>
+    <button class="btn btn-p btn-sm" onclick="oppRefresh()" id="opp-refresh-btn">↻ Aggiorna</button>
+  </div>
+
+  <!-- Stats strip -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="opp-stats-strip">
+    <div class="card" style="text-align:center;padding:12px 8px">
+      <div style="font-size:22px;font-weight:800;font-family:var(--fm);color:#F1F5F9" id="opp-stat-total">—</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px">Idee attive</div>
+    </div>
+    <div class="card" style="text-align:center;padding:12px 8px">
+      <div style="font-size:22px;font-weight:800;font-family:var(--fm);color:#10B981" id="opp-stat-longs">—</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px">Long</div>
+    </div>
+    <div class="card" style="text-align:center;padding:12px 8px">
+      <div style="font-size:22px;font-weight:800;font-family:var(--fm);color:#EF4444" id="opp-stat-shorts">—</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px">Short</div>
+    </div>
+    <div class="card" style="text-align:center;padding:12px 8px;position:relative;cursor:pointer" onclick="oppShowAnomalies()" id="opp-anom-card">
+      <div style="font-size:22px;font-weight:800;font-family:var(--fm);color:#F59E0B" id="opp-stat-anomalies">—</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:2px">Anomalie non lette</div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-g btn-sm opp-dir-btn on" data-dir="" onclick="oppSetDir('',this)">Tutti</button>
+    <button class="btn btn-g btn-sm opp-dir-btn" data-dir="LONG" onclick="oppSetDir('LONG',this)">🟢 Long only</button>
+    <button class="btn btn-g btn-sm opp-dir-btn" data-dir="SHORT" onclick="oppSetDir('SHORT',this)">🔴 Short only</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+      <span style="font-size:10px;color:var(--t3)">Score min:</span>
+      <input type="range" id="opp-score-filter" min="0" max="100" value="45" style="width:80px" oninput="document.getElementById('opp-score-val').textContent=this.value;oppLoadIdeas()">
+      <span id="opp-score-val" style="font-size:11px;font-weight:700;color:#A78BFA;min-width:20px">45</span>
+    </div>
+  </div>
+
+  <!-- Trade ideas list -->
+  <div id="opp-ideas-list" style="display:flex;flex-direction:column;gap:10px">
+    <div style="text-align:center;padding:30px;color:var(--t3);font-size:12px">Caricamento trade ideas…</div>
+  </div>
+
+  <!-- Anomaly alerts panel (hidden by default) -->
+  <div id="opp-anomalies-panel" style="display:none;flex-direction:column;gap:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:13px;font-weight:700;color:#F59E0B">⚠ Anomalie di Mercato</div>
+      <button class="btn btn-g btn-sm" onclick="document.getElementById('opp-anomalies-panel').style.display='none'">✕ Chiudi</button>
+    </div>
+    <div id="opp-anomalies-list" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+
+</div>
+</div>
 
 <div class="view" id="view-tradgentic">
   <div id="tg-root">

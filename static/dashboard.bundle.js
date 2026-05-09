@@ -5133,3 +5133,188 @@ if(typeof renderDash === 'function' && !window._syncHooked){
     setTimeout(syncIntelCardsFromDOM, 4000);
   };
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   OPPORTUNITY ENGINE — Trade Ideas + Anomaly Alerts
+   ════════════════════════════════════════════════════════════════════ */
+
+var _oppDir = '';
+var _oppIdeasCache = [];
+
+/* Load dashboard on view open */
+document.addEventListener('wl-view-change', function(e){
+  if(e.detail && e.detail.view === 'opportunity') oppRefresh();
+});
+/* Hook into sv() if it doesn't dispatch events */
+var _svOrig = window.sv;
+window.sv = function(name, el){
+  if(name === 'opportunity') oppRefresh();
+  return _svOrig ? _svOrig.apply(this, arguments) : null;
+};
+
+async function oppRefresh(){
+  var btn = document.getElementById('opp-refresh-btn');
+  if(btn) btn.disabled = true;
+  try {
+    var dash = await rq('/api/opportunity/dashboard');
+    if(dash){
+      _oppIdeasCache = dash.top_ideas || [];
+      _oppRenderStats(dash);
+    }
+    await oppLoadIdeas();
+  } catch(e){ console.warn('opp refresh', e); }
+  if(btn){ btn.disabled = false; }
+}
+
+function _oppRenderStats(dash){
+  var s = dash.stats || {};
+  _setTxt('opp-stat-total',   s.total  || 0);
+  _setTxt('opp-stat-longs',   s.longs  || 0);
+  _setTxt('opp-stat-shorts',  s.shorts || 0);
+  _setTxt('opp-stat-anomalies', dash.unread_anomalies || 0);
+  // Badge on nav
+  var badge = document.getElementById('opp-nav-badge');
+  if(badge) badge.style.display = (dash.unread_anomalies > 0) ? 'block' : 'none';
+}
+
+function _setTxt(id, val){
+  var el = document.getElementById(id);
+  if(el) el.textContent = val;
+}
+
+async function oppLoadIdeas(){
+  var dir   = _oppDir;
+  var score = document.getElementById('opp-score-filter') ? document.getElementById('opp-score-filter').value : 45;
+  var url   = '/api/opportunity/ideas?limit=30&min_score='+score;
+  if(dir) url += '&direction='+dir;
+
+  var list = document.getElementById('opp-ideas-list');
+  if(!list) return;
+  list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3);font-size:12px">⏳ Caricamento…</div>';
+
+  var data = await rq(url);
+  var ideas = (data && data.ideas) ? data.ideas : [];
+
+  if(!ideas.length){
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--t3);font-size:12px">Nessuna trade idea trovata.<br>Le idee vengono generate automaticamente dagli eventi ad alto impatto.</div>';
+    return;
+  }
+
+  list.innerHTML = ideas.map(function(idea){ return _oppIdeaCard(idea); }).join('');
+}
+
+function _oppIdeaCard(idea){
+  var isLong    = idea.direction === 'LONG';
+  var dirColor  = isLong ? '#10B981' : '#EF4444';
+  var dirLabel  = isLong ? '▲ LONG' : '▼ SHORT';
+  var scoreColor = idea.opp_score >= 70 ? '#F59E0B' : idea.opp_score >= 55 ? '#60A5FA' : '#94A3B8';
+  var confPct   = Math.round((idea.confidence || 0.5) * 100);
+  var targetPct = idea.target_pct ? (idea.target_pct > 0 ? '+' : '') + idea.target_pct.toFixed(1) + '%' : '—';
+  var stopPct   = idea.stop_pct ? '-' + idea.stop_pct.toFixed(1) + '%' : '—';
+  var entry     = (idea.entry_low && idea.entry_high)
+    ? idea.entry_low.toFixed(2) + ' – ' + idea.entry_high.toFixed(2)
+    : 'Market';
+  var catBadge  = idea.event_category || '';
+  var risks     = [];
+  var catalysts = [];
+  try { risks     = typeof idea.risks     === 'string' ? JSON.parse(idea.risks)     : (idea.risks     || []); } catch(e){}
+  try { catalysts = typeof idea.catalysts === 'string' ? JSON.parse(idea.catalysts) : (idea.catalysts || []); } catch(e){}
+
+  return '<div class="card" style="border-left:3px solid '+dirColor+';padding:14px">'
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">'
+    +   '<div style="display:flex;align-items:center;gap:8px">'
+    +     '<div style="font-size:16px;font-weight:800;font-family:var(--fm);color:'+dirColor+'">'+_escHtml(idea.ticker)+'</div>'
+    +     '<div style="font-size:10px;padding:2px 7px;border-radius:100px;background:rgba(255,255,255,.06);color:'+dirColor+'">'+dirLabel+'</div>'
+    +     (catBadge ? '<div style="font-size:9px;padding:2px 6px;border-radius:100px;background:rgba(255,255,255,.05);color:var(--t3)">'+_escHtml(catBadge)+'</div>' : '')
+    +   '</div>'
+    +   '<div style="display:flex;align-items:center;gap:6px">'
+    +     '<div style="font-size:11px;font-weight:700;color:'+scoreColor+'">⚡'+idea.opp_score+'</div>'
+    +     '<div style="font-size:10px;color:var(--t3)">'+confPct+'% conf.</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--t2);margin:8px 0 10px;line-height:1.55">'+_escHtml(idea.asset_name)+'</div>'
+    + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:10px;font-style:italic">'+_escHtml(idea.rationale||'')+'</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">'
+    +   _oppKpi('Entry', entry)
+    +   _oppKpi('Target', targetPct, isLong ? '#10B981' : '#EF4444')
+    +   _oppKpi('Stop', stopPct, '#EF4444')
+    +   _oppKpi('Timeframe', idea.timeframe || '—')
+    + '</div>'
+    + (catalysts.length ? '<div style="font-size:10px;color:var(--t3);margin-bottom:4px">Catalizzatori: '
+        + catalysts.map(function(c){return '<span style="color:#60A5FA">'+_escHtml(c)+'</span>';}).join(' · ')
+        + '</div>' : '')
+    + (risks.length ? '<div style="font-size:10px;color:var(--t3)">Rischi: '
+        + risks.map(function(r){return '<span style="color:#F87171">'+_escHtml(r)+'</span>';}).join(' · ')
+        + '</div>' : '')
+    + (idea.event_title ? '<div style="font-size:10px;color:var(--t3);margin-top:8px;padding-top:8px;border-top:1px solid var(--bd)">📰 '+_escHtml(idea.event_title.slice(0,90))+'</div>' : '')
+    + '</div>';
+}
+
+function _oppKpi(label, val, color){
+  return '<div style="background:var(--bg2);border-radius:var(--r8);padding:6px 8px;text-align:center">'
+    + '<div style="font-size:12px;font-weight:700;font-family:var(--fm);color:'+(color||'#F1F5F9')+'">'+_escHtml(String(val))+'</div>'
+    + '<div style="font-size:9px;color:var(--t3);margin-top:1px">'+_escHtml(label)+'</div>'
+    + '</div>';
+}
+
+function oppSetDir(dir, btn){
+  _oppDir = dir;
+  document.querySelectorAll('.opp-dir-btn').forEach(function(b){b.classList.remove('on');});
+  if(btn) btn.classList.add('on');
+  oppLoadIdeas();
+}
+
+async function oppShowAnomalies(){
+  var panel = document.getElementById('opp-anomalies-panel');
+  var list  = document.getElementById('opp-anomalies-list');
+  if(!panel || !list) return;
+  panel.style.display = 'flex';
+  list.innerHTML = '<div style="color:var(--t3);font-size:12px">Caricamento…</div>';
+  var data = await rq('/api/opportunity/anomalies?limit=30&unread_only=true');
+  var alerts = (data && data.alerts) ? data.alerts : [];
+  if(!alerts.length){
+    list.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:16px;text-align:center">Nessuna anomalia non letta.</div>';
+    return;
+  }
+  list.innerHTML = alerts.map(function(a){
+    var sevColor = a.severity==='high' ? '#EF4444' : a.severity==='medium' ? '#F59E0B' : '#94A3B8';
+    var typeIcon = {volume_spike:'📊', price_breakout:'💥', momentum_divergence:'🔄', post_event_drift:'🎯'}[a.alert_type] || '⚠';
+    return '<div class="card" style="border-left:3px solid '+sevColor+';padding:12px;position:relative">'
+      + '<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">'
+      +   '<span style="font-size:14px">'+typeIcon+'</span>'
+      +   '<div style="font-size:12px;font-weight:700;color:var(--t1);flex:1">'+_escHtml(a.title)+'</div>'
+      +   '<button onclick="oppAckAlert('+a.id+',this)" style="font-size:9px;padding:2px 7px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--t3);cursor:pointer">✓ Letto</button>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--t3);line-height:1.55">'+_escHtml(a.detail)+'</div>'
+      + '<div style="font-size:10px;color:var(--t3);margin-top:6px">'+a.created_at.slice(0,16).replace('T',' ')+'</div>'
+      + '</div>';
+  }).join('');
+  // Scroll into view
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+async function oppAckAlert(id, btn){
+  await rq('/api/opportunity/anomalies/'+id+'/ack', {method:'POST', body:{}});
+  if(btn) btn.closest('.card').style.opacity = '0.4';
+  // Update unread count
+  var c = document.getElementById('opp-stat-anomalies');
+  if(c){ var n = parseInt(c.textContent)||0; c.textContent = Math.max(0,n-1); }
+}
+
+function _escHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── WebSocket hook for real-time anomaly badge ── */
+var _oppWsOrig = window._handleWsMessage;
+window._handleWsMessage = function(msg){
+  if(_oppWsOrig) _oppWsOrig(msg);
+  if(msg && msg.type === 'anomaly_alerts' && msg.count > 0){
+    var badge = document.getElementById('opp-nav-badge');
+    if(badge) badge.style.display = 'block';
+    var c = document.getElementById('opp-stat-anomalies');
+    if(c){ var n = parseInt(c.textContent)||0; c.textContent = n + msg.count; }
+    toast('⚠ '+msg.count+' nuova anomalia di mercato', 'inf');
+  }
+};
+
