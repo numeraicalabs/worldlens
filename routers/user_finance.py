@@ -4,6 +4,8 @@ import json
 import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, Body
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import Optional
 from auth import require_user
 from scheduler import get_finance_cache
 from models import WatchlistItem, AlertCreate
@@ -12,6 +14,152 @@ from ai_layer import ai_watchlist_digest, ai_available_async, _get_user_ai_keys,
 
 finance_router = APIRouter(prefix="/api/finance", tags=["finance"])
 user_router = APIRouter(prefix="/api/user", tags=["user"])
+
+
+# ── Portfolio Holdings (used by Finance Hub frontend) ─────────────────────────
+
+class HoldingIn(BaseModel):
+    ticker: str
+    shares: float
+    avg_price: float
+    currency: str = "USD"
+    asset_class: str = "equity"
+    isin: str = ""
+    name: str = ""
+
+
+async def _ensure_fh_tables(db):
+    await db.executescript("""
+    CREATE TABLE IF NOT EXISTS etf_portfolios (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL,
+        name        TEXT NOT NULL DEFAULT 'Portafoglio Principale',
+        strategy    TEXT DEFAULT 'custom',
+        created_at  TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS etf_holdings (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        portfolio_id  INTEGER NOT NULL,
+        isin          TEXT NOT NULL DEFAULT '',
+        ticker        TEXT NOT NULL,
+        name          TEXT NOT NULL DEFAULT '',
+        shares        REAL NOT NULL DEFAULT 0,
+        avg_price     REAL NOT NULL DEFAULT 0,
+        current_price REAL,
+        currency      TEXT DEFAULT 'USD',
+        asset_class   TEXT DEFAULT 'equity',
+        created_at    TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (portfolio_id) REFERENCES etf_portfolios(id)
+    );
+    """)
+    await db.commit()
+
+
+async def _get_or_create_portfolio(db, user_id: int) -> int:
+    """Return the user's default portfolio id, creating one if needed."""
+    async with db.execute(
+        "SELECT id FROM etf_portfolios WHERE user_id=? ORDER BY created_at LIMIT 1",
+        (user_id,)
+    ) as cur:
+        row = await cur.fetchone()
+    if row:
+        return row[0]
+    cur2 = await db.execute(
+        "INSERT INTO etf_portfolios (user_id, name, strategy) VALUES (?,?,?)",
+        (user_id, "Portafoglio Principale", "custom")
+    )
+    await db.commit()
+    return cur2.lastrowid
+
+
+@finance_router.get("/portfolios")
+async def fh_list_portfolios(user=Depends(require_user)):
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await _ensure_fh_tables(db)
+        pid = await _get_or_create_portfolio(db, user["id"])
+        async with db.execute(
+            "SELECT * FROM etf_portfolios WHERE user_id=? ORDER BY created_at",
+            (user["id"],)
+        ) as cur:
+            portfolios = [dict(r) for r in await cur.fetchall()]
+        for p in portfolios:
+            async with db.execute(
+                "SELECT * FROM etf_holdings WHERE portfolio_id=?", (p["id"],)
+            ) as cur2:
+                p["holdings"] = [dict(r) for r in await cur2.fetchall()]
+    return portfolios
+
+
+@finance_router.post("/portfolios", status_code=201)
+async def fh_create_portfolio(data: dict = Body(...), user=Depends(require_user)):
+    name = data.get("name", "Portafoglio Principale")
+    strategy = data.get("strategy", "custom")
+    async with aiosqlite.connect(settings.db_path) as db:
+        await _ensure_fh_tables(db)
+        cur = await db.execute(
+            "INSERT INTO etf_portfolios (user_id, name, strategy) VALUES (?,?,?)",
+            (user["id"], name, strategy)
+        )
+        await db.commit()
+    return {"id": cur.lastrowid, "name": name, "strategy": strategy}
+
+
+@finance_router.post("/portfolios/{pid}/holdings", status_code=201)
+async def fh_add_holding(pid: int, data: HoldingIn, user=Depends(require_user)):
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await _ensure_fh_tables(db)
+        # Verify portfolio belongs to user
+        async with db.execute(
+            "SELECT id FROM etf_portfolios WHERE id=? AND user_id=?",
+            (pid, user["id"])
+        ) as cur:
+            if not await cur.fetchone():
+                raise HTTPException(404, "Portfolio not found")
+        # Use ticker as name fallback
+        display_name = data.name.strip() if data.name.strip() else data.ticker.upper()
+        cur2 = await db.execute(
+            "INSERT INTO etf_holdings "
+            "(portfolio_id, isin, ticker, name, shares, avg_price, currency, asset_class) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (pid, data.isin, data.ticker.upper(), display_name,
+             data.shares, data.avg_price, data.currency, data.asset_class)
+        )
+        await db.commit()
+    return {"id": cur2.lastrowid, "ticker": data.ticker.upper()}
+
+
+@finance_router.delete("/holdings/{hid}")
+async def fh_delete_holding(hid: int, user=Depends(require_user)):
+    async with aiosqlite.connect(settings.db_path) as db:
+        await _ensure_fh_tables(db)
+        await db.execute(
+            "DELETE FROM etf_holdings WHERE id=? AND portfolio_id IN "
+            "(SELECT id FROM etf_portfolios WHERE user_id=?)",
+            (hid, user["id"])
+        )
+        await db.commit()
+    return {"success": True}
+
+
+@finance_router.get("/search/{query}")
+async def fh_search_ticker(query: str):
+    """Simple ticker search — returns candidates from known assets."""
+    from scheduler import get_finance_cache
+    assets = get_finance_cache() or []
+    q = query.upper()
+    results = [
+        {"ticker": a["symbol"], "name": a.get("name", a["symbol"])}
+        for a in assets
+        if q in a["symbol"].upper() or q in a.get("name", "").upper()
+    ][:10]
+    # Always include the query itself as first option if not already there
+    symbols = [r["ticker"] for r in results]
+    if q not in symbols:
+        results.insert(0, {"ticker": q, "name": q})
+    return {"results": results}
 
 
 # ── Finance ──────────────────────────────────────────
