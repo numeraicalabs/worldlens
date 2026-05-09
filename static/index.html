@@ -41,6 +41,31 @@
     #loader { position: fixed; inset: 0; background: #060B12; display: flex;
               flex-direction: column; align-items: center; justify-content: center;
               z-index: 9999; }
+
+    /* ── Landing page desktop fix ──────────────────────────────────────
+       On desktop (≥901px) the app CSS sets body{padding-left:200px} for
+       the sidebar. Undo that completely when the landing is shown so the
+       page fills the full viewport without offset or clipping.           */
+    body.landing-mode {
+      padding-left: 0 !important;
+      padding-bottom: 0 !important;
+    }
+    body.landing-mode #nav,
+    body.landing-mode nav#nav,
+    body.landing-mode #wl-mobile-nav { display: none !important; }
+    body.landing-mode #landing {
+      width: 100vw !important;
+      max-width: 100vw !important;
+      margin-left: 0 !important;
+      box-sizing: border-box;
+    }
+    body.landing-mode .l-hero,
+    body.landing-mode .l-stats-strip,
+    body.landing-mode .l-how,
+    body.landing-mode .l-features,
+    body.landing-mode .l-testimonials,
+    body.landing-mode .l-final-cta,
+    body.landing-mode .l-footer { box-sizing: border-box; }
   </style>
 </head>
 <body>
