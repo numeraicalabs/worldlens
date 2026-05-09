@@ -949,6 +949,41 @@ def start():
         id="tg_pnl",
         next_run_time=__import__('datetime').datetime.now(),
     )
+
+    # ── Opportunity Score Engine + Event-to-Trade Pipeline (every 10 min) ────
+    async def _run_opportunity_pipeline():
+        try:
+            from routers.opportunity import run_opportunity_pipeline
+            count = await run_opportunity_pipeline(lookback_hours=4)
+            if count:
+                logger.info("Opportunity pipeline: %d new trade ideas", count)
+        except Exception as e:
+            logger.warning("opportunity_pipeline: %s", e)
+
+    _scheduler.add_job(
+        _run_opportunity_pipeline, "interval",
+        minutes=10,
+        id="opportunity_pipeline",
+        next_run_time=__import__('datetime').datetime.now(),
+        misfire_grace_time=300,
+    )
+
+    # ── Smart Anomaly Alert Scanner (every 5 min) ─────────────────────────────
+    async def _run_anomaly_scan():
+        try:
+            from routers.opportunity import run_anomaly_scan
+            await run_anomaly_scan()
+        except Exception as e:
+            logger.warning("anomaly_scan: %s", e)
+
+    _scheduler.add_job(
+        _run_anomaly_scan, "interval",
+        minutes=5,
+        id="anomaly_scan",
+        next_run_time=__import__('datetime').datetime.now(),
+        misfire_grace_time=120,
+    )
+
     _scheduler.start()
     logger.info(
         "Scheduler started — events every %ds, finance every %ds, sentiment every 180s",
