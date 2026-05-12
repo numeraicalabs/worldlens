@@ -984,6 +984,22 @@ def start():
         misfire_grace_time=120,
     )
 
+    # ── Performance Tracker (Fase 4) — every hour ────────────────────────────
+    async def _run_performance_tracker():
+        try:
+            from routers.opportunity import run_performance_tracker
+            await run_performance_tracker()
+        except Exception as e:
+            logger.warning("performance_tracker: %s", e)
+
+    _scheduler.add_job(
+        _run_performance_tracker, "interval",
+        hours=1,
+        id="performance_tracker",
+        next_run_time=__import__('datetime').datetime.now(),
+        misfire_grace_time=600,
+    )
+
     _scheduler.start()
     logger.info(
         "Scheduler started — events every %ds, finance every %ds, sentiment every 180s",
