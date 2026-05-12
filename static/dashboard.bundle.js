@@ -5318,3 +5318,266 @@ window._handleWsMessage = function(msg){
   }
 };
 
+
+/* ════════════════════════════════════════════════════════════════════
+   OPPORTUNITY ENGINE — FASE 1 (Add to Portfolio) + FASE 4 (Track Record)
+   ════════════════════════════════════════════════════════════════════ */
+
+// ── Tab switcher ────────────────────────────────────────────────────
+function oppMainTab(tab, btn){
+  ['ideas','performance','anomalies'].forEach(function(t){
+    var el = document.getElementById('opp-tab-'+t);
+    if(el) el.style.display = t===tab ? 'flex' : 'none';
+    if(el && t===tab) el.style.flexDirection = 'column';
+  });
+  document.querySelectorAll('.opp-main-tab').forEach(function(b){ b.classList.remove('on'); });
+  if(btn) btn.classList.add('on');
+  if(tab==='performance') oppLoadPerformance();
+  if(tab==='anomalies')   oppShowAnomalies();
+}
+
+// ── Enhance existing _oppIdeaCard with "Aggiungi" button ────────────
+var _oppIdeaCardOrig = window._oppIdeaCard || (typeof _oppIdeaCard !== 'undefined' ? _oppIdeaCard : null);
+
+// Override _oppIdeaCard to inject the "Aggiungi al Portafoglio" button
+// and the live P&L badge when pnl_pct is available
+window._oppIdeaCard = function(idea){
+  var isLong    = idea.direction === 'LONG';
+  var dirColor  = isLong ? '#10B981' : '#EF4444';
+  var dirLabel  = isLong ? '▲ LONG' : '▼ SHORT';
+  var scoreColor = idea.opp_score >= 70 ? '#F59E0B' : idea.opp_score >= 55 ? '#60A5FA' : '#94A3B8';
+  var confPct   = Math.round((idea.confidence || 0.5) * 100);
+  var targetPct = idea.target_pct ? (idea.target_pct > 0 ? '+' : '') + parseFloat(idea.target_pct).toFixed(1) + '%' : '—';
+  var stopPct   = idea.stop_pct ? '-' + parseFloat(idea.stop_pct).toFixed(1) + '%' : '—';
+  var entry     = (idea.entry_low && idea.entry_high)
+    ? parseFloat(idea.entry_low).toFixed(2) + ' – ' + parseFloat(idea.entry_high).toFixed(2)
+    : 'Market';
+
+  // Live P&L badge (Fase 4)
+  var pnlBadge = '';
+  if(idea.pnl_pct !== null && idea.pnl_pct !== undefined){
+    var pnl = parseFloat(idea.pnl_pct);
+    var pnlColor = pnl >= 0 ? '#10B981' : '#EF4444';
+    pnlBadge = '<span style="font-size:10px;font-weight:700;color:'+pnlColor+';background:rgba('+
+      (pnl>=0?'16,185,129':'239,68,68')+',.1);padding:2px 7px;border-radius:100px;margin-left:6px">'+
+      (pnl>=0?'+':'')+pnl.toFixed(1)+'% P&L</span>';
+  }
+
+  var catBadge  = idea.event_category || '';
+  var risks = [], catalysts = [];
+  try { risks     = typeof idea.risks     === 'string' ? JSON.parse(idea.risks)     : (idea.risks     || []); } catch(e){}
+  try { catalysts = typeof idea.catalysts === 'string' ? JSON.parse(idea.catalysts) : (idea.catalysts || []); } catch(e){}
+
+  // Add to portfolio button (Fase 1)
+  var ideaId = idea.id || '';
+  var addBtn = ideaId
+    ? '<button onclick="oppOpenAddModal('+ideaId+',\''+_escHtml(idea.ticker)+'\',\''+_escHtml(idea.asset_name)+'\','+
+        (idea.entry_low||0)+','+dirColor.replace('#','')+',\''+dirLabel+'\')" '+
+        'style="font-size:10px;padding:4px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);'+
+        'background:rgba(255,255,255,.05);color:var(--t2);cursor:pointer;white-space:nowrap">'+
+        '+ Portafoglio</button>'
+    : '';
+
+  return '<div class="card" style="border-left:3px solid '+dirColor+';padding:14px">'
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">'
+    +   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +     '<div style="font-size:16px;font-weight:800;font-family:var(--fm);color:'+dirColor+'">'+_escHtml(idea.ticker)+'</div>'
+    +     '<div style="font-size:10px;padding:2px 7px;border-radius:100px;background:rgba(255,255,255,.06);color:'+dirColor+'">'+dirLabel+'</div>'
+    +     pnlBadge
+    +     (catBadge ? '<div style="font-size:9px;padding:2px 6px;border-radius:100px;background:rgba(255,255,255,.05);color:var(--t3)">'+_escHtml(catBadge)+'</div>' : '')
+    +   '</div>'
+    +   '<div style="display:flex;align-items:center;gap:6px">'
+    +     '<div style="font-size:11px;font-weight:700;color:'+scoreColor+'">⚡'+idea.opp_score+'</div>'
+    +     '<div style="font-size:10px;color:var(--t3)">'+confPct+'% conf.</div>'
+    +     addBtn
+    +   '</div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--t2);margin:8px 0 4px;line-height:1.55">'+_escHtml(idea.asset_name)+'</div>'
+    + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:10px;font-style:italic">'+_escHtml(idea.rationale||'')+'</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">'
+    +   _oppKpi('Entry', entry)
+    +   _oppKpi('Target', targetPct, isLong ? '#10B981' : '#EF4444')
+    +   _oppKpi('Stop', stopPct, '#EF4444')
+    +   _oppKpi('Timeframe', idea.timeframe || '—')
+    + '</div>'
+    + (catalysts.length ? '<div style="font-size:10px;color:var(--t3);margin-bottom:4px">Catalizzatori: '
+        + catalysts.map(function(c){return '<span style="color:#60A5FA">'+_escHtml(c)+'</span>';}).join(' · ')+'</div>' : '')
+    + (risks.length ? '<div style="font-size:10px;color:var(--t3)">Rischi: '
+        + risks.map(function(r){return '<span style="color:#F87171">'+_escHtml(r)+'</span>';}).join(' · ')+'</div>' : '')
+    + (idea.outcome_note ? '<div style="font-size:10px;margin-top:8px;padding-top:8px;border-top:1px solid var(--bd);color:var(--t2)">'+_escHtml(idea.outcome_note)+'</div>' : '')
+    + (idea.event_title ? '<div style="font-size:10px;color:var(--t3);margin-top:6px">📰 '+_escHtml(String(idea.event_title||'').slice(0,90))+'</div>' : '')
+    + '</div>';
+};
+
+// ── FASE 1: Add to Portfolio modal ──────────────────────────────────
+var _oppAddIdeaId   = null;
+var _oppAddGenPrice = 0;
+
+function oppOpenAddModal(ideaId, ticker, assetName, entryPrice, dirColorHex, dirLabel){
+  _oppAddIdeaId   = ideaId;
+  _oppAddGenPrice = entryPrice || 0;
+
+  var modal = document.getElementById('opp-add-port-modal');
+  var info  = document.getElementById('opp-add-port-info');
+  var sel   = document.getElementById('opp-add-port-select');
+  var cost  = document.getElementById('opp-add-port-cost');
+
+  if(!modal) return;
+
+  if(info) info.innerHTML =
+    '<strong style="color:#'+dirColorHex+'">'+_escHtml(ticker)+'</strong> '+dirLabel+
+    ' &mdash; '+_escHtml(assetName)+
+    (entryPrice ? '<br>Prezzo entry: <strong>'+parseFloat(entryPrice).toFixed(2)+'</strong>' : '');
+
+  // Populate portfolios
+  if(sel){
+    sel.innerHTML = '<option value="">Caricamento…</option>';
+    rq('/api/finance/portfolios').then(function(ports){
+      if(!ports || !Array.isArray(ports)){ sel.innerHTML='<option value="">Nessun portafoglio</option>'; return; }
+      sel.innerHTML = ports.map(function(p){
+        return '<option value="'+p.id+'">'+_escHtml(p.name||'Portafoglio')+'</option>';
+      }).join('');
+    });
+  }
+
+  // Recalculate cost on shares change
+  var sharesEl = document.getElementById('opp-add-port-shares');
+  if(sharesEl){
+    sharesEl.value = 1;
+    sharesEl.oninput = function(){
+      if(cost && _oppAddGenPrice){
+        var s = parseFloat(this.value)||0;
+        cost.textContent = 'Costo stimato: ' + (s * _oppAddGenPrice).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' USD';
+      }
+    };
+    if(cost && entryPrice) cost.textContent = 'Costo stimato: '+parseFloat(entryPrice).toFixed(2)+' USD';
+  }
+
+  modal.style.display = 'flex';
+}
+
+function oppCloseAddModal(){
+  var modal = document.getElementById('opp-add-port-modal');
+  if(modal) modal.style.display = 'none';
+  _oppAddIdeaId = null;
+}
+
+async function oppConfirmAddToPortfolio(){
+  if(!_oppAddIdeaId){ toast('Seleziona una trade idea','err'); return; }
+  var portId = (document.getElementById('opp-add-port-select')||{}).value;
+  var shares = parseFloat((document.getElementById('opp-add-port-shares')||{}).value)||0;
+  if(!portId){ toast('Seleziona un portafoglio','err'); return; }
+  if(shares <= 0){ toast('Inserisci una quantità valida','err'); return; }
+
+  var btn = document.querySelector('#opp-add-port-modal .btn-p');
+  if(btn){ btn.disabled=true; btn.textContent='Aggiunta…'; }
+
+  var r = await rq('/api/opportunity/ideas/'+_oppAddIdeaId+'/add-to-portfolio',{
+    method:'POST', body:{ portfolio_id: parseInt(portId), shares: shares }
+  });
+
+  if(btn){ btn.disabled=false; btn.textContent='✅ Aggiungi al Portafoglio'; }
+
+  if(r && r.success){
+    toast('✅ '+_escHtml(r.ticker||'')+' aggiunto al portafoglio!', 'ok');
+    oppCloseAddModal();
+  } else {
+    toast('Errore: '+(r && r.detail ? r.detail : 'Riprova'), 'err');
+  }
+}
+
+// ── FASE 4: Track Record tab ─────────────────────────────────────────
+async function oppLoadPerformance(){
+  var activeEl = document.getElementById('opp-perf-active');
+  var closedEl = document.getElementById('opp-perf-closed');
+  if(activeEl) activeEl.innerHTML = '<div style="color:var(--t3);font-size:12px">Caricamento…</div>';
+  if(closedEl) closedEl.innerHTML = '';
+
+  var data = await rq('/api/opportunity/performance');
+  if(!data){ return; }
+
+  var tr = data.track_record || {};
+  var as = data.active_summary || {};
+
+  // Fill stats strip
+  var hrColor = (tr.hit_rate_pct||0) >= 50 ? '#10B981' : '#EF4444';
+  var avgColor = (tr.avg_pnl_pct||0) >= 0 ? '#10B981' : '#EF4444';
+  _oppSetTxt('opp-tr-hitrate', (tr.hit_rate_pct||0).toFixed(0)+'%', hrColor);
+  _oppSetTxtColor('opp-tr-hitrate', hrColor);
+  _oppSetTxt('opp-tr-avgpnl',  (tr.avg_pnl_pct>=0?'+':'')+((tr.avg_pnl_pct||0).toFixed(1))+'%');
+  document.getElementById('opp-tr-avgpnl').style.color = avgColor;
+  _oppSetTxt('opp-tr-best',  tr.best_pnl_pct  ? '+'+tr.best_pnl_pct.toFixed(1)+'%' : '—');
+  _oppSetTxt('opp-tr-worst', tr.worst_pnl_pct !== undefined ? tr.worst_pnl_pct.toFixed(1)+'%' : '—');
+
+  // Active ideas with live P&L
+  var active = data.active_ideas || [];
+  if(activeEl){
+    if(!active.length){
+      activeEl.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:10px 0">Nessuna posizione attiva.</div>';
+    } else {
+      activeEl.innerHTML = active.map(function(idea){ return _oppPerfRow(idea, true); }).join('');
+    }
+  }
+
+  // Closed history
+  var closed = data.closed_ideas || [];
+  if(closedEl){
+    if(!closed.length){
+      closedEl.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:10px 0">Nessun trade chiuso ancora. Le idee vengono monitorate ogni ora.</div>';
+    } else {
+      closedEl.innerHTML = closed.map(function(idea){ return _oppPerfRow(idea, false); }).join('');
+    }
+  }
+}
+
+function _oppSetTxt(id, val, color){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = val;
+  if(color) el.style.color = color;
+}
+function _oppSetTxtColor(id, color){
+  var el = document.getElementById(id);
+  if(el) el.style.color = color;
+}
+
+function _oppPerfRow(idea, isActive){
+  var isLong   = idea.direction === 'LONG';
+  var dirColor = isLong ? '#10B981' : '#EF4444';
+  var pnl      = idea.pnl_pct !== null && idea.pnl_pct !== undefined ? parseFloat(idea.pnl_pct) : null;
+  var pnlTxt   = pnl !== null ? ((pnl>=0?'+':'')+pnl.toFixed(2)+'%') : '—';
+  var pnlColor = pnl !== null ? (pnl >= 0 ? '#10B981' : '#EF4444') : '#94A3B8';
+
+  var statusIcons = { hit_target:'✅', hit_stop:'🛑', expired:'⏱', active:'⏳' };
+  var statusIcon  = statusIcons[idea.status] || '';
+
+  var maxFav = idea.max_favorable_pct;
+  var maxFavTxt = (maxFav !== null && maxFav !== undefined)
+    ? 'Max: '+(maxFav>=0?'+':'')+parseFloat(maxFav).toFixed(1)+'%'
+    : '';
+
+  return '<div class="card" style="border-left:3px solid '+dirColor+';padding:11px 14px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+    +   '<div style="display:flex;align-items:center;gap:8px">'
+    +     statusIcon+' '
+    +     '<strong style="color:'+dirColor+'">'+_escHtml(idea.ticker)+'</strong>'
+    +     '<span style="font-size:10px;color:var(--t3)">'+_escHtml(idea.direction)+'</span>'
+    +   '</div>'
+    +   '<div style="text-align:right">'
+    +     '<div style="font-size:14px;font-weight:800;font-family:var(--fm);color:'+pnlColor+'">'+pnlTxt+'</div>'
+    +     (maxFavTxt ? '<div style="font-size:9px;color:var(--t3)">'+maxFavTxt+'</div>' : '')
+    +   '</div>'
+    + '</div>'
+    + (idea.outcome_note ? '<div style="font-size:11px;color:var(--t2);margin-top:6px">'+_escHtml(idea.outcome_note)+'</div>' : '')
+    + '<div style="font-size:10px;color:var(--t3);margin-top:4px">'
+    +   _escHtml(String(idea.rationale||'').slice(0,80))
+    +   (idea.created_at ? ' · '+idea.created_at.slice(0,10) : '')
+    + '</div>'
+    + (isActive ? '<button onclick="oppOpenAddModal('+(idea.id||0)+',\''+_escHtml(idea.ticker)+
+        '\',\''+_escHtml(idea.asset_name||'')+'\','+(idea.price_current||idea.price_at_generation||0)+
+        ',\''+(isLong?'10B981':'EF4444')+'\',\''+(isLong?'▲ LONG':'▼ SHORT')+'\')" '+
+        'style="margin-top:8px;font-size:10px;padding:3px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:var(--t2);cursor:pointer">+ Portafoglio</button>'
+      : '')
+    + '</div>';
+}
+
