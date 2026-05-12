@@ -69,7 +69,14 @@ CREATE TABLE IF NOT EXISTS trade_ideas (
     catalysts   TEXT DEFAULT '[]',   -- JSON array
     status      TEXT DEFAULT 'active',  -- active|expired|hit_target|hit_stop
     created_at  TEXT DEFAULT (datetime('now')),
-    expires_at  TEXT
+    expires_at  TEXT,
+    -- Performance tracking (Fase 4)
+    price_at_generation REAL,           -- market price when idea was created
+    price_current       REAL,           -- last checked price
+    pnl_pct             REAL,           -- current P&L %
+    max_favorable_pct   REAL,           -- best P&L seen
+    tracked_at          TEXT,           -- last price check
+    outcome_note        TEXT DEFAULT '' -- e.g. 'Hit target +4.2% in 3 days'
 );
 
 CREATE TABLE IF NOT EXISTS anomaly_alerts (
@@ -362,9 +369,11 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
     for idea in ideas:
         tk = idea["ticker"].upper()
         cur_price = price_map.get(tk)
-        if cur_price and not idea.get("entry_low"):
-            idea["entry_low"]  = round(cur_price * 0.995, 2)
-            idea["entry_high"] = round(cur_price * 1.005, 2)
+        if cur_price:
+            if not idea.get("entry_low"):
+                idea["entry_low"]  = round(cur_price * 0.995, 2)
+                idea["entry_high"] = round(cur_price * 1.005, 2)
+            idea["_gen_price"] = cur_price  # stored for performance tracking
 
     # Persist to DB
     expires_at = (datetime.utcnow() + timedelta(days=10)).isoformat()
@@ -386,8 +395,8 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
                    (event_id, event_title, event_category, event_severity,
                     ticker, asset_name, direction, entry_low, entry_high,
                     target_pct, stop_pct, timeframe, confidence, opp_score,
-                    rationale, risks, catalysts, expires_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    rationale, risks, catalysts, expires_at, price_at_generation)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     event_id,
                     event.get("title", "")[:200],
@@ -407,6 +416,7 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
                     json.dumps(idea.get("risks", [])),
                     json.dumps(idea.get("catalysts", [])),
                     expires_at,
+                    idea.get("_gen_price"),  # price_at_generation
                 )
             )
 
@@ -906,3 +916,321 @@ async def update_idea_status(
         )
         await db.commit()
     return {"success": True}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FASE 4 — PERFORMANCE TRACKER
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _migrate_performance_columns():
+    """Add performance columns to existing trade_ideas table if missing."""
+    cols = [
+        ("price_at_generation", "REAL"),
+        ("price_current",       "REAL"),
+        ("pnl_pct",             "REAL"),
+        ("max_favorable_pct",   "REAL"),
+        ("tracked_at",          "TEXT"),
+        ("outcome_note",        "TEXT DEFAULT ''"),
+    ]
+    async with aiosqlite.connect(settings.db_path) as db:
+        for col, definition in cols:
+            try:
+                await db.execute(f"ALTER TABLE trade_ideas ADD COLUMN {col} {definition}")
+                await db.commit()
+            except Exception:
+                pass  # column already exists
+
+
+async def run_performance_tracker() -> int:
+    """
+    Hourly job: check current prices for all active trade ideas.
+    Updates pnl_pct, max_favorable_pct, and status (hit_target / hit_stop / expired).
+    Returns count of ideas updated.
+    """
+    try:
+        await _migrate_performance_columns()
+
+        from scheduler import get_finance_cache
+        fin_cache = get_finance_cache() or []
+        price_map = {a["symbol"].upper(): a.get("price") for a in fin_cache if a.get("price")}
+
+        if not price_map:
+            return 0
+
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+
+            # Fetch all active ideas that have a generation price
+            async with db.execute(
+                """SELECT id, ticker, direction, target_pct, stop_pct,
+                          price_at_generation, entry_low, max_favorable_pct,
+                          created_at, expires_at
+                   FROM trade_ideas
+                   WHERE status='active'"""
+            ) as cur:
+                ideas = [dict(r) for r in await cur.fetchall()]
+
+            now = datetime.utcnow()
+            updated = 0
+
+            for idea in ideas:
+                tk = idea["ticker"].upper()
+                cur_price = price_map.get(tk)
+                if not cur_price:
+                    continue
+
+                # Reference price: price_at_generation if available, else entry midpoint
+                ref_price = idea.get("price_at_generation")
+                if not ref_price:
+                    lo = idea.get("entry_low")
+                    hi = idea.get("entry_high")
+                    if lo and hi:
+                        ref_price = (lo + hi) / 2
+                if not ref_price or ref_price <= 0:
+                    continue
+
+                # Calculate P&L from perspective of the trade direction
+                price_move_pct = (cur_price - ref_price) / ref_price * 100
+                if idea["direction"] == "SHORT":
+                    pnl_pct = -price_move_pct
+                else:
+                    pnl_pct = price_move_pct
+
+                # Track max favorable excursion
+                prev_max = idea.get("max_favorable_pct") or 0.0
+                max_fav = max(prev_max, pnl_pct)
+
+                # Determine new status
+                new_status = "active"
+                outcome_note = ""
+                target = idea.get("target_pct", 0) or 0
+                stop   = idea.get("stop_pct", 0)   or 0
+
+                days_old = (now - datetime.fromisoformat(
+                    idea["created_at"].replace("Z", "")
+                )).days if idea.get("created_at") else 0
+
+                if target and pnl_pct >= abs(target):
+                    new_status   = "hit_target"
+                    days_label   = f"{days_old}d" if days_old else "intraday"
+                    outcome_note = f"✅ Target raggiunto +{pnl_pct:.1f}% in {days_label}"
+                elif stop and pnl_pct <= -abs(stop):
+                    new_status   = "hit_stop"
+                    outcome_note = f"🛑 Stop loss -{abs(pnl_pct):.1f}% dopo {days_old}d"
+                elif idea.get("expires_at"):
+                    try:
+                        exp = datetime.fromisoformat(idea["expires_at"].replace("Z", ""))
+                        if now > exp:
+                            new_status   = "expired"
+                            outcome_note = f"⏱ Scaduta dopo {days_old}d. P&L finale: {pnl_pct:+.1f}%"
+                    except Exception:
+                        pass
+
+                # Update DB
+                await db.execute(
+                    """UPDATE trade_ideas SET
+                           price_current=?, pnl_pct=?, max_favorable_pct=?,
+                           tracked_at=?, status=?, outcome_note=?
+                       WHERE id=?""",
+                    (round(cur_price, 4), round(pnl_pct, 2), round(max_fav, 2),
+                     now.isoformat(), new_status, outcome_note, idea["id"])
+                )
+                updated += 1
+
+            if updated:
+                await db.commit()
+
+        if updated:
+            logger.info("Performance tracker: %d ideas updated", updated)
+        return updated
+
+    except Exception as e:
+        logger.error("run_performance_tracker: %s", e)
+        return 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FASE 4 — PERFORMANCE API ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/performance")
+async def get_performance_summary(user=Depends(require_user)):
+    """
+    Track record: aggregated stats on all closed ideas.
+    Shows hit rate, average P&L, best/worst trades.
+    """
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await _ensure_tables(db)
+        await _migrate_performance_columns()
+
+        # Closed ideas
+        async with db.execute(
+            """SELECT id, ticker, asset_name, direction, target_pct, stop_pct,
+                      pnl_pct, max_favorable_pct, opp_score, confidence,
+                      status, outcome_note, created_at, tracked_at,
+                      event_category, rationale
+               FROM trade_ideas
+               WHERE status IN ('hit_target','hit_stop','expired')
+               ORDER BY tracked_at DESC
+               LIMIT 50"""
+        ) as cur:
+            closed = [dict(r) for r in await cur.fetchall()]
+
+        # Active with live P&L
+        async with db.execute(
+            """SELECT id, ticker, asset_name, direction, target_pct, stop_pct,
+                      pnl_pct, max_favorable_pct, opp_score, confidence,
+                      status, outcome_note, created_at, tracked_at,
+                      event_category, rationale, price_at_generation, price_current
+               FROM trade_ideas
+               WHERE status='active'
+               ORDER BY pnl_pct DESC NULLS LAST
+               LIMIT 20"""
+        ) as cur:
+            active = [dict(r) for r in await cur.fetchall()]
+
+    # Compute stats
+    hits   = [x for x in closed if x["status"] == "hit_target"]
+    stops  = [x for x in closed if x["status"] == "hit_stop"]
+    total  = len(closed)
+    hit_rate = round(len(hits) / total * 100, 1) if total else 0
+
+    pnls = [x["pnl_pct"] for x in closed if x.get("pnl_pct") is not None]
+    avg_pnl   = round(sum(pnls) / len(pnls), 2) if pnls else 0
+    best_pnl  = round(max(pnls), 2) if pnls else 0
+    worst_pnl = round(min(pnls), 2) if pnls else 0
+
+    # Active P&L summary
+    active_pnls = [x["pnl_pct"] for x in active if x.get("pnl_pct") is not None]
+    active_avg  = round(sum(active_pnls) / len(active_pnls), 2) if active_pnls else 0
+    in_profit   = len([p for p in active_pnls if p > 0])
+
+    return {
+        "track_record": {
+            "total_closed":   total,
+            "hit_target":     len(hits),
+            "hit_stop":       len(stops),
+            "expired":        total - len(hits) - len(stops),
+            "hit_rate_pct":   hit_rate,
+            "avg_pnl_pct":    avg_pnl,
+            "best_pnl_pct":   best_pnl,
+            "worst_pnl_pct":  worst_pnl,
+        },
+        "active_summary": {
+            "count":         len(active),
+            "in_profit":     in_profit,
+            "avg_pnl_pct":   active_avg,
+        },
+        "closed_ideas":  closed,
+        "active_ideas":  active,
+    }
+
+
+@router.post("/ideas/{idea_id}/add-to-portfolio")
+async def idea_add_to_portfolio(
+    idea_id: int,
+    payload: dict = Body(...),
+    user=Depends(require_user),
+):
+    """
+    Fase 1: one-click add a trade idea to user's portfolio.
+    Receives: {portfolio_id, shares}
+    Creates the holding via finance_hub logic.
+    """
+    portfolio_id = payload.get("portfolio_id")
+    shares       = float(payload.get("shares", 1))
+
+    if not portfolio_id or shares <= 0:
+        from fastapi import HTTPException
+        raise HTTPException(400, "portfolio_id e shares richiesti")
+
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Fetch idea
+        async with db.execute(
+            "SELECT * FROM trade_ideas WHERE id=?", (idea_id,)
+        ) as cur:
+            idea = await cur.fetchone()
+        if not idea:
+            from fastapi import HTTPException
+            raise HTTPException(404, "Trade idea non trovata")
+        idea = dict(idea)
+
+        # Verify portfolio ownership
+        async with db.execute(
+            "SELECT id FROM etf_portfolios WHERE id=? AND user_id=?",
+            (portfolio_id, user["id"])
+        ) as cur:
+            port = await cur.fetchone()
+        if not port:
+            from fastapi import HTTPException
+            raise HTTPException(404, "Portafoglio non trovato")
+
+    # Determine entry price: midpoint of entry range or price_at_generation
+    entry_price = None
+    if idea.get("entry_low") and idea.get("entry_high"):
+        entry_price = round((idea["entry_low"] + idea["entry_high"]) / 2, 4)
+    elif idea.get("price_at_generation"):
+        entry_price = idea["price_at_generation"]
+    else:
+        from scheduler import get_finance_cache
+        fc = get_finance_cache() or []
+        pm = {a["symbol"].upper(): a.get("price") for a in fc}
+        entry_price = pm.get(idea["ticker"].upper(), 0) or 0
+
+    if not entry_price or entry_price <= 0:
+        from fastapi import HTTPException
+        raise HTTPException(400, "Prezzo entry non disponibile per questo ticker")
+
+    # Add holding via finance_hub
+    from routers.finance_hub import add_holding, HoldingCreate
+    holding_data = HoldingCreate(
+        ticker      = idea["ticker"],
+        name        = idea["asset_name"],
+        shares      = shares,
+        avg_price   = entry_price,
+        currency    = "USD",
+        asset_class = "equity",
+    )
+
+    try:
+        result = await add_holding(
+            pid  = portfolio_id,
+            data = holding_data,
+            user = user,
+        )
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(500, f"Errore aggiunta holding: {e}")
+
+    # Log the link between idea and portfolio holding
+    async with aiosqlite.connect(settings.db_path) as db:
+        await db.execute(
+            """CREATE TABLE IF NOT EXISTS idea_portfolio_links (
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               idea_id INTEGER NOT NULL,
+               portfolio_id INTEGER NOT NULL,
+               holding_id INTEGER,
+               user_id INTEGER NOT NULL,
+               shares REAL NOT NULL,
+               entry_price REAL NOT NULL,
+               linked_at TEXT DEFAULT (datetime('now'))
+            )"""
+        )
+        await db.execute(
+            "INSERT INTO idea_portfolio_links (idea_id,portfolio_id,holding_id,user_id,shares,entry_price) VALUES (?,?,?,?,?,?)",
+            (idea_id, portfolio_id, result.get("id"), user["id"], shares, entry_price)
+        )
+        await db.commit()
+
+    return {
+        "success":     True,
+        "holding_id":  result.get("id"),
+        "ticker":      idea["ticker"],
+        "shares":      shares,
+        "entry_price": entry_price,
+        "portfolio_id": portfolio_id,
+        "message":     f"{idea['ticker']} aggiunto al portafoglio a {entry_price:.2f}",
+    }
