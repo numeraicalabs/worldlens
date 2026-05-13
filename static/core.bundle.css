@@ -481,7 +481,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 .port-amt{font-size:10px;color:var(--t3);width:58px;text-align:right;flex-shrink:0}
 
 /* ─── ACHIEVEMENTS ─── */
-#view-gamification{flex-direction:column;overflow-y:auto;padding:18px;gap:14px;background:var(--bg0)}
+#view-gamification{flex-direction:column;overflow:hidden;background:var(--bg0)}
 .badge-card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r12);padding:12px;text-align:center;transition:all .2s}
 .badge-card.earned{border-color:rgba(139,92,246,.35);background:rgba(139,92,246,.08)}
 .badge-card:not(.earned){opacity:.45;filter:grayscale(.7)}
@@ -528,7 +528,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 .alcard.inactive{opacity:.5}
 
 /* ─── PROFILE ─── */
-#view-profile{flex-direction:column;overflow-y:auto;padding:18px;gap:12px;background:var(--bg0)}
+#view-profile{flex-direction:column;overflow:hidden;background:var(--bg0)}
 .prof-hdr{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r16);padding:18px}
 .pav-big{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0}
 .prof-name{font-family:var(--fh);font-size:18px;font-weight:700}
@@ -958,7 +958,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 ═══════════════════════════════════════ */
 #view-tradgentic{flex-direction:column;overflow-y:auto;padding:0;gap:0;background:var(--bg0)}
 #view-earlywarning, #view-supplychain {
-  flex-direction:column; overflow-y:auto; padding:18px; gap:14px; background:var(--bg0);
+  flex-direction:column; overflow:hidden; background:var(--bg0);
 }
 .ew-score-hero {
   background:linear-gradient(135deg,rgba(239,68,68,.1),rgba(249,115,22,.07));
@@ -7383,7 +7383,7 @@ body {
   }
 
   /* Profile */
-  #view-profile > div { padding: 12px 12px 80px !important; gap: 10px !important; }
+  #view-profile > div { padding: 12px 12px 80px !important; gap: 10px !important; -webkit-overflow-scrolling: touch !important; }
   .prof-hdr { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
   .pav-big { width: 48px !important; height: 48px !important; border-radius: 12px !important; font-size: 18px !important; }
   .prof-2col { grid-template-columns: 1fr !important; gap: 10px !important; }
@@ -7398,7 +7398,7 @@ body {
   #view-portfolio [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
 
   /* Early Warning */
-  #view-earlywarning > div { padding: 12px 12px 80px !important; gap: 10px !important; }
+  #view-earlywarning > div { padding: 12px 12px 80px !important; gap: 10px !important; -webkit-overflow-scrolling: touch !important; }
   #ew-gauges { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
   .pattern-grid { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
   .ew-signals-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
@@ -7409,7 +7409,7 @@ body {
   .sc-sector-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
 
   /* Gamification */
-  #view-gamification > div { padding: 12px 12px 80px !important; gap: 10px !important; }
+  #view-gamification > div { padding: 12px 12px 80px !important; gap: 10px !important; -webkit-overflow-scrolling: touch !important; }
   #view-gamification [style*="grid-template-columns: repeat(4"] { grid-template-columns: 1fr 1fr !important; }
   #view-gamification [style*="grid-template-columns: repeat(3"] { grid-template-columns: 1fr 1fr !important; }
 
@@ -7850,6 +7850,14 @@ body {
   /* All views proper padding for nav */
   #content > .view.on > div:first-child {
     padding-bottom: 80px !important;
+  }
+
+
+  /* Ensure all inner scroll containers work on iOS Safari */
+  .view > div[style*="overflow-y"] {
+    flex: 1 !important;
+    min-height: 0 !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   /* Landing page mobile */
@@ -10085,4 +10093,23 @@ body.landing-mode #landing {
 /* Landing page scroll fix — ensure smooth scroll on iOS */
 #landing {
   -webkit-overflow-scrolling: touch !important;
+}
+
+/* ── Mobile scroll fix: inner div containers in views ── */
+@media (max-width: 900px) {
+  /* Force proper scroll on iOS Safari for all view inner containers */
+  #view-profile > div,
+  #view-gamification > div,
+  #view-earlywarning > div,
+  #view-supplychain > div,
+  #view-alerts > div,
+  #view-macro > div,
+  #view-markets > div,
+  #view-ai > div {
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 80px !important;
+  }
 }
