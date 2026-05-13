@@ -1234,3 +1234,252 @@ async def idea_add_to_portfolio(
         "portfolio_id": portfolio_id,
         "message":     f"{idea['ticker']} aggiunto al portafoglio a {entry_price:.2f}",
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FASE 2 — PORTFOLIO RISK SCANNER
+# FASE 3 — OPPORTUNITY SCORE SUL PORTAFOGLIO
+# Single endpoint — same SQL join powers both
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/portfolio-analysis/{portfolio_id}")
+async def get_portfolio_analysis(
+    portfolio_id: int,
+    user=Depends(require_user),
+):
+    """
+    Fase 2 + 3 combined:
+
+    - Fase 2: Risk Scanner — for each holding checks active SHORT ideas
+      that conflict with the position (you hold LONG, idea says SHORT = risk)
+    - Fase 3: Opportunity Score — for each holding aggregates all active
+      idea scores, directions, and P&L to give a portfolio-level signal
+
+    Returns:
+      portfolio_score:    0-100 weighted opportunity score for the portfolio
+      risk_alerts:        list of conflict signals (holding vs idea direction)
+      holding_signals:    per-ticker breakdown with score, direction, ideas
+      summary:            one-line AI-free natural language summary
+    """
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await _ensure_tables(db)
+
+        # 1. Verify portfolio ownership and get holdings
+        async with db.execute(
+            """SELECT id FROM etf_portfolios WHERE id=? AND user_id=?""",
+            (portfolio_id, user["id"])
+        ) as cur:
+            if not await cur.fetchone():
+                from fastapi import HTTPException
+                raise HTTPException(404, "Portfolio non trovato")
+
+        async with db.execute(
+            """SELECT id, ticker, shares, avg_price, current_price,
+                      asset_class, name
+               FROM etf_holdings WHERE portfolio_id=?""",
+            (portfolio_id,)
+        ) as cur:
+            holdings = [dict(r) for r in await cur.fetchall()]
+
+        if not holdings:
+            return {
+                "portfolio_score": 0,
+                "risk_alerts": [],
+                "holding_signals": [],
+                "summary": "Nessuna posizione nel portafoglio.",
+            }
+
+        # 2. For each ticker get active trade ideas (single query)
+        tickers = list({h["ticker"].upper() for h in holdings})
+        placeholders = ",".join(["?" for _ in tickers])
+        async with db.execute(
+            f"""SELECT ticker, direction, opp_score, confidence,
+                       target_pct, stop_pct, pnl_pct, rationale,
+                       event_category, timeframe, id
+                FROM trade_ideas
+                WHERE UPPER(ticker) IN ({placeholders})
+                  AND status='active'
+                ORDER BY opp_score DESC""",
+            tickers
+        ) as cur:
+            all_ideas = [dict(r) for r in await cur.fetchall()]
+
+    # 3. Also check for anomaly alerts on these tickers
+    async with aiosqlite.connect(settings.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        p2 = ",".join(["?" for _ in tickers])
+        async with db.execute(
+            f"""SELECT ticker, alert_type, severity, title, detail, created_at
+                FROM anomaly_alerts
+                WHERE UPPER(ticker) IN ({p2})
+                  AND datetime(created_at) > datetime('now','-48 hours')
+                  AND acknowledged=0
+                ORDER BY created_at DESC""",
+            tickers
+        ) as cur:
+            anomalies = [dict(r) for r in await cur.fetchall()]
+
+    # 4. Build per-ticker signal map
+    ideas_by_ticker: Dict[str, list] = {}
+    for idea in all_ideas:
+        tk = idea["ticker"].upper()
+        ideas_by_ticker.setdefault(tk, []).append(idea)
+
+    anomalies_by_ticker: Dict[str, list] = {}
+    for a in anomalies:
+        tk = a["ticker"].upper()
+        anomalies_by_ticker.setdefault(tk, []).append(a)
+
+    # 5. Get current prices from finance_cache
+    from scheduler import get_finance_cache
+    fin_cache = get_finance_cache() or []
+    price_map = {a["symbol"].upper(): a.get("price") for a in fin_cache if a.get("price")}
+
+    # 6. Process each holding
+    holding_signals = []
+    risk_alerts = []
+    weighted_score_num = 0.0
+    weighted_score_den = 0.0
+
+    for h in holdings:
+        tk      = h["ticker"].upper()
+        ideas   = ideas_by_ticker.get(tk, [])
+        anoms   = anomalies_by_ticker.get(tk, [])
+
+        cur_price = price_map.get(tk) or h.get("current_price") or h["avg_price"]
+        position_value = float(h["shares"]) * float(cur_price or h["avg_price"])
+
+        # Holding direction is always LONG (you own it = bullish)
+        # Risk: any LONG holding with active SHORT trade idea = conflict
+        short_ideas = [i for i in ideas if i["direction"] == "SHORT"]
+        long_ideas  = [i for i in ideas if i["direction"] == "LONG"]
+
+        # Opportunity score for this ticker
+        if ideas:
+            best_score = max(i["opp_score"] for i in ideas)
+            # Penalize score if dominant direction conflicts with holding
+            dominant = "LONG" if len(long_ideas) >= len(short_ideas) else "SHORT"
+            if dominant == "SHORT":
+                # We're long but signal says short = risk, lower opportunity score
+                ticker_opp_score = max(0, best_score - 20)
+            else:
+                ticker_opp_score = best_score
+        else:
+            ticker_opp_score = 0
+
+        # Weight by position value for portfolio score
+        weighted_score_num += ticker_opp_score * position_value
+        weighted_score_den += position_value
+
+        # Build risk alerts for this holding
+        for idea in short_ideas:
+            risk_level = "high" if idea["opp_score"] >= 65 else "medium"
+            risk_alerts.append({
+                "ticker":       tk,
+                "asset_name":   h.get("name", tk),
+                "risk_level":   risk_level,
+                "conflict_type": "long_vs_short_signal",
+                "title":        f"⚠ {tk}: posizione LONG in conflitto con segnale SHORT",
+                "detail":       f"Hai {float(h['shares']):.2f} quote di {tk} (LONG) ma il segnale "
+                                f"(score {idea['opp_score']}) suggerisce SHORT. "
+                                f"Target: {idea.get('target_pct',0):.1f}% · Stop: {idea.get('stop_pct',0):.1f}%",
+                "idea_id":      idea["id"],
+                "opp_score":    idea["opp_score"],
+                "rationale":    idea.get("rationale", ""),
+                "timeframe":    idea.get("timeframe", ""),
+            })
+
+        # Anomaly-based risk
+        for anom in anoms:
+            if anom["severity"] == "high":
+                risk_alerts.append({
+                    "ticker":       tk,
+                    "asset_name":   h.get("name", tk),
+                    "risk_level":   "medium",
+                    "conflict_type": "anomaly_"+anom["alert_type"],
+                    "title":        anom["title"],
+                    "detail":       anom["detail"],
+                    "idea_id":      None,
+                    "opp_score":    0,
+                    "rationale":    "",
+                    "timeframe":    "",
+                })
+
+        # Compute live P&L for this holding
+        cost_basis = float(h["shares"]) * float(h["avg_price"])
+        pnl_pct = ((cur_price - float(h["avg_price"])) / float(h["avg_price"]) * 100
+                   if h["avg_price"] else 0)
+
+        holding_signals.append({
+            "ticker":         tk,
+            "asset_name":     h.get("name", tk),
+            "shares":         float(h["shares"]),
+            "avg_price":      float(h["avg_price"]),
+            "current_price":  round(cur_price, 4) if cur_price else None,
+            "position_value": round(position_value, 2),
+            "pnl_pct":        round(pnl_pct, 2),
+            "opp_score":      ticker_opp_score,
+            "ideas_count":    len(ideas),
+            "long_signals":   len(long_ideas),
+            "short_signals":  len(short_ideas),
+            "has_conflict":   len(short_ideas) > 0,
+            "has_anomaly":    len(anoms) > 0,
+            "best_long":      long_ideas[0] if long_ideas else None,
+            "best_short":     short_ideas[0] if short_ideas else None,
+            "anomalies":      anoms[:2],
+        })
+
+    # 7. Portfolio-level weighted opportunity score
+    portfolio_score = int(weighted_score_num / weighted_score_den) if weighted_score_den else 0
+
+    # 8. Natural language summary (no AI, rule-based)
+    n_conflicts = len([s for s in holding_signals if s["has_conflict"]])
+    n_anomalies = len([s for s in holding_signals if s["has_anomaly"]])
+    n_long_ok   = len([s for s in holding_signals if not s["has_conflict"] and s["long_signals"] > 0])
+    n_no_signal = len([s for s in holding_signals if s["ideas_count"] == 0])
+
+    summary_parts = []
+    if portfolio_score >= 65:
+        summary_parts.append(f"📈 Score opportunità elevato ({portfolio_score}/100)")
+    elif portfolio_score >= 40:
+        summary_parts.append(f"⚡ Score opportunità moderato ({portfolio_score}/100)")
+    else:
+        summary_parts.append(f"🔵 Score opportunità basso ({portfolio_score}/100)")
+
+    if n_conflicts:
+        summary_parts.append(
+            f"⚠ {n_conflicts} position{'i' if n_conflicts>1 else 'e'} "
+            f"in conflitto con segnali SHORT attivi"
+        )
+    if n_long_ok:
+        summary_parts.append(
+            f"✅ {n_long_ok} asset con segnali LONG allineati"
+        )
+    if n_anomalies:
+        summary_parts.append(
+            f"📊 {n_anomalies} anomalie di mercato rilevate nelle ultime 48h"
+        )
+    if n_no_signal:
+        summary_parts.append(
+            f"🔍 {n_no_signal} asset senza segnali recenti"
+        )
+
+    summary = " · ".join(summary_parts) if summary_parts else "Nessun segnale attivo al momento."
+
+    # Sort: conflicts first, then by score desc
+    holding_signals.sort(key=lambda x: (-int(x["has_conflict"]), -x["opp_score"]))
+    risk_alerts.sort(key=lambda x: (
+        {"high": 0, "medium": 1, "low": 2}.get(x["risk_level"], 3),
+        -x["opp_score"]
+    ))
+
+    return {
+        "portfolio_id":    portfolio_id,
+        "portfolio_score": portfolio_score,
+        "risk_alerts":     risk_alerts,
+        "holding_signals": holding_signals,
+        "summary":         summary,
+        "tickers_covered": len([s for s in holding_signals if s["ideas_count"] > 0]),
+        "total_holdings":  len(holdings),
+    }
