@@ -594,22 +594,54 @@ async def add_holding(pid: int, data: HoldingCreate, user=Depends(require_user))
         raise HTTPException(404, "Portfolio not found")
 
     # Auto-fill name from finance_cache if not provided
-    name = data.name
+    name = data.name or ""
     if not name:
         fc = await _db("SELECT name FROM finance_cache WHERE symbol=?",
                        (data.ticker.upper(),), fetchone=True)
-        name = fc["name"] if fc else data.ticker.upper()
+        name = (fc.get("name") if fc else None) or data.ticker.upper()
 
-    hid = await _db(
-        """INSERT INTO etf_holdings
-           (portfolio_id, isin, ticker, name, shares, avg_price, currency, asset_class)
-           VALUES (?,?,?,?,?,?,?,?)""",
-        (pid, "", data.ticker.upper(), name, data.shares,
-         data.avg_price, data.currency, data.asset_class),
-        lastrowid=True
-    )
-    return {"id": hid, "ticker": data.ticker.upper(), "shares": data.shares,
-            "avg_price": data.avg_price, "name": name}
+    # Ensure optional columns exist (safe migration for existing DBs)
+    async with aiosqlite.connect(settings.db_path) as _mdb:
+        for _col, _def in [
+            ("currency",     "TEXT DEFAULT 'USD'"),
+            ("asset_class",  "TEXT DEFAULT 'equity'"),
+            ("purchase_date","TEXT DEFAULT NULL"),
+        ]:
+            try:
+                await _mdb.execute(f"ALTER TABLE etf_holdings ADD COLUMN {_col} {_def}")
+                await _mdb.commit()
+            except Exception:
+                pass  # column already exists — OK
+
+    # Insert using direct aiosqlite to get reliable lastrowid
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                """INSERT INTO etf_holdings
+                   (portfolio_id, isin, ticker, name, shares, avg_price,
+                    currency, asset_class, purchase_date)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (pid, "", data.ticker.upper(), name, float(data.shares),
+                 float(data.avg_price), data.currency or "USD",
+                 data.asset_class or "equity",
+                 data.purchase_date or None)
+            ) as cur:
+                hid = cur.lastrowid
+            await db.commit()
+
+        if not hid:
+            raise HTTPException(500, "Insert failed: no lastrowid returned")
+
+        return {"id": hid, "ticker": data.ticker.upper(), "shares": data.shares,
+                "avg_price": data.avg_price, "name": name}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import traceback
+        logger.error("add_holding error: %s\n%s", exc, traceback.format_exc())
+        raise HTTPException(500, f"Errore inserimento posizione: {exc}")
 
 
 @router.put("/holdings/{hid}")
