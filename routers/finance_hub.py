@@ -491,39 +491,73 @@ async def list_portfolios(user=Depends(require_user)):
     for p in portfolios:
         pid = p["id"]
         currency = p.get("base_currency") or "EUR"
+        # Ensure icon/color have defaults if meta row is missing
+        p_safe = dict(p)
+        p_safe.setdefault("icon",  "💼")
+        p_safe.setdefault("color", "#7C3AED")
+        p_safe.setdefault("base_currency", "EUR")
         try:
             pnl = await calculate_portfolio_pnl(pid, currency)
             result.append({
-                **p,
-                "total_value": pnl["total_value"],
+                **p_safe,
+                "total_value":      pnl["total_value"],
                 "total_return_pct": pnl["total_return_pct"],
                 "today_return_pct": pnl["today_return_pct"],
-                "num_holdings": pnl["num_holdings"],
-                "ytd_return_pct": pnl.get("ytd_return_pct"),
+                "num_holdings":     pnl["num_holdings"],
+                "ytd_return_pct":   pnl.get("ytd_return_pct"),
             })
         except Exception as e:
             logger.debug("list_portfolios pnl %d: %s", pid, e)
-            result.append({**p, "total_value": 0, "total_return_pct": 0,
+            result.append({**p_safe, "total_value": 0, "total_return_pct": 0,
                             "today_return_pct": 0, "num_holdings": 0})
 
-    return {"portfolios": result, "count": len(result)}
+    # Return both formats for compatibility
+    return result  # JS handles both array and {portfolios:[...]}
 
 
 @router.post("/portfolios", status_code=201)
 async def create_portfolio(data: PortfolioCreate, user=Depends(require_user)):
-    pid = await _db(
-        "INSERT INTO etf_portfolios (user_id, name, strategy) VALUES (?,?,?)",
-        (user["id"], data.name, data.strategy), lastrowid=True
-    )
-    await _db(
-        """INSERT INTO etf_portfolios_meta
-           (portfolio_id, base_currency, benchmark_ticker, description, color, icon)
-           VALUES (?,?,?,?,?,?)""",
-        (pid, data.base_currency, data.benchmark_ticker,
-         data.description, data.color, data.icon)
-    )
-    return {"id": pid, "name": data.name, "strategy": data.strategy,
-            "base_currency": data.base_currency, "color": data.color, "icon": data.icon}
+    """Create portfolio + meta in a single transaction via direct aiosqlite."""
+    try:
+        async with aiosqlite.connect(settings.db_path) as db:
+            # Ensure meta table exists
+            await db.executescript("""
+                CREATE TABLE IF NOT EXISTS etf_portfolios_meta (
+                    portfolio_id    INTEGER PRIMARY KEY,
+                    base_currency   TEXT NOT NULL DEFAULT 'EUR',
+                    benchmark_ticker TEXT DEFAULT 'VWCE',
+                    description     TEXT DEFAULT '',
+                    color           TEXT DEFAULT '#7C3AED',
+                    icon            TEXT DEFAULT '💼',
+                    is_public       INTEGER DEFAULT 0,
+                    updated_at      TEXT DEFAULT (datetime('now')),
+                    FOREIGN KEY (portfolio_id) REFERENCES etf_portfolios(id)
+                );
+            """)
+            async with db.execute(
+                "INSERT INTO etf_portfolios (user_id, name, strategy) VALUES (?,?,?)",
+                (user["id"], data.name, data.strategy or "custom")
+            ) as cur:
+                pid = cur.lastrowid
+            if not pid:
+                raise HTTPException(500, "Portfolio insert failed")
+            await db.execute(
+                """INSERT OR REPLACE INTO etf_portfolios_meta
+                   (portfolio_id, base_currency, benchmark_ticker, description, color, icon)
+                   VALUES (?,?,?,?,?,?)""",
+                (pid, data.base_currency or "EUR", data.benchmark_ticker or "VWCE",
+                 data.description or "", data.color or "#7C3AED", data.icon or "💼")
+            )
+            await db.commit()
+        logger.info("Portfolio created: id=%d user=%d name=%s", pid, user["id"], data.name)
+        return {"id": pid, "name": data.name, "strategy": data.strategy,
+                "base_currency": data.base_currency, "color": data.color, "icon": data.icon}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import traceback
+        logger.error("create_portfolio error: %s\n%s", exc, traceback.format_exc())
+        raise HTTPException(500, f"Errore creazione portafoglio: {exc}")
 
 
 @router.put("/portfolios/{pid}")
