@@ -5176,31 +5176,56 @@ function runLabSim(type){
     return;
   }
 
-  // Build portfolio context
-  var port = _fhPortfolios.find(function(p){ return p.id===_fhCurrentPortfolioId; });
-  var holdingsSummary = '';
-  if(port && port.holdings && port.holdings.length){
-    holdingsSummary = port.holdings.map(function(h){
-      return h.ticker + ' (' + parseFloat(h.weight_pct||0).toFixed(0) + '%)';
-    }).join(', ');
-  }
 
-  var prompts = {
-    backtest: 'Fai un backtest storico del mio portafoglio negli ultimi 3 anni. Portafoglio: '+holdingsSummary+'. Calcola rendimento annualizzato stimato, volatilità, Sharpe ratio e Max Drawdown. Sii specifico con numeri.',
-    stress:   'Stress test del portafoglio: '+holdingsSummary+'. Se si verificasse una crisi tipo GFC 2008 o COVID-19, qual è l\'impatto stimato in % su ogni asset? Suggerisci 3 coperture concrete (hedge).',
-    optimize: 'Analizza questo portafoglio: '+holdingsSummary+'. Suggerisci un ribilanciamento concreto per massimizzare lo Sharpe ratio. Indica % target per ogni asset e 1-2 nuove posizioni da aggiungere.',
-  };
-
+  // Show loading immediately
   resultEl.style.display='block';
-  resultEl.innerHTML = '<div style="padding:16px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.7">'
-    +'⏳ Simulazione in corso con Jarvis AI…</div>';
+  resultEl.innerHTML = '<div style="padding:16px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.7">⏳ Caricamento contesto portafoglio…</div>';
 
-  rq('/api/brain/agent/ask',{method:'POST',body:{query:prompts[type], session_id:'lab_'+type}})
-    .then(function(r){
-      var ans = (r&&(r.answer||r.response||r.detail))||'Configura una chiave AI in Profilo → Impostazioni per utilizzare le simulazioni.';
-      resultEl.innerHTML = '<div style="padding:16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.75;white-space:pre-wrap">'+_esc(ans)+'</div>';
-    });
+  // Fetch fresh portfolio detail to get real holdings with weights/P&L
+  rq('/api/finance/portfolios/'+_fhCurrentPortfolioId).then(function(portDetail){
+    var holdings = (portDetail && portDetail.holdings) || [];
+    var portName = (portDetail && portDetail.name) || 'Portafoglio';
+    var currency = (portDetail && portDetail.base_currency) || 'EUR';
+    var totalVal = portDetail && portDetail.total_value ? fmtCurrency(portDetail.total_value, currency) : '—';
+    var retPct   = portDetail && portDetail.total_return_pct
+      ? (portDetail.total_return_pct >= 0 ? '+' : '') + parseFloat(portDetail.total_return_pct).toFixed(2) + '%' : '—';
+
+    var holdingsSummary = holdings.length
+      ? holdings.map(function(h){
+          return h.ticker
+            + ' (' + parseFloat(h.weight_pct||0).toFixed(0) + '%'
+            + ', avg ' + parseFloat(h.avg_price||0).toFixed(2)
+            + ', P&L ' + (parseFloat(h.return_pct||0)>=0?'+':'') + parseFloat(h.return_pct||0).toFixed(1) + '%)';
+        }).join(', ')
+      : 'Portafoglio vuoto';
+
+    var ctx = 'Portafoglio: ' + portName + ' | Valore: ' + totalVal + ' | Rendimento totale: ' + retPct + '\n'
+      + 'Posizioni: ' + holdingsSummary + '\n\n';
+
+    var prompts = {
+      backtest: ctx + 'Fai un backtest storico stimato di questo portafoglio negli ultimi 3 anni. Per ogni asset stima rendimento annualizzato, volatilità e contributo. Calcola Sharpe ratio e Max Drawdown del portafoglio complessivo. Sii specifico con numeri e percentuali.',
+      stress:   ctx + 'Esegui uno stress test. Simula: (1) crisi GFC 2008 -40% equity, (2) shock COVID-19, (3) rialzo Fed +300bp. Per ogni scenario indica % perdita stimata su ciascuna posizione e totale portafoglio. Suggerisci 3 strumenti concreti di copertura (hedge) con ticker specifici.',
+      optimize: ctx + 'Analizza e suggerisci un ribilanciamento per massimizzare lo Sharpe ratio. Indica % target per ogni asset, cosa ridurre/vendere, e 1-2 nuove posizioni da aggiungere con ticker e motivazione basata sul contesto macro attuale.',
+    };
+
+    resultEl.innerHTML = '<div style="padding:16px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.7">⏳ Analisi AI in corso… (15-30 secondi)</div>';
+
+    rq('/api/brain-agent/ask',{method:'POST',body:{query:prompts[type], session_id:'lab_fh_'+type}})
+      .then(function(r){
+        var ans = (r && (r.answer || r.response))
+          || (r && typeof r.detail === 'string' ? r.detail : null)
+          || 'Configura una chiave AI in Profilo → Impostazioni AI.';
+        resultEl.innerHTML =
+          '<div style="padding:16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.75;white-space:pre-wrap">' + _esc(ans) + '</div>'
+          + '<div style="display:flex;gap:8px;margin-top:10px">'
+          + '<button class="btn btn-g btn-sm" onclick="document.getElementById('fh-lab-result').style.display='none'">✕ Chiudi</button>'
+          + '<button class="btn btn-g btn-sm" onclick="runLabSim(''+type+'')" style="margin-left:auto">↻ Rigenera</button>'
+          + '</div>';
+      })
+      .catch(function(e){ resultEl.innerHTML='<div style="padding:12px;color:#F87171;font-size:12px">Errore: '+_esc(String(e))+'</div>'; });
+  });
 }
+
 
 /* ═══════════════════════════════════════
    MODALS — Portfolio
