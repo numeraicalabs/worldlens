@@ -4638,11 +4638,6 @@ function _tAgo(ts){
    FINANCE HUB — JavaScript
    ═══════════════════════════════════════════════════════════════ */
 
-var _fhCurrentPortfolioId = null;
-var _fhPortfolios = [];
-var _fhHistory = [];
-var _fhSelectedIcon = '💼';
-
 /* ── Tab switching ── */
 function fhTab(name, btn){
   document.querySelectorAll('.fh-tab').forEach(function(b){ b.classList.remove('on'); });
@@ -5215,17 +5210,20 @@ function runLabSim(type){
         var ans = (r && (r.answer || r.response))
           || (r && typeof r.detail === 'string' ? r.detail : null)
           || 'Configura una chiave AI in Profilo → Impostazioni AI.';
-        resultEl.innerHTML =
-          '<div style="padding:16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.75;white-space:pre-wrap">' + _esc(ans) + '</div>'
-          + '<div style="display:flex;gap:8px;margin-top:10px">'
-          + '<button class="btn btn-g btn-sm" onclick="document.getElementById('fh-lab-result').style.display='none'">✕ Chiudi</button>'
-          + '<button class="btn btn-g btn-sm" onclick="runLabSim(''+type+'')" style="margin-left:auto">↻ Rigenera</button>'
-          + '</div>';
+        resultEl.innerHTML = [
+          '<div style="padding:16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:10px;font-size:12px;color:var(--t2);line-height:1.75;white-space:pre-wrap">',
+          _esc(ans),
+          '</div>',
+          '<div style="display:flex;gap:8px;margin-top:10px">',
+          '<button class="btn btn-g btn-sm" onclick="var el=document.getElementById(&quot;fh-lab-result&quot;);if(el)el.style.display=&quot;none&quot;">&#x2715; Chiudi</button>',
+          '</div>'
+        ].join('');
       })
-      .catch(function(e){ resultEl.innerHTML='<div style="padding:12px;color:#F87171;font-size:12px">Errore: '+_esc(String(e))+'</div>'; });
+      .catch(function(e){
+        resultEl.innerHTML = '<div style="padding:12px;color:#F87171;font-size:12px">Errore AI: ' + _esc(String(e)) + '</div>';
+      });
   });
 }
-
 
 /* ═══════════════════════════════════════
    MODALS — Portfolio
