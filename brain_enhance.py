@@ -15,6 +15,7 @@ import logging
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Tuple
 
+from db import get_db
 import aiosqlite
 from config import settings
 
@@ -119,8 +120,7 @@ async def refresh_topic_summaries(user_id: int):
     if not ug and not ua:
         return  # no AI available
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_enhance_tables(db)
 
         # Get entry counts per topic for this user
@@ -149,8 +149,7 @@ async def refresh_topic_summaries(user_id: int):
     logger.info("Brain Layer2: refreshing %d topic summaries for user %d", len(to_refresh), user_id)
 
     for topic, count in to_refresh[:5]:  # cap per cycle
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             # Fetch top entries for this topic
             async with db.execute(
                 "SELECT content, source, weight, timestamp FROM brain_entries "
@@ -163,7 +162,7 @@ async def refresh_topic_summaries(user_id: int):
         if not summary:
             continue
 
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await ensure_enhance_tables(db)
             await db.execute(
                 "INSERT INTO brain_summaries (user_id, topic, summary, entry_count) "
@@ -179,8 +178,7 @@ async def refresh_topic_summaries(user_id: int):
 
 async def get_topic_summaries(user_id: int) -> Dict[str, str]:
     """Return cached topic summaries for a user."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_enhance_tables(db)
         async with db.execute(
             "SELECT topic, summary, entry_count, generated_at FROM brain_summaries "
@@ -233,8 +231,7 @@ async def explain_edge(
     edge_sig = f"{src_label}|{relation}|{tgt_label}"
 
     # Check cache first
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_enhance_tables(db)
         async with db.execute(
             "SELECT explanation FROM kg_edge_explanations WHERE edge_sig=?", (edge_sig,)
@@ -273,7 +270,7 @@ async def explain_edge(
             return None
 
         # Cache it
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await ensure_enhance_tables(db)
             await db.execute(
                 "INSERT OR REPLACE INTO kg_edge_explanations (edge_sig, explanation) VALUES (?,?)",
@@ -320,8 +317,7 @@ async def enrich_kg_edges_batch(limit: int = 10):
                 )
                 edges_to_explain = [dict(r) for r in rows]
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute(
                     """SELECT e.id, n1.label as src, e.relation, n2.label as tgt,
                               e.evidence_text, e.weight
@@ -342,8 +338,7 @@ async def enrich_kg_edges_batch(limit: int = 10):
     explained = 0
     for edge in edges_to_explain:
         sig = f"{edge['src']}|{edge['relation']}|{edge['tgt']}"
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             await ensure_enhance_tables(db)
             async with db.execute(
                 "SELECT id FROM kg_edge_explanations WHERE edge_sig=?", (sig,)
@@ -370,8 +365,7 @@ async def enrich_kg_edges_batch(limit: int = 10):
 
 async def get_edge_explanations_for_node(node_label: str) -> List[Dict]:
     """Get all cached explanations for edges connected to a node."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_enhance_tables(db)
         async with db.execute(
             "SELECT edge_sig, explanation FROM kg_edge_explanations "
@@ -491,8 +485,7 @@ async def check_new_kg_connections(user_id: int) -> List[Dict]:
                 )
                 new_connections = [dict(r) for r in rows]
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute(
                     """SELECT n1.label as src, e.relation, n2.label as tgt,
                               e.evidence_text, e.weight
@@ -533,8 +526,7 @@ async def run_proactive_digest(user_id: int):
     today = date.today().isoformat()
     digest_items = []
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_enhance_tables(db)
 
         # Check if we already generated today's digest for this user
@@ -549,8 +541,7 @@ async def run_proactive_digest(user_id: int):
         return  # already generated today
 
     # 1. Find top active topics in last 24h
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             """SELECT topic, COUNT(*) as cnt FROM brain_entries
                WHERE user_id=? AND datetime(timestamp) > datetime('now','-24 hours')
@@ -562,8 +553,7 @@ async def run_proactive_digest(user_id: int):
     # Generate topic digests
     for topic_row in active_topics:
         topic = topic_row["topic"]
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """SELECT content, source, weight FROM brain_entries
                    WHERE user_id=? AND topic=?
@@ -607,8 +597,7 @@ async def run_proactive_digest(user_id: int):
     # 3. Drift detection on top topics
     for topic_row in active_topics[:2]:
         topic = topic_row["topic"]
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """SELECT content FROM brain_entries WHERE user_id=? AND topic=?
                    AND datetime(timestamp) > datetime('now','-24 hours')
@@ -640,7 +629,7 @@ async def run_proactive_digest(user_id: int):
 
     # Save digest items
     if digest_items:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await ensure_enhance_tables(db)
             for item in digest_items:
                 await db.execute(
@@ -660,8 +649,7 @@ async def run_proactive_digest(user_id: int):
 
 async def get_digest_for_user(user_id: int, limit: int = 10) -> List[Dict]:
     """Get unread digest items for user, newest first."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_enhance_tables(db)
         async with db.execute(
             "SELECT * FROM brain_digest_items WHERE user_id=? "
@@ -673,7 +661,7 @@ async def get_digest_for_user(user_id: int, limit: int = 10) -> List[Dict]:
 
 async def mark_digest_read(user_id: int, item_id: int):
     """Mark a digest item as read."""
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await ensure_enhance_tables(db)
         await db.execute(
             "UPDATE brain_digest_items SET read=1 WHERE id=? AND user_id=?",

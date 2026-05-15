@@ -17,6 +17,7 @@ import re
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Tuple
 
+from db import get_db
 import aiosqlite
 from config import settings
 
@@ -63,7 +64,7 @@ async def _write_entry(
     """Write a single brain entry. Returns entry id or None."""
     tags_json = json.dumps(tags or [])
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             from routers.brain import BRAIN_SCHEMA
             await db.executescript(BRAIN_SCHEMA)
             # Avoid duplicate: same content snippet in last 24h
@@ -111,8 +112,7 @@ async def populate_brain_from_events(user_id: int = _SYSTEM_USER_ID) -> int:
     """
     written = 0
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """SELECT title, summary, ai_summary, category, country_name,
                           severity, source_url, timestamp
@@ -210,8 +210,7 @@ async def _get_kg_context_for_event(ev: Dict) -> str:
                         if r["description"]:
                             context_parts.append(f"• **{r['label']}** ({r['type']}): {r['description'][:150]}")
             else:
-                async with aiosqlite.connect(settings.db_path) as db:
-                    db.row_factory = aiosqlite.Row
+                async with get_db() as db:
                     async with db.execute(
                         "SELECT label, type, description FROM kg_nodes "
                         "WHERE label LIKE ? AND description != '' LIMIT 2",
@@ -232,8 +231,7 @@ async def populate_brain_from_macro(user_id: int = _SYSTEM_USER_ID) -> int:
     """Write brain entries for significant macro indicator changes."""
     written = 0
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """SELECT name, value, previous, unit, category, country, updated_at
                    FROM macro_indicators
@@ -335,7 +333,7 @@ async def generate_daily_digest(user_id: int = _SYSTEM_USER_ID) -> Optional[str]
 
     # Check if digest already generated today
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await _ensure_brain_tables_exist(db)
             async with db.execute(
                 "SELECT content FROM brain_digests WHERE user_id=? AND date=?",
@@ -348,8 +346,7 @@ async def generate_daily_digest(user_id: int = _SYSTEM_USER_ID) -> Optional[str]
         pass
 
     # Gather data for digest
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             """SELECT title, category, country_name, severity, timestamp
                FROM events
@@ -437,7 +434,7 @@ async def generate_daily_digest(user_id: int = _SYSTEM_USER_ID) -> Optional[str]
 
     # Save digest
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await _ensure_brain_tables_exist(db)
             await db.execute(
                 "INSERT OR REPLACE INTO brain_digests (user_id, date, content, ai_enhanced) "
@@ -477,8 +474,7 @@ async def _get_top_kg_nodes(limit: int = 8) -> List[Dict]:
                 )
                 return [dict(r) for r in rows]
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute(
                     "SELECT label, type, description, source_count FROM kg_nodes "
                     "ORDER BY source_count DESC LIMIT ?", (limit,)

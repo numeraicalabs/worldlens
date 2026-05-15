@@ -24,6 +24,7 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Any
 
+from db import get_db
 import aiosqlite
 from config import settings
 
@@ -393,8 +394,7 @@ async def _get_kg_connections_today() -> List[Dict]:
                        LIMIT 8""")
                 return [dict(r) for r in rows]
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute(
                     """SELECT n1.label as src, e.relation, n2.label as tgt,
                               e.weight, COALESCE(e.evidence_text,'') as evidence
@@ -423,7 +423,7 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
 
     today = date.today().isoformat()
 
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.executescript(CACHE_SCHEMA)
         await db.commit()
 
@@ -558,7 +558,7 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
             logger.warning("global_cache PG save: %s", _e)
     
     # Also save to SQLite as local cache
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.executescript(CACHE_SCHEMA)
         await db.execute(
             """INSERT OR REPLACE INTO global_cache
@@ -606,7 +606,7 @@ async def get_global_cache(force_refresh: bool = False) -> Optional[Dict]:
                         return d
             except Exception: pass
         # SQLite fallback
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await db.executescript(CACHE_SCHEMA)
             await db.commit()
             async with db.execute(
