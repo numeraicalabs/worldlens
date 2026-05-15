@@ -229,6 +229,203 @@ async def db_executemany(sql: str, params_list: List[Tuple]) -> None:
 # ── Schema management ──────────────────────────────────────────────────────────
 
 # Full unified schema — works on both Postgres and SQLite
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UNIFIED DB CONNECTION — routes to PG (Supabase) or SQLite transparently
+# Usage in routers:
+#   from db import get_db
+#   async with get_db() as db:
+#       rows = await db.fetchall("SELECT * FROM users WHERE id=?", (uid,))
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _PGCursor:
+    """Wraps asyncpg cursor to look like aiosqlite cursor."""
+    def __init__(self, rows, lastrowid=None):
+        self._rows = rows
+        self.lastrowid = lastrowid or 0
+        self.rowcount = len(rows) if rows else 0
+
+    async def fetchall(self):
+        return self._rows or []
+
+    async def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+    async def fetchval(self):
+        if self._rows and self._rows[0]:
+            vals = list(dict(self._rows[0]).values())
+            return vals[0] if vals else None
+        return None
+
+    def __aiter__(self):
+        self._idx = 0
+        return self
+
+    async def __anext__(self):
+        if self._idx >= len(self._rows or []):
+            raise StopAsyncIteration
+        row = self._rows[self._idx]
+        self._idx += 1
+        return row
+
+
+class _PGDb:
+    """Wraps asyncpg connection to be aiosqlite-compatible."""
+    def __init__(self, conn):
+        self._conn = conn
+        self.row_factory = None  # ignored, PG always returns dicts
+
+    def _adapt(self, sql: str) -> str:
+        return _sqlite_to_pg(sql)
+
+    async def execute(self, sql: str, params: tuple = ()):
+        pg_sql = self._adapt(sql)
+        verb = pg_sql.strip()[:6].upper()
+        try:
+            if verb in ("INSERT", "UPDATE", "DELETE"):
+                # Try RETURNING id for INSERT
+                if verb == "INSERT" and "RETURNING" not in pg_sql.upper():
+                    pg_sql_ret = pg_sql.rstrip(";") + " RETURNING id"
+                    try:
+                        row = await self._conn.fetchrow(pg_sql_ret, *params)
+                        lastrowid = row["id"] if row and "id" in row else 0
+                        return _PGCursor([], lastrowid)
+                    except Exception:
+                        pass
+                await self._conn.execute(pg_sql, *params)
+                return _PGCursor([])
+            else:
+                rows = await self._conn.fetch(pg_sql, *params)
+                dicts = [dict(r) for r in rows]
+                return _PGCursor(dicts)
+        except Exception as e:
+            logger.debug("_PGDb.execute [%s...]: %s", pg_sql[:60], e)
+            return _PGCursor([])
+
+    async def executemany(self, sql: str, params_list):
+        pg_sql = self._adapt(sql)
+        for params in params_list:
+            try:
+                await self._conn.execute(pg_sql, *params)
+            except Exception as e:
+                logger.debug("_PGDb.executemany: %s", e)
+
+    async def executescript(self, script: str):
+        stmts = [s.strip() for s in script.split(";") if s.strip()]
+        for stmt in stmts:
+            try:
+                await self._conn.execute(self._adapt(stmt))
+            except Exception as e:
+                msg = str(e).lower()
+                if "already exists" not in msg and "duplicate" not in msg:
+                    logger.debug("executescript stmt: %s", e)
+
+    async def commit(self):
+        pass  # asyncpg auto-commits in non-transaction mode
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        pass
+
+    def __aiter__(self):
+        raise NotImplementedError
+
+
+class _SQLiteCompat:
+    """Thin wrapper around aiosqlite that exposes the same interface."""
+    def __init__(self, path: str):
+        self._path = path
+        self._db = None
+
+    async def __aenter__(self):
+        import aiosqlite as _aiosqlite
+        self._db = await _aiosqlite.connect(self._path)
+        self._db.row_factory = _aiosqlite.Row
+        return _DBCompat(self._db)
+
+    async def __aexit__(self, *args):
+        if self._db:
+            await self._db.close()
+
+
+class _DBCompat:
+    """Unified cursor/execute interface backed by aiosqlite."""
+    def __init__(self, db):
+        self._db = db
+        self.row_factory = None
+
+    async def execute(self, sql: str, params: tuple = ()):
+        async with self._db.execute(sql, params) as cur:
+            import aiosqlite as _aiosqlite
+            self._db.row_factory = _aiosqlite.Row
+            rows = [dict(r) for r in await cur.fetchall()]
+            return _PGCursor(rows, cur.lastrowid)
+
+    async def executemany(self, sql: str, params_list):
+        await self._db.executemany(sql, params_list)
+
+    async def executescript(self, script: str):
+        await self._db.executescript(script)
+
+    async def commit(self):
+        await self._db.commit()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        pass
+
+
+class _get_db_ctx:
+    """
+    Async context manager returned by get_db().
+    Routes to Supabase PG when available, falls back to SQLite.
+    """
+    def __init__(self):
+        self._pg_ctx = None
+        self._sq_ctx = None
+        self._db = None
+
+    async def __aenter__(self):
+        pool = await _get_pg_pool()
+        if pool:
+            conn = await pool.acquire()
+            self._pg_ctx = conn
+            self._pool = pool
+            return _PGDb(conn)
+        else:
+            import aiosqlite as _aiosqlite
+            from config import settings as _settings
+            self._sq_ctx = await _aiosqlite.connect(_settings.db_path)
+            self._sq_ctx.row_factory = _aiosqlite.Row
+            return _DBCompat(self._sq_ctx)
+
+    async def __aexit__(self, *args):
+        if self._pg_ctx:
+            try:
+                await self._pool.release(self._pg_ctx)
+            except Exception:
+                pass
+        if self._sq_ctx:
+            try:
+                await self._sq_ctx.close()
+            except Exception:
+                pass
+
+
+def get_db() -> _get_db_ctx:
+    """
+    Usage:
+        async with get_db() as db:
+            result = await db.execute("SELECT * FROM users WHERE id=?", (uid,))
+            rows = await result.fetchall()
+    """
+    return _get_db_ctx()
+
+
 FULL_SCHEMA_PG = """
 CREATE TABLE IF NOT EXISTS users (
     id                  SERIAL PRIMARY KEY,
