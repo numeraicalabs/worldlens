@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import aiosqlite
+from db import get_db
 from fastapi import APIRouter, Query, Body, HTTPException, Depends
 from auth import get_current_user
 from fastapi.responses import JSONResponse
@@ -55,8 +56,7 @@ async def get_events(
         params.append(limit)
         params.append(offset)
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT *, CASE category "
                 "WHEN 'ECONOMICS' THEN 1.2 WHEN 'FINANCE' THEN 1.2 "
@@ -76,7 +76,7 @@ async def get_events(
 @router.get("/stats/summary")
 async def stats_summary():
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             async with db.execute("SELECT COUNT(*) FROM events") as c:
                 total = (await c.fetchone())[0]
             async with db.execute(
@@ -121,8 +121,7 @@ async def stats_summary():
 async def get_heatmap():
     """Country-level risk data for heatmap overlay."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT country_code, country_name, COUNT(*) as event_count, "
                 "AVG(severity) as avg_severity, MAX(severity) as max_severity, "
@@ -142,8 +141,7 @@ async def get_heatmap():
 async def get_region_risk(country_code: str):
     cc = country_code.upper()
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM region_risk WHERE country_code=? AND datetime(updated_at) > datetime('now','-1 hour')",
                 (cc,)
@@ -168,7 +166,7 @@ async def get_region_risk(country_code: str):
             "event_count": len(events),
         }
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute(
                     "INSERT OR REPLACE INTO region_risk (country_code,country_name,risk_score,trend,assessment,event_count) "
                     "VALUES (?,?,?,?,?,?)",
@@ -199,8 +197,7 @@ async def ai_ask(payload: dict = Body(...)):
 @router.post("/ai/score/{event_id}")
 async def score_event(event_id: str):
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
                 row = await c.fetchone()
         if not row:
@@ -208,7 +205,7 @@ async def score_event(event_id: str):
         ev = dict(row)
         score = await ai_score_event(ev["title"], ev.get("summary", ""), ev["category"])
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute(
                     "UPDATE events SET ai_summary=?, ai_impact_score=?, ai_market_note=?, ai_tags=? WHERE id=?",
                     (score.get("summary", ""), score.get("impact_score", 5.0),
@@ -228,8 +225,7 @@ async def score_event(event_id: str):
 @router.get("/macro/indicators")
 async def get_macro():
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT name, value, previous, unit, category, country, updated_at "
                 "FROM macro_indicators ORDER BY category, name"
@@ -245,8 +241,7 @@ async def get_macro():
 @router.get("/macro/briefing")
 async def get_macro_briefing():
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT * FROM macro_indicators") as c:
                 indicators = [dict(r) for r in await c.fetchall()]
             async with db.execute(
@@ -266,8 +261,7 @@ async def get_macro_briefing():
 async def analyze_sentiment(event_id: str):
     """Run sentiment analysis on an event and cache result."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
                 row = await c.fetchone()
         if not row:
@@ -288,7 +282,7 @@ async def analyze_sentiment(event_id: str):
         result = await ai_sentiment(ev["title"], ev.get("summary", ""), ev["category"])
 
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute(
                     "UPDATE events SET sentiment_score=?, sentiment_tone=?, "
                     "sentiment_intensity=?, sentiment_info_type=?, sentiment_entities=? WHERE id=?",
@@ -312,8 +306,7 @@ async def analyze_sentiment(event_id: str):
 async def show_impact(event_id: str):
     """Generate market impact analysis for an event."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
                 row = await c.fetchone()
         if not row:
@@ -335,7 +328,7 @@ async def show_impact(event_id: str):
         )
 
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute(
                     "UPDATE events SET show_impact_cache=? WHERE id=?",
                     (json.dumps(result), event_id)
@@ -356,8 +349,7 @@ async def show_impact(event_id: str):
 async def batch_sentiment(hours: int = 24, limit: int = 50):
     """Return pre-computed sentiment for recent events."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT id, sentiment_score, sentiment_tone, sentiment_intensity, "
                 "sentiment_info_type FROM events "
@@ -380,8 +372,7 @@ async def batch_sentiment(hours: int = 24, limit: int = 50):
 async def extract_entities(event_id: str):
     """Extract named entities (NER) for an event and cache result."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
                 row = await c.fetchone()
         if not row:
@@ -399,7 +390,7 @@ async def extract_entities(event_id: str):
         entities = await ai_ner(ev["title"], ev.get("summary",""), ev["category"])
 
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute("UPDATE events SET ner_entities=? WHERE id=?",
                                  (json.dumps(entities), event_id))
                 await db.commit()
@@ -420,8 +411,7 @@ async def get_event_relationships(event_id: str, hours: int = Query(72), limit: 
     Uses topic vector similarity + AI relationship classification.
     """
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
                 row = await c.fetchone()
             if not row:
@@ -452,7 +442,7 @@ async def get_event_relationships(event_id: str, hours: int = Query(72), limit: 
 
         try:
             rel_ids = [r["target_id"] for r in relationships]
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute(
                     "UPDATE events SET related_event_ids=?, relationship_types=? WHERE id=?",
                     (json.dumps(rel_ids), json.dumps(relationships), event_id)
@@ -475,8 +465,7 @@ async def get_graph_nodes(hours: int = Query(48), min_severity: float = Query(5.
     Used by the Knowledge Graph visualization on the map.
     """
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT id, title, category, severity, impact, country_code, country_name, "
                 "timestamp, latitude, longitude, sentiment_score, sentiment_tone, "
@@ -527,8 +516,7 @@ async def enrich_event(event_id: str):
     topic_vector → NER → sentiment → relationships (async, best-effort)
     """
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
                 row = await c.fetchone()
         if not row:
@@ -564,7 +552,7 @@ async def enrich_event(event_id: str):
         if results:
             sets = ", ".join(f"{k}=?" for k in results)
             try:
-                async with aiosqlite.connect(settings.db_path) as db:
+                async with get_db() as db:
                     await db.execute(f"UPDATE events SET {sets} WHERE id=?",
                                      list(results.values()) + [event_id])
                     await db.commit()
@@ -583,8 +571,7 @@ async def enrich_event(event_id: str):
 async def get_multidim_sentiment(event_id: str):
     """Return the full multi-dimensional sentiment object for an event."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT sentiment_score, sentiment_tone, sentiment_intensity, "
                 "sentiment_info_type, sentiment_entities, "
@@ -627,8 +614,7 @@ async def get_personalized_events(
     try:
         if not user:
             try:
-                async with aiosqlite.connect(settings.db_path) as db:
-                    db.row_factory = aiosqlite.Row
+                async with get_db() as db:
                     async with db.execute(
                         "SELECT * FROM events WHERE datetime(timestamp) > datetime('now',?) "
                         "ORDER BY severity DESC LIMIT ?",
@@ -641,8 +627,7 @@ async def get_personalized_events(
 
         uid = user["id"]
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
 
             async with db.execute("""
                 SELECT e.category, COUNT(*) as cnt
@@ -762,8 +747,7 @@ async def get_asset_drivers(
     Returns top 5 relevant events ordered by severity × recency.
     """
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             symbol_clean = symbol.upper().strip()
             async with db.execute("""
                 SELECT id, title, category, country_name, severity,
@@ -840,8 +824,7 @@ async def export_events_csv(
         where.append("severity >= ?"); params.append(min_severity)
         params.append(limit)
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 f"SELECT id,timestamp,title,summary,category,source,country_name,"
                 f"severity,impact,sentiment_tone,url,related_markets,source_count "
@@ -890,8 +873,7 @@ async def export_events_csv(
 @router.get("/{event_id}")
 async def get_event(event_id: str):
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
                 row = await c.fetchone()
         if not row:

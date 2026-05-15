@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import aiosqlite
+from db import get_db
 from fastapi import APIRouter, Depends, HTTPException, Body
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -34,8 +35,7 @@ async def get_asset(symbol: str):
 # ── Profile ──────────────────────────────────────────
 @user_router.get("/profile")
 async def get_profile(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT id,email,username,avatar_color,bio,timezone,notifications_enabled,"
             "onboarding_done,tutorial_done,interests,regions,market_prefs,experience_level,"
@@ -77,7 +77,7 @@ async def update_profile(payload: dict = Body(...), user=Depends(require_user)):
     if not updates:
         return {"status": "no changes"}
     sets = ", ".join(k + "=?" for k in updates)
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE users SET " + sets + " WHERE id=?",
             list(updates.values()) + [user["id"]]
@@ -93,7 +93,7 @@ async def complete_onboarding(payload: dict = Body(...), user=Depends(require_us
     regions = payload.get("regions", [])
     market_prefs = payload.get("market_prefs", [])
     experience = payload.get("experience_level", "beginner")
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE users SET onboarding_done=1, interests=?, regions=?, market_prefs=?, experience_level=? WHERE id=?",
             (json.dumps(interests), json.dumps(regions), json.dumps(market_prefs), experience, user["id"])
@@ -133,7 +133,7 @@ async def complete_onboarding(payload: dict = Body(...), user=Depends(require_us
 
 @user_router.post("/complete-tutorial")
 async def complete_tutorial(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute("UPDATE users SET tutorial_done=1 WHERE id=?", (user["id"],))
         await db.commit()
     return {"status": "ok"}
@@ -143,8 +143,7 @@ async def complete_tutorial(user=Depends(require_user)):
 @user_router.get("/watchlist")
 async def get_watchlist(user=Depends(require_user)):
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM watchlist WHERE user_id=? ORDER BY type, label", (user["id"],)
             ) as c:
@@ -155,7 +154,7 @@ async def get_watchlist(user=Depends(require_user)):
 
 @user_router.post("/watchlist")
 async def add_watchlist(item: WatchlistItem, user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "INSERT OR IGNORE INTO watchlist (user_id,type,value,label) VALUES (?,?,?,?)",
             (user["id"], item.type, item.value, item.label or item.value)
@@ -166,7 +165,7 @@ async def add_watchlist(item: WatchlistItem, user=Depends(require_user)):
 
 @user_router.delete("/watchlist/{item_id}")
 async def del_watchlist(item_id: int, user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute("DELETE FROM watchlist WHERE id=? AND user_id=?", (item_id, user["id"]))
         await db.commit()
     return {"status": "ok"}
@@ -174,8 +173,7 @@ async def del_watchlist(item_id: int, user=Depends(require_user)):
 
 @user_router.get("/watchlist/digest")
 async def watchlist_digest(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute("SELECT * FROM watchlist WHERE user_id=?", (user["id"],)) as c:
             items = [dict(r) for r in await c.fetchall()]
         codes = [i["value"] for i in items if i["type"] == "country"]
@@ -194,8 +192,7 @@ async def watchlist_digest(user=Depends(require_user)):
 @user_router.get("/alerts")
 async def get_alerts(user=Depends(require_user)):
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM alerts WHERE user_id=? ORDER BY created_at DESC", (user["id"],)
             ) as c:
@@ -206,7 +203,7 @@ async def get_alerts(user=Depends(require_user)):
 
 @user_router.post("/alerts")
 async def create_alert(alert: AlertCreate, user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "INSERT INTO alerts (user_id,title,condition,type) VALUES (?,?,?,?)",
             (user["id"], alert.title, alert.condition, alert.type)
@@ -217,7 +214,7 @@ async def create_alert(alert: AlertCreate, user=Depends(require_user)):
 
 @user_router.delete("/alerts/{alert_id}")
 async def del_alert(alert_id: int, user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute("DELETE FROM alerts WHERE id=? AND user_id=?", (alert_id, user["id"]))
         await db.commit()
     return {"status": "ok"}
@@ -225,7 +222,7 @@ async def del_alert(alert_id: int, user=Depends(require_user)):
 
 @user_router.put("/alerts/{alert_id}/toggle")
 async def toggle_alert(alert_id: int, user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE alerts SET active=CASE WHEN active=1 THEN 0 ELSE 1 END WHERE id=? AND user_id=?",
             (alert_id, user["id"])
@@ -249,7 +246,7 @@ async def save_user_ai_key(payload: dict = Body(...), user=Depends(require_user)
 
     col = "user_gemini_key" if provider == "gemini" else "user_anthropic_key"
 
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(f"UPDATE users SET {col}=? WHERE id=?", (key, user["id"]))
         await db.commit()
 
@@ -262,7 +259,7 @@ async def delete_user_ai_key(provider: str = "gemini", user=Depends(require_user
     if provider not in ("gemini", "claude", "anthropic"):
         return {"status": "error", "message": "Unknown provider"}
     col = "user_gemini_key" if provider == "gemini" else "user_anthropic_key"
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(f"UPDATE users SET {col}='' WHERE id=?", (user["id"],))
         await db.commit()
     return {"status": "ok"}
@@ -271,8 +268,7 @@ async def delete_user_ai_key(provider: str = "gemini", user=Depends(require_user
 @user_router.get("/ai-key/status")
 async def get_user_ai_key_status(user=Depends(require_user)):
     """Return which personal AI keys the user has configured (previews only — never full key)."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT user_gemini_key, user_anthropic_key FROM users WHERE id=?", (user["id"],)
         ) as cur:

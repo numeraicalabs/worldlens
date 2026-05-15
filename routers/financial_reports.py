@@ -20,6 +20,7 @@ from datetime import date, datetime
 from typing import Optional, List, Dict
 
 import aiosqlite
+from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException, BackgroundTasks
 from auth import require_user
 from config import settings
@@ -99,8 +100,7 @@ async def get_kg_context(
                     )
                 return [dict(r) for r in rows]
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 ph = ",".join("?" * len(node_types))
                 async with db.execute(
                     f"SELECT id, label, type, description, source_count FROM kg_nodes "
@@ -132,8 +132,7 @@ async def get_kg_edges_for_node(label: str, limit: int = 10) -> List[Dict]:
                 )
                 return [dict(r) for r in rows]
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute(
                     """SELECT e.relation, e.weight, e.evidence_text,
                               n1.label as src_label, n2.label as tgt_label
@@ -153,8 +152,7 @@ async def get_kg_edges_for_node(label: str, limit: int = 10) -> List[Dict]:
 async def get_recent_events(limit: int = 15, severity_min: float = 6.0) -> List[Dict]:
     """Get recent high-severity events from SQLite events table."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """SELECT title, summary, ai_summary, category, country_name,
                           severity, timestamp
@@ -173,8 +171,7 @@ async def get_recent_events(limit: int = 15, severity_min: float = 6.0) -> List[
 async def get_macro_indicators(limit: int = 15) -> List[Dict]:
     """Get current macro indicators."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT name, value, previous, unit, category, country, updated_at "
                 "FROM macro_indicators ORDER BY updated_at DESC LIMIT ?",
@@ -534,7 +531,7 @@ async def generate_report(
             async with pool.acquire() as conn:
                 kg_nodes = await conn.fetchval("SELECT COUNT(*) FROM kg_nodes") or 0
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 async with db.execute("SELECT COUNT(*) FROM kg_nodes") as c:
                     kg_nodes = (await c.fetchone())[0] or 0
     except Exception:

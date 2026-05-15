@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Optional, List
 
 import aiosqlite
+from db import get_db
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -76,7 +77,7 @@ class EmailRequest(BaseModel):
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 async def get_db():
-    return await aiosqlite.connect(settings.db_path)
+    return await get_db()
 
 
 def _row(cursor, row):
@@ -91,7 +92,7 @@ async def save_onboarding(
     data: dict,
     user=Depends(get_current_user)
 ):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE users SET onboarding_done=1 WHERE id=?",
             (user["id"],)
@@ -104,8 +105,7 @@ async def save_onboarding(
 
 @router.get("/portfolios")
 async def list_portfolios(user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT * FROM etf_portfolios WHERE user_id=? ORDER BY created_at",
             (user["id"],)
@@ -127,7 +127,7 @@ async def create_portfolio(
     data: PortfolioCreate,
     user=Depends(get_current_user)
 ):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         cur = await db.execute(
             "INSERT INTO etf_portfolios (user_id, name, strategy) VALUES (?,?,?)",
             (user["id"], data.name, data.strategy)
@@ -142,7 +142,7 @@ async def add_holding(
     data: HoldingCreate,
     user=Depends(get_current_user)
 ):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         async with db.execute(
             "SELECT id FROM etf_portfolios WHERE id=? AND user_id=?",
             (pid, user["id"])
@@ -161,7 +161,7 @@ async def add_holding(
 
 @router.delete("/holdings/{hid}")
 async def delete_holding(hid: int, user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "DELETE FROM etf_holdings WHERE id=? AND portfolio_id IN "
             "(SELECT id FROM etf_portfolios WHERE user_id=?)",
@@ -175,8 +175,7 @@ async def delete_holding(hid: int, user=Depends(get_current_user)):
 
 @router.get("/alerts")
 async def list_alerts(user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT * FROM etf_alerts WHERE user_id=? ORDER BY created_at DESC",
             (user["id"],)
@@ -186,7 +185,7 @@ async def list_alerts(user=Depends(get_current_user)):
 
 @router.post("/alerts", status_code=201)
 async def create_alert(data: AlertCreate, user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         cur = await db.execute(
             "INSERT INTO etf_alerts (user_id, etf_isin, etf_ticker, alert_type, "
             "threshold, current_price, channels) VALUES (?,?,?,?,?,?,?)",
@@ -199,7 +198,7 @@ async def create_alert(data: AlertCreate, user=Depends(get_current_user)):
 
 @router.patch("/alerts/{aid}")
 async def update_alert(aid: int, data: AlertUpdate, user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         if data.active is not None:
             await db.execute(
                 "UPDATE etf_alerts SET active=? WHERE id=? AND user_id=?",
@@ -217,7 +216,7 @@ async def update_alert(aid: int, data: AlertUpdate, user=Depends(get_current_use
 
 @router.delete("/alerts/{aid}")
 async def delete_alert(aid: int, user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "DELETE FROM etf_alerts WHERE id=? AND user_id=?",
             (aid, user["id"])
@@ -230,8 +229,7 @@ async def delete_alert(aid: int, user=Depends(get_current_user)):
 
 @router.get("/settings")
 async def get_settings(user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT key, value FROM etf_settings WHERE user_id=?",
             (user["id"],)
@@ -248,7 +246,7 @@ async def get_settings(user=Depends(get_current_user)):
 
 @router.put("/settings")
 async def save_settings(data: dict, user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         for key, value in data.items():
             v = json.dumps(value) if isinstance(value, (dict, list)) else str(value)
             await db.execute(
@@ -264,8 +262,7 @@ async def save_settings(data: dict, user=Depends(get_current_user)):
 
 @router.get("/community/posts")
 async def list_posts():
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT * FROM etf_community_posts ORDER BY created_at DESC LIMIT 50"
         ) as cur:
@@ -276,7 +273,7 @@ async def list_posts():
 async def create_post(data: PostCreate, user=Depends(get_current_user)):
     name = user.get("username") or user.get("email", "Utente")
     avatar = name[:2].upper()
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         cur = await db.execute(
             "INSERT INTO etf_community_posts (user_id, user_name, avatar, content, portfolio_snapshot) "
             "VALUES (?,?,?,?,?)",
@@ -287,14 +284,13 @@ async def create_post(data: PostCreate, user=Depends(get_current_user)):
         async with db.execute(
             "SELECT * FROM etf_community_posts WHERE id=?", (pid,)
         ) as cur2:
-            db.row_factory = aiosqlite.Row
             row = await cur2.fetchone()
             return dict(row) if row else {"id": pid}
 
 
 @router.post("/community/posts/{pid}/like")
 async def like_post(pid: int, user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE etf_community_posts SET likes=likes+1 WHERE id=?", (pid,)
         )
@@ -322,8 +318,7 @@ async def get_models():
 async def generate_report(req: ReportRequest, user=Depends(get_current_user)):
     """Generate a PDF or PPTX portfolio report."""
     # Fetch user's portfolios
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT * FROM etf_portfolios WHERE user_id=?", (user["id"],)
         ) as cur:
@@ -349,7 +344,7 @@ async def generate_report(req: ReportRequest, user=Depends(get_current_user)):
         filepath = _gen_pptx(username, holdings, total_value, invested, pl)
 
     if filepath:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             cur = await db.execute(
                 "INSERT INTO etf_reports (user_id, format, type, filepath) VALUES (?,?,?,?)",
                 (user["id"], req.format, req.type, str(filepath))
@@ -362,8 +357,7 @@ async def generate_report(req: ReportRequest, user=Depends(get_current_user)):
 
 @router.get("/reports/download/{rid}")
 async def download_report(rid: int, user=Depends(get_current_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT * FROM etf_reports WHERE id=? AND user_id=?", (rid, user["id"])
         ) as cur:
@@ -389,8 +383,7 @@ async def email_report(req: EmailRequest, user=Depends(get_current_user)):
     if not gen.get("id"):
         raise HTTPException(500, "Report generation failed")
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT * FROM etf_reports WHERE id=?", (gen["id"],)
         ) as cur:

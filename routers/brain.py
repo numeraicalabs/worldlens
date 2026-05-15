@@ -16,6 +16,7 @@ from typing import Optional, List, Dict, Any
 
 import aiosqlite
 from db import db_execute, db_fetchall, db_fetchone, db_fetchval
+from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException, BackgroundTasks
 from auth import require_user, require_admin
 from config import settings
@@ -153,7 +154,7 @@ async def brain_ingest(
 
     close_after = db is None
     if db is None:
-        db = await aiosqlite.connect(settings.db_path)
+        db = await get_db()
         await ensure_brain_tables(db)
 
     try:
@@ -208,8 +209,7 @@ async def brain_search(
     clean_query = " OR ".join(clean_query.split()[:8])  # FTS5 OR logic
 
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             await ensure_brain_tables(db)
 
             if source_filter:
@@ -301,7 +301,7 @@ async def feed_brain_batch(payload: dict = Body(...), user=Depends(require_user)
     """Ingest multiple entries at once."""
     entries = payload.get("entries", [])
     added = 0
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await ensure_brain_tables(db)
         for e in entries[:50]:  # cap at 50 per batch
             content = (e.get("content") or "").strip()
@@ -330,8 +330,7 @@ async def brain_stats(user=Depends(require_user)):
     """Per-user brain statistics."""
     uid = user["id"]
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             await ensure_brain_tables(db)
 
             # Total entries
@@ -402,7 +401,7 @@ def _brain_level(total: int) -> str:
 @router.delete("/reset")
 async def reset_brain(user=Depends(require_user)):
     """Clear the user's own brain."""
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await ensure_brain_tables(db)
         await db.execute("DELETE FROM brain_entries WHERE user_id=?", (user["id"],))
         await db.execute("DELETE FROM brain_sessions WHERE user_id=?", (user["id"],))
@@ -417,8 +416,7 @@ async def reset_brain(user=Depends(require_user)):
 @router.get("/admin/stats")
 async def admin_brain_stats(_=Depends(require_admin)):
     """Admin: global brain statistics across all users."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_brain_tables(db)
 
         async with db.execute("SELECT COUNT(*) as n FROM brain_entries") as c:
@@ -480,8 +478,7 @@ async def admin_inject_global(_=Depends(require_admin), payload: dict = Body(...
     if not content:
         raise HTTPException(400, "content required")
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_brain_tables(db)
         async with db.execute("SELECT id FROM users WHERE is_active=1") as c:
             user_ids = [r["id"] for r in await c.fetchall()]
@@ -498,7 +495,7 @@ async def admin_inject_global(_=Depends(require_admin), payload: dict = Body(...
 @router.delete("/admin/user/{user_id}")
 async def admin_reset_user_brain(user_id: int, _=Depends(require_admin)):
     """Admin: reset a specific user's brain."""
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await ensure_brain_tables(db)
         await db.execute("DELETE FROM brain_entries WHERE user_id=?", (user_id,))
         await db.execute("DELETE FROM brain_sessions WHERE user_id=?", (user_id,))
@@ -510,8 +507,7 @@ async def admin_reset_user_brain(user_id: int, _=Depends(require_admin)):
 @router.get("/admin/user/{user_id}/entries")
 async def admin_user_brain_entries(user_id: int, limit: int = 50, _=Depends(require_admin)):
     """Admin: read a user's brain entries."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_brain_tables(db)
         async with db.execute(
             "SELECT * FROM brain_entries WHERE user_id=? ORDER BY timestamp DESC LIMIT ?",
@@ -525,9 +521,47 @@ async def admin_user_brain_entries(user_id: int, limit: int = 50, _=Depends(requ
 
 @router.get("/summaries")
 async def get_summaries(user=Depends(require_user)):
-    """Layer 2: Get all cached topic summaries."""
+    """Layer 2: Get all cached topic summaries.
+    If brain is empty, return summaries derived from global events."""
     from brain_enhance import get_topic_summaries
-    return await get_topic_summaries(user["id"])
+    summaries = await get_topic_summaries(user["id"])
+    if summaries:
+        return summaries
+
+    # Brain is empty — build minimal summaries from global events DB
+    try:
+        import aiosqlite
+        from config import settings as _s
+        async with get_db() as _db:
+            async with _db.execute(
+                """SELECT category, COUNT(*) as cnt,
+                          GROUP_CONCAT(title, '|') as titles
+                   FROM events
+                   WHERE datetime(timestamp) > datetime('now','-7 days')
+                   GROUP BY category ORDER BY cnt DESC LIMIT 6"""
+            ) as _c:
+                rows = [dict(r) for r in await _c.fetchall()]
+
+        _topic_map = {
+            "ECONOMICS": "macro", "FINANCE": "finance",
+            "CONFLICT": "geopolitics", "GEOPOLITICS": "geopolitics",
+            "ENERGY": "energy", "TECHNOLOGY": "tech",
+            "POLITICS": "politics", "SECURITY": "security",
+        }
+        fallback = {}
+        for row in rows:
+            cat = row["category"]
+            topic = _topic_map.get(cat, cat.lower())
+            titles = [t for t in (row["titles"] or "").split("|") if t][:3]
+            if titles:
+                fallback[topic] = {
+                    "summary": "Attività recente: " + "; ".join(titles),
+                    "count": row["cnt"],
+                    "ts": "",
+                }
+        return fallback
+    except Exception:
+        return {}
 
 
 @router.post("/summaries/refresh")
@@ -581,8 +615,7 @@ async def get_kg_explanations(node: str = "", user=Depends(require_user)):
         explanations = await get_edge_explanations_for_node(node)
     else:
         # Return recent explanations
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT edge_sig, explanation, generated_at FROM kg_edge_explanations "
                 "ORDER BY generated_at DESC LIMIT 20"
@@ -599,8 +632,7 @@ async def get_digest(user=Depends(require_user)):
     user_id = user["id"]
     today = date.today().isoformat()
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM brain_digests WHERE user_id=? AND date=? LIMIT 1",
                 (user_id, today)
@@ -609,8 +641,7 @@ async def get_digest(user=Depends(require_user)):
             if row:
                 return dict(row)
         # Try system digest (user_id=1)
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM brain_digests WHERE user_id=1 AND date=? LIMIT 1",
                 (today,)

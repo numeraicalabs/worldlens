@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
 import aiosqlite
+from db import get_db
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Body, HTTPException, BackgroundTasks
 from auth import require_user, require_admin
 from config import settings
@@ -496,7 +497,7 @@ async def upsert_node(label: str, ntype: str, description: str = "",
             return row["id"] if row else None
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             cur = await db.execute(
                 """INSERT INTO kg_nodes (label, type, description, confidence, aliases)
                    VALUES (?,?,?,?,?)
@@ -542,7 +543,7 @@ async def upsert_edge(src_id: int, tgt_id: int, relation: str,
             return row["id"] if row else None
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             cur = await db.execute(
                 """INSERT INTO kg_edges (src_id, tgt_id, relation, evidence_text, weight)
                    VALUES (?,?,?,?,?)
@@ -620,7 +621,7 @@ async def ingest_extraction_result(result: Dict, upload_id: int) -> Tuple[int, i
                     nodes_added, edges_added, upload_id
                 )
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute(
                     "UPDATE kg_uploads SET nodes_added=nodes_added+?, edges_added=edges_added+? WHERE id=?",
                     (nodes_added, edges_added, upload_id)
@@ -679,7 +680,7 @@ async def _create_upload_record(user_id: int, filename: str, source_type: str, s
             )
             return row["id"]
     else:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             cur = await db.execute(
                 "INSERT INTO kg_uploads (user_id, filename, source_type, status) VALUES (?,?,?,?)",
                 (user_id, filename, source_type, status)
@@ -700,7 +701,7 @@ async def _finish_upload_record(upload_id: int, status: str, nodes: int, edges: 
                 status, nodes, edges, error[:500], upload_id
             )
     else:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await db.execute(
                 "UPDATE kg_uploads SET status=?, nodes_added=?, edges_added=?, "
                 "error_msg=?, completed_at=? WHERE id=?",
@@ -789,7 +790,7 @@ async def upload_file(
             upload_id = row["id"]
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             cur = await db.execute(
                 "INSERT INTO kg_uploads (user_id, filename, source_type, status) "
                 "VALUES (?,?,'processing',?)",
@@ -823,8 +824,7 @@ async def get_upload_status(upload_id: int, user=Depends(require_user)):
             return dict(row) if row else HTTPException(404, "Upload not found")
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM kg_uploads WHERE id=? AND user_id=?", (upload_id, user["id"])
             ) as c:
@@ -847,8 +847,7 @@ async def list_uploads(user=Depends(require_user)):
             return [dict(r) for r in rows]
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM kg_uploads WHERE user_id=? ORDER BY created_at DESC LIMIT 20",
                 (user["id"],)
@@ -893,8 +892,7 @@ async def list_nodes(
             return [dict(r) for r in rows]
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             if q:
                 sql = "SELECT n.*, un.weight as user_weight, un.bookmarked as user_bookmarked FROM kg_nodes n LEFT JOIN kg_user_nodes un ON un.node_id=n.id AND un.user_id=? WHERE n.label LIKE ?" + (" AND n.type=?" if ntype else "") + " ORDER BY n.source_count DESC LIMIT ?"
                 params = [user["id"], f"%{q}%"] + ([ntype] if ntype else []) + [limit]
@@ -948,8 +946,7 @@ async def get_neighbors(node_id: int, depth: int = 1, user=Depends(require_user)
             }
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT * FROM kg_nodes WHERE id=?", (node_id,)) as c:
                 node = await c.fetchone()
             if not node:
@@ -1012,8 +1009,7 @@ async def get_full_graph(limit: int = 1000, user=Depends(require_user)):
             }
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """SELECT n.*, COALESCE(un.weight,1) as user_weight,
                           COALESCE(un.bookmarked,0) as user_bookmarked
@@ -1054,7 +1050,7 @@ async def toggle_bookmark(node_id: int, user=Depends(require_user)):
             )
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await db.execute(
                 """INSERT INTO kg_user_nodes (user_id, node_id, bookmarked)
                    VALUES (?,?,1)
@@ -1088,8 +1084,7 @@ async def kg_stats(user=Depends(require_user)):
         }
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute("SELECT COUNT(*) as n FROM kg_nodes") as c: nodes = (await c.fetchone())["n"]
             async with db.execute("SELECT COUNT(*) as n FROM kg_edges") as c: edges = (await c.fetchone())["n"]
             async with db.execute("SELECT type, COUNT(*) as n FROM kg_nodes GROUP BY type ORDER BY n DESC") as c: by_type = [dict(r) for r in await c.fetchall()]
@@ -1128,7 +1123,7 @@ async def ingest_text(
             upload_id = row["id"]
     else:
         import aiosqlite
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             cur = await db.execute(
                 "INSERT INTO kg_uploads (user_id, filename, source_type, status) VALUES (?,'inline_text','text','processing')",
                 (user["id"],)
@@ -1303,8 +1298,7 @@ async def kg_status(_=Depends(require_user)):
                 e = await conn.fetchval("SELECT COUNT(*) FROM kg_edges")
             return {"ok": True, "backend": "postgresql", "nodes": n, "edges": e}
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute("SELECT COUNT(*) as n FROM kg_nodes") as c:
                     n = (await c.fetchone())["n"]
                 async with db.execute("SELECT COUNT(*) as n FROM kg_edges") as c:

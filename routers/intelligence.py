@@ -6,6 +6,7 @@ import logging
 import aiosqlite
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Optional
+from db import get_db
 from fastapi import APIRouter, Depends, Body, Query
 from auth import require_user
 from config import settings
@@ -270,8 +271,7 @@ async def get_early_warning(user=Depends(require_user)):
     """
     # Load user's personal AI key (takes priority over admin key)
     _ug, _ua = await _get_user_ai_keys(user["id"])
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
 
         # Check snapshot cache (valid for 30 min)
@@ -422,7 +422,7 @@ async def get_early_warning(user=Depends(require_user)):
     }
 
     # Cache snapshot
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await _ensure_tables(db)
         await db.execute(
             "INSERT OR REPLACE INTO ew_snapshots "
@@ -458,8 +458,7 @@ async def get_early_warning(user=Depends(require_user)):
 @router.get("/early-warning/timeline")
 async def get_ew_timeline():
     """Historical EW scores over last 7 days."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             "SELECT snapshot_date, global_ew_score, sentiment_trend, "
@@ -473,8 +472,7 @@ async def get_ew_timeline():
 @router.get("/early-warning/signals")
 async def get_active_signals():
     """Return currently active crisis signals."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         # Auto-generate signals from recent events
         async with db.execute(
@@ -541,7 +539,7 @@ async def get_active_signals():
 @router.post("/early-warning/refresh")
 async def refresh_early_warning(user=Depends(require_user)):
     """Force-invalidate the 30-min EW cache. Next GET will regenerate assessment."""
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await _ensure_tables(db)
         await db.execute("DELETE FROM ew_snapshots WHERE snapshot_date=?", (date.today().isoformat(),))
         await db.commit()
@@ -555,8 +553,7 @@ async def get_supply_chain():
     Global supply chain risk map with live risk levels per node.
     Correlates events with known chokepoints and critical nodes.
     """
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
@@ -685,8 +682,7 @@ async def get_sector_exposure():
         "Mining":            ["congo_cobalt", "spodumene", "redsea"],
     }
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') LIMIT 100"
@@ -728,8 +724,7 @@ async def get_sector_exposure():
 async def analyze_event_sc_impact(payload: dict = Body(...)):
     """Analyze a specific event's supply chain impact."""
     event_id = payload.get("event_id", "")
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as c:
             row = await c.fetchone()
     if not row:
@@ -827,8 +822,7 @@ async def macro_brief_endpoint(user=Depends(require_user)):
     try:
         ug, ua = await _get_user_ai_keys(user["id"])
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT id,title,summary,ai_summary,severity,country_name,category,timestamp "
                 "FROM events "
@@ -920,8 +914,7 @@ async def macro_brief_endpoint(user=Depends(require_user)):
 @router.get("/watchlist-digest")
 async def watchlist_digest_endpoint(user=Depends(require_user)):
     """Personalised digest for the AI Analyst page."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT label, value FROM user_watchlist WHERE user_id=? LIMIT 10",
             (user["id"],)
@@ -950,8 +943,7 @@ async def macro_narrative_endpoint(user=Depends(require_user)):
         ug, ua = await _get_user_ai_keys(user["id"])
         lang   = user.get("lang", "it")
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT name,value,previous,unit,country,updated_at "
                 "FROM macro_indicators ORDER BY updated_at DESC LIMIT 20"
@@ -1041,16 +1033,38 @@ async def get_dashboard_cache(user=Depends(require_user)):
     lang = user.get("lang", "it")
 
     cache = await get_global_cache()
-    if not cache:
-        return {"error": "Cache not yet generated", "retry_after": 30}
 
-    # If user has personal key and cache is rule-based, generate enhanced version
+    # If cache missing, generate immediately (rule-based, no AI needed)
+    if not cache:
+        try:
+            from global_cache import generate_global_cache
+            cache = await generate_global_cache(force=False)
+        except Exception:
+            pass
+
+    # Still nothing (DB empty, no events yet) — return minimal live data
+    if not cache:
+        from scheduler import get_finance_cache
+        fin = get_finance_cache() or []
+        return {
+            "top_events": [],
+            "macro_narrative": [],
+            "kg_connections": [],
+            "market_snapshot": fin[:5],
+            "ew_assessment": "",
+            "global_brief": "",
+            "ai_enhanced": False,
+            "_fallback": True,
+        }
+
+    # If user has personal key and cache is rule-based, enhance in background
     if (ug or ua) and not cache.get("ai_enhanced"):
         try:
             from global_cache import generate_global_cache
-            cache = await generate_global_cache(force=True)
+            import asyncio
+            asyncio.ensure_future(generate_global_cache(force=True))
         except Exception:
-            pass  # Use existing cache
+            pass  # Non-blocking — return existing cache immediately
 
     return cache
 

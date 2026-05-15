@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 import httpx
+from db import get_db
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
@@ -549,8 +550,7 @@ async def get_insider_alerts(days: int = Query(7)):
     # Get recent WorldLens events from DB
     alerts = []
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT id, title, category, timestamp, severity, related_markets "
                 "FROM events WHERE datetime(timestamp) > datetime('now',?) ORDER BY severity DESC LIMIT 50",

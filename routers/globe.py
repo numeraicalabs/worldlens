@@ -6,6 +6,7 @@ Provides real-time regional summaries, event heatmap data, and AI-generated
 from __future__ import annotations
 import json, logging, time
 from typing import List, Dict, Optional
+from db import get_db
 from fastapi import APIRouter
 import aiosqlite
 
@@ -163,7 +164,7 @@ async def get_region_summaries():
     # Re-load AI settings from DB on every call — ensures Gemini key saved
     # by admin is picked up without requiring a server restart.
     try:
-        async with aiosqlite.connect(settings.db_path) as _sdb:
+        async with get_db() as _sdb:
             async with _sdb.execute(
                 "SELECT key, value FROM app_settings WHERE key IN "
                 "('global_ai_provider','gemini_api_key','anthropic_api_key')"
@@ -176,8 +177,7 @@ async def get_region_summaries():
     except Exception:
         pass  # silently skip if DB not ready — stubs will show
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         results = []
         for name, cfg in REGIONS.items():
             events = await _get_region_events(db, cfg["codes"])
@@ -202,8 +202,7 @@ async def get_region_summaries():
 @router.get("/heatmap-points")
 async def get_heatmap_points():
     """Lat/lon event points for the 3D globe glow markers."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT latitude, longitude, severity, category, impact, title "
             "FROM events WHERE latitude IS NOT NULL AND longitude IS NOT NULL "
@@ -217,8 +216,7 @@ async def get_heatmap_points():
 @router.get("/stats")
 async def get_globe_stats():
     """Top-line stats for the globe header ticker."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT COUNT(*) as total, "
             "SUM(CASE WHEN impact='High' THEN 1 ELSE 0 END) as high, "
@@ -279,7 +277,7 @@ async def globe_debug():
 
     # Also check how many events are in DB
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             async with db.execute("SELECT COUNT(*) FROM events") as cur:
                 total = (await cur.fetchone())[0]
             async with db.execute(

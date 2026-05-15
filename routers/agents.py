@@ -5,6 +5,7 @@ Block A: enriched prompts, delta brief, threshold alerts, full profile persisten
 from __future__ import annotations
 import json, time, logging
 from typing import Optional, Dict, List
+from db import get_db
 from fastapi import APIRouter, Depends, Body
 import aiosqlite
 
@@ -138,8 +139,7 @@ _CACHE_TTL = 120
 
 async def _load_user_config(user_id: int, bot_id: str) -> Dict:
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT config_json FROM agent_configs WHERE user_id=? AND bot_id=?",
                 (user_id, bot_id)
@@ -156,7 +156,7 @@ async def _load_user_config(user_id: int, bot_id: str) -> Dict:
 
 async def _save_brief_history(user_id: int, bot_id: str, brief: Dict, event_count: int):
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await db.execute(
                 "INSERT INTO agent_brief_history (user_id, bot_id, brief_json, signal, event_count) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -175,8 +175,7 @@ async def _save_brief_history(user_id: int, bot_id: str, brief: Dict, event_coun
 
 async def _load_previous_brief(user_id: int, bot_id: str) -> Optional[Dict]:
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT brief_json, signal, event_count, created_at "
                 "FROM agent_brief_history WHERE user_id=? AND bot_id=? "
@@ -197,8 +196,7 @@ async def _load_previous_brief(user_id: int, bot_id: str) -> Optional[Dict]:
 
 async def _load_user_watchlist(user_id: int) -> List[Dict]:
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT type, value, label FROM watchlist WHERE user_id=? LIMIT 20",
                 (user_id,)
@@ -230,8 +228,7 @@ async def _get_bot_events(bot_id: str, config: Dict, limit: int = 15) -> List[Di
 
     placeholders = ",".join("?" * len(cats))
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 f"SELECT id, title, summary, category, country_name, country_code, "
                 f"severity, impact, timestamp, source, sentiment_tone "
@@ -473,8 +470,7 @@ async def _generate_brief(
 @router.get("/config")
 async def get_all_configs(user=Depends(require_user)):
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT bot_id, config_json FROM agent_configs WHERE user_id=?",
                 (user["id"],)
@@ -516,7 +512,7 @@ async def save_bot_config(bot_id: str, payload: dict = Body(...), user=Depends(r
         "custom_notes":       str(payload.get("custom_notes") or "")[:500],
     }
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO agent_configs "
                 "(user_id, bot_id, config_json, updated_at) VALUES (?, ?, ?, datetime('now'))",
@@ -597,8 +593,7 @@ async def get_brief_history(bot_id: str, limit: int = 7, user=Depends(require_us
     if bot_id not in DEFAULT_BOTS:
         return {"error": "Unknown bot"}
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT signal, event_count, created_at FROM agent_brief_history "
                 "WHERE user_id=? AND bot_id=? ORDER BY created_at DESC LIMIT ?",
@@ -616,7 +611,7 @@ async def reset_bot_config(bot_id: str, user=Depends(require_user)):
     if bot_id not in DEFAULT_BOTS:
         return {"error": "Unknown bot"}
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await db.execute(
                 "DELETE FROM agent_configs WHERE user_id=? AND bot_id=?",
                 (user["id"], bot_id)
@@ -702,8 +697,7 @@ async def bot_debate(user=Depends(require_user)):
     """
     # Pick the single highest-severity event in the last 24h
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
                 "ORDER BY severity DESC LIMIT 1"
@@ -771,8 +765,7 @@ async def _update_streak(user_id: int):
     from datetime import date, timedelta
     today = date.today().isoformat()
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM agent_streaks WHERE user_id=?", (user_id,)
             ) as cur:
@@ -827,8 +820,7 @@ async def _update_streak(user_id: int):
 async def get_streak(user=Depends(require_user)):
     """Return current streak stats for the user."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM agent_streaks WHERE user_id=?", (user["id"],)
             ) as cur:
@@ -875,8 +867,7 @@ async def use_streak_freeze(user=Depends(require_user)):
     from datetime import date, timedelta
     today = date.today().isoformat()
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM agent_streaks WHERE user_id=?", (user["id"],)
             ) as cur:
@@ -894,7 +885,7 @@ async def use_streak_freeze(user=Depends(require_user)):
             if days_ago < 7:
                 return {"error": f"Freeze available in {7 - days_ago} day(s)"}
 
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await db.execute(
                 "UPDATE agent_streaks SET streak_frozen=1, freeze_used_date=? WHERE user_id=?",
                 (today, user["id"])
@@ -929,8 +920,7 @@ async def get_prediction(bot_id: str, user=Depends(require_user)):
 
     week = _week_key()
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM agent_predictions WHERE user_id=? AND bot_id=? AND week_key=?",
                 (user["id"], bot_id, week)
@@ -952,7 +942,7 @@ async def get_prediction(bot_id: str, user=Depends(require_user)):
 
         prediction = await _generate_prediction(bot_id, config, events)
         if prediction:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute(
                     "INSERT OR REPLACE INTO agent_predictions "
                     "(user_id, bot_id, week_key, prediction_json) VALUES (?, ?, ?, ?)",
@@ -976,8 +966,7 @@ async def get_all_predictions(user=Depends(require_user)):
         if not config.get("enabled", True):
             continue
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute(
                     "SELECT * FROM agent_predictions WHERE user_id=? AND bot_id=? AND week_key=?",
                     (user["id"], bot_id, week)
@@ -995,7 +984,7 @@ async def get_all_predictions(user=Depends(require_user)):
                 events = await _get_bot_events(bot_id, config, limit=10)
                 pred   = await _generate_prediction(bot_id, config, events)
                 if pred:
-                    async with aiosqlite.connect(settings.db_path) as db:
+                    async with get_db() as db:
                         await db.execute(
                             "INSERT OR REPLACE INTO agent_predictions "
                             "(user_id, bot_id, week_key, prediction_json) VALUES (?, ?, ?, ?)",
@@ -1063,8 +1052,7 @@ async def verify_prediction(bot_id: str, week_key: str, user=Depends(require_use
     if bot_id not in DEFAULT_BOTS:
         return {"error": "Unknown bot"}
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT * FROM agent_predictions WHERE user_id=? AND bot_id=? AND week_key=?",
                 (user["id"], bot_id, week_key)
@@ -1085,7 +1073,7 @@ async def verify_prediction(bot_id: str, week_key: str, user=Depends(require_use
 
         verify = await _verify_prediction_ai(bot_id, prediction, events)
 
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await db.execute(
                 "UPDATE agent_predictions SET verify_json=?, verify_ts=datetime('now'), "
                 "accuracy_score=? WHERE user_id=? AND bot_id=? AND week_key=?",
@@ -1135,8 +1123,7 @@ async def get_bot_accuracy(bot_id: str, user=Depends(require_user)):
     if bot_id not in DEFAULT_BOTS:
         return {"error": "Unknown bot"}
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT week_key, prediction_json, verify_json, accuracy_score "
                 "FROM agent_predictions "
@@ -1178,8 +1165,7 @@ async def get_daily_digest(bot_id: str, user=Depends(require_user)):
     today = date.today().isoformat()
 
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT sent_at FROM agent_digest_log WHERE user_id=? AND bot_id=? AND digest_date=?",
                 (user["id"], bot_id, today)
@@ -1194,7 +1180,7 @@ async def get_daily_digest(bot_id: str, user=Depends(require_user)):
 
         # Mark as sent
         if not sent:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute(
                     "INSERT OR IGNORE INTO agent_digest_log (user_id, bot_id, digest_date) "
                     "VALUES (?, ?, ?)",

@@ -33,6 +33,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import aiosqlite
+from db import get_db
 from fastapi import APIRouter, Depends, Query, Body
 
 from auth import require_user
@@ -331,8 +332,7 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
     if not event_id:
         return None
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
 
         # Skip already processed unless forced
@@ -378,8 +378,7 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
     # Persist to DB
     expires_at = (datetime.utcnow() + timedelta(days=10)).isoformat()
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
 
         # Save opportunity score
@@ -445,8 +444,7 @@ async def run_opportunity_pipeline(lookback_hours: int = 4) -> int:
     Returns count of new ideas created.
     """
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """SELECT id, title, category, severity, ai_impact_score,
                           ai_summary, summary, impact, country_name, country_code
@@ -604,8 +602,7 @@ async def run_anomaly_scan() -> int:
 
         # ── Dedup and persist ─────────────────────────────────────────────────
         saved = 0
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             await _ensure_tables(db)
 
             for alert in new_alerts:
@@ -692,8 +689,7 @@ async def get_trade_ideas(
     user=Depends(require_user),
 ):
     """Return latest trade ideas, optionally filtered."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
 
         filters = ["status=?", "opp_score>=?"]
@@ -731,8 +727,7 @@ async def get_trade_ideas(
 @router.get("/ideas/top")
 async def get_top_ideas(user=Depends(require_user)):
     """Top 5 high-confidence ideas for dashboard widget."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             """SELECT ticker, asset_name, direction, target_pct, confidence,
@@ -749,8 +744,7 @@ async def get_top_ideas(user=Depends(require_user)):
 @router.get("/score/{event_id}")
 async def get_event_score(event_id: str, user=Depends(require_user)):
     """Get opportunity score and ideas for a specific event."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
 
         async with db.execute(
@@ -781,8 +775,7 @@ async def get_event_score(event_id: str, user=Depends(require_user)):
 @router.post("/score/{event_id}/generate")
 async def generate_ideas_for_event(event_id: str, user=Depends(require_user)):
     """Manually trigger idea generation for a specific event."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute("SELECT * FROM events WHERE id=?", (event_id,)) as cur:
             ev = await cur.fetchone()
 
@@ -804,8 +797,7 @@ async def get_anomaly_alerts(
     user=Depends(require_user),
 ):
     """Return recent anomaly alerts."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
 
         conditions = []
@@ -832,7 +824,7 @@ async def get_anomaly_alerts(
 @router.post("/anomalies/{alert_id}/ack")
 async def acknowledge_alert(alert_id: int, user=Depends(require_user)):
     """Mark anomaly alert as acknowledged."""
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE anomaly_alerts SET acknowledged=1 WHERE id=?", (alert_id,)
         )
@@ -846,8 +838,7 @@ async def get_opportunity_dashboard(user=Depends(require_user)):
     Aggregated dashboard: top ideas + anomaly summary + pipeline stats.
     Single endpoint for the frontend widget.
     """
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
 
         # Top ideas
@@ -910,7 +901,7 @@ async def update_idea_status(
     if new_status not in ("active", "expired", "hit_target", "hit_stop"):
         from fastapi import HTTPException
         raise HTTPException(400, "Invalid status")
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE trade_ideas SET status=? WHERE id=?", (new_status, idea_id)
         )
@@ -932,7 +923,7 @@ async def _migrate_performance_columns():
         ("tracked_at",          "TEXT"),
         ("outcome_note",        "TEXT DEFAULT ''"),
     ]
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         for col, definition in cols:
             try:
                 await db.execute(f"ALTER TABLE trade_ideas ADD COLUMN {col} {definition}")
@@ -957,8 +948,7 @@ async def run_performance_tracker() -> int:
         if not price_map:
             return 0
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
 
             # Fetch all active ideas that have a generation price
             async with db.execute(
@@ -1059,8 +1049,7 @@ async def get_performance_summary(user=Depends(require_user)):
     Track record: aggregated stats on all closed ideas.
     Shows hit rate, average P&L, best/worst trades.
     """
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         await _migrate_performance_columns()
 
@@ -1145,8 +1134,7 @@ async def idea_add_to_portfolio(
         from fastapi import HTTPException
         raise HTTPException(400, "portfolio_id e shares richiesti")
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
 
         # Fetch idea
         async with db.execute(
@@ -1206,7 +1194,7 @@ async def idea_add_to_portfolio(
         raise HTTPException(500, f"Errore aggiunta holding: {e}")
 
     # Log the link between idea and portfolio holding
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             """CREATE TABLE IF NOT EXISTS idea_portfolio_links (
                id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1261,8 +1249,7 @@ async def get_portfolio_analysis(
       holding_signals:    per-ticker breakdown with score, direction, ideas
       summary:            one-line AI-free natural language summary
     """
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
 
         # 1. Verify portfolio ownership and get holdings
@@ -1306,8 +1293,7 @@ async def get_portfolio_analysis(
             all_ideas = [dict(r) for r in await cur.fetchall()]
 
     # 3. Also check for anomaly alerts on these tickers
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         p2 = ",".join(["?" for _ in tickers])
         async with db.execute(
             f"""SELECT ticker, alert_type, severity, title, detail, created_at

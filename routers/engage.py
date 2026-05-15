@@ -6,6 +6,7 @@ import logging
 import aiosqlite
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict
+from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
@@ -113,8 +114,7 @@ async def get_daily_insight(user=Depends(require_user)):
     # Load user's personal AI key first
     _ug, _ua = await _get_user_ai_keys(user["id"])
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             await _ensure_tables(db)
             # Return cached insight if exists
             async with db.execute(
@@ -199,7 +199,7 @@ async def get_daily_insight(user=Depends(require_user)):
 
         # Cache it (best effort)
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
+            async with get_db() as db:
                 await db.execute(
                     "INSERT OR REPLACE INTO daily_insights (user_id, date, insight) VALUES (?,?,?)",
                     (user["id"], today, text)
@@ -235,8 +235,7 @@ async def get_daily_insight(user=Depends(require_user)):
 @router.get("/missions/today")
 async def get_today_missions(user=Depends(require_user)):
     today = date.today().isoformat()
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             "SELECT * FROM daily_missions WHERE user_id=? AND date=?", (user["id"], today)
@@ -269,8 +268,7 @@ async def get_today_missions(user=Depends(require_user)):
 @router.post("/missions/complete/{mission_id}")
 async def complete_mission(mission_id: str, user=Depends(require_user)):
     today = date.today().isoformat()
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             "SELECT * FROM daily_missions WHERE user_id=? AND date=? AND mission_id=?",
@@ -302,7 +300,7 @@ async def complete_mission(mission_id: str, user=Depends(require_user)):
     bonus = 0
     if remaining == 0:
         bonus = 50  # Bonus for completing all missions
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             await db.execute("UPDATE user_xp SET xp=xp+50 WHERE user_id=?", (user["id"],))
             await db.commit()
     return {"status": "completed", "xp": xp, "all_done_bonus": bonus, "remaining": remaining}
@@ -311,8 +309,7 @@ async def complete_mission(mission_id: str, user=Depends(require_user)):
 # ── Predictions ───────────────────────────────────────
 @router.get("/predictions")
 async def get_predictions(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             "SELECT * FROM predictions WHERE user_id=? ORDER BY created_at DESC LIMIT 20",
@@ -343,7 +340,7 @@ async def create_prediction(payload: dict = Body(...), user=Depends(require_user
     question = "Will " + asset + " go " + direction + " due to: " + event_title[:80] + "?"
     resolves_at = (datetime.utcnow() + timedelta(hours=24)).isoformat()
 
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await _ensure_tables(db)
         await db.execute(
             "INSERT INTO predictions (user_id,question,event_id,event_title,direction,asset,resolves_at) VALUES (?,?,?,?,?,?,?)",
@@ -358,8 +355,7 @@ async def create_prediction(payload: dict = Body(...), user=Depends(require_user
 async def resolve_prediction(pred_id: int, payload: dict = Body(...), user=Depends(require_user)):
     """Auto-resolve: compare prediction direction against actual market move."""
     actual_change = payload.get("actual_change", 0.0)  # % change of the asset
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             "SELECT * FROM predictions WHERE id=? AND user_id=?", (pred_id, user["id"])
@@ -388,8 +384,7 @@ async def resolve_prediction(pred_id: int, payload: dict = Body(...), user=Depen
 @router.get("/weekly-report")
 async def get_weekly_report(user=Depends(require_user)):
     week_start = (date.today() - timedelta(days=date.today().weekday())).isoformat()
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             "SELECT * FROM weekly_reports WHERE user_id=? AND week_start=?",
@@ -472,7 +467,7 @@ async def get_weekly_report(user=Depends(require_user)):
     report = {"narrative": narrative, "stats": stats}
     report_json = json.dumps(report)
 
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await _ensure_tables(db)
         await db.execute(
             "INSERT OR REPLACE INTO weekly_reports (user_id, week_start, report) VALUES (?,?,?)",
@@ -486,8 +481,7 @@ async def get_weekly_report(user=Depends(require_user)):
 # ── Layout Preferences ────────────────────────────────
 @router.get("/layout")
 async def get_layout(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
             "SELECT layout_type FROM layout_prefs WHERE user_id=?", (user["id"],)
@@ -496,8 +490,7 @@ async def get_layout(user=Depends(require_user)):
     if row:
         return {"layout": dict(row)["layout_type"]}
     # Auto-detect based on user profile
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT interests, market_prefs, experience_level FROM users WHERE id=?", (user["id"],)
         ) as c:
@@ -525,7 +518,7 @@ async def set_layout(payload: dict = Body(...), user=Depends(require_user)):
     layout = payload.get("layout", "default")
     if layout not in ("default", "trader", "geo", "macro"):
         raise HTTPException(400, "Invalid layout")
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await _ensure_tables(db)
         await db.execute(
             "INSERT OR REPLACE INTO layout_prefs (user_id, layout_type) VALUES (?,?)",
@@ -539,8 +532,7 @@ async def set_layout(payload: dict = Body(...), user=Depends(require_user)):
 @router.get("/risk-radar")
 async def get_risk_radar(user=Depends(require_user)):
     """Get data for the shareable Global Risk Radar snapshot."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT COUNT(*) FROM events WHERE datetime(timestamp) > datetime('now','-24 hours')"
         ) as c:

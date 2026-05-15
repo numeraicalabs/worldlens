@@ -19,6 +19,7 @@ from datetime import datetime, date
 from typing import Dict, List, Optional, Set, Tuple, Any
 
 import aiosqlite
+from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
@@ -108,8 +109,7 @@ async def _find_node(pool, label: str) -> Optional[Dict]:
                     )
                 return dict(row) if row else None
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute(
                     "SELECT * FROM kg_nodes WHERE LOWER(label)=LOWER(?) LIMIT 1", (label,)
                 ) as c:
@@ -164,8 +164,7 @@ async def _get_neighbors(pool, node_id: int) -> List[Tuple[Dict, Dict]]:
                             "src_id": d["src_id"], "tgt_id": d["tgt_id"]}
                     results.append((node, edge))
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 # Outgoing edges
                 async with db.execute(
                     """SELECT e.id as eid, e.src_id, e.tgt_id, e.relation,
@@ -359,8 +358,7 @@ async def get_live_context(topic: str = "") -> str:
     """Fetch relevant live data from DB to enrich Jarvis responses."""
     lines = []
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
 
             # Recent high-severity events
             async with db.execute(
@@ -551,8 +549,7 @@ async def graph_stats(user=Depends(require_user)):
                 top   = await conn.fetch("SELECT label, type, source_count FROM kg_nodes ORDER BY source_count DESC LIMIT 10")
                 by_type = await conn.fetch("SELECT type, COUNT(*) as n FROM kg_nodes GROUP BY type ORDER BY n DESC")
         else:
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute("SELECT COUNT(*) as n FROM kg_nodes") as c: nodes = (await c.fetchone())["n"]
                 async with db.execute("SELECT COUNT(*) as n FROM kg_edges") as c: edges = (await c.fetchone())["n"]
                 async with db.execute("SELECT label, type, source_count FROM kg_nodes ORDER BY source_count DESC LIMIT 10") as c:

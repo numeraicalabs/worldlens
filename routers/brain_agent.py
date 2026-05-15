@@ -18,6 +18,7 @@ from datetime import datetime, date
 from typing import Optional, List, Dict, Tuple
 
 import aiosqlite
+from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
@@ -450,8 +451,7 @@ async def ask_agent(payload: dict = Body(...), user=Depends(require_user)):
     except Exception as _ke:
         logger.debug("brain_agent KG inject: %s", _ke)
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_agent_tables(db)
         await ensure_brain_tables(db)
 
@@ -515,8 +515,7 @@ async def ask_agent(payload: dict = Body(...), user=Depends(require_user)):
             )
 
     # Save response to DB
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_agent_tables(db)
         msg_id = await save_message(
             db, session_id, user_id, "assistant",
@@ -567,8 +566,7 @@ async def submit_feedback(payload: dict = Body(...), user=Depends(require_user))
 
     user_id = user["id"]
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_agent_tables(db)
 
         # Get message
@@ -645,8 +643,7 @@ async def implicit_feedback(payload: dict = Body(...), user=Depends(require_user
         signal = "mild_positive"
 
     if delta > 0:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             await ensure_agent_tables(db)
             async with db.execute(
                 "SELECT sources_json FROM brain_agent_messages WHERE id=? AND user_id=?",
@@ -669,8 +666,7 @@ async def implicit_feedback(payload: dict = Body(...), user=Depends(require_user
 
 @router.get("/sessions")
 async def list_sessions(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_agent_tables(db)
         async with db.execute(
             "SELECT * FROM brain_agent_sessions WHERE user_id=? ORDER BY updated_at DESC LIMIT 20",
@@ -682,8 +678,7 @@ async def list_sessions(user=Depends(require_user)):
 
 @router.get("/sessions/{session_id}/messages")
 async def get_session_messages(session_id: str, user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_agent_tables(db)
         async with db.execute(
             "SELECT * FROM brain_agent_messages WHERE session_id=? AND user_id=? ORDER BY created_at ASC",
@@ -695,7 +690,7 @@ async def get_session_messages(session_id: str, user=Depends(require_user)):
 
 @router.delete("/sessions/{session_id}")
 async def delete_session(session_id: str, user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await ensure_agent_tables(db)
         await db.execute(
             "DELETE FROM brain_agent_messages WHERE session_id=? AND user_id=?",
@@ -714,8 +709,7 @@ async def delete_session(session_id: str, user=Depends(require_user)):
 @router.get("/templates")
 async def get_templates(user=Depends(require_user)):
     """Returns templates with per-user stats (win rate, usage count)."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await ensure_agent_tables(db)
         async with db.execute(
             "SELECT template, uses, positive, negative FROM brain_agent_template_stats WHERE user_id=?",

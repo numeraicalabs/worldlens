@@ -5,6 +5,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
+from db import get_db
 from fastapi import APIRouter, Query, Body
 from fastapi.responses import JSONResponse
 from config import settings
@@ -660,8 +661,7 @@ async def guided_analysis(symbol: str):
         prices = [100 * (1 + random.gauss(0, 0.01)) for _ in range(60)]
 
     # Load context
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT * FROM events WHERE datetime(timestamp)>datetime('now','-72 hours') "
             "ORDER BY severity DESC LIMIT 50"
@@ -681,8 +681,7 @@ async def guided_analysis(symbol: str):
 async def get_trending():
     """Return trending / most-searched assets based on recent event correlation."""
     import aiosqlite
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT title, category, country_code FROM events "
             "WHERE datetime(timestamp)>datetime('now','-24 hours') "
@@ -1533,8 +1532,7 @@ async def get_historical_events(
 
     # Fetch relevant events from DB within date range
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """SELECT id, timestamp, title, summary, category, country_name,
                           severity, impact, ai_summary, ai_market_note,

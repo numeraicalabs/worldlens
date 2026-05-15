@@ -4,6 +4,7 @@ import json
 import aiosqlite
 import random
 from datetime import datetime
+from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
@@ -155,8 +156,7 @@ async def _check_badges(db, user_id: int, xp_row: dict) -> list:
 
 @router.get("/stats")
 async def get_gamification_stats(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_gamification_tables(db)
         xp_row = await _get_or_create_xp(db, user["id"])
         async with db.execute(
@@ -191,8 +191,7 @@ async def track_action(payload: dict = Body(...), user=Depends(require_user)):
                "macro_visit": "macro_visits", "event_score": "events_scored"}
     xp_gain = xp_map.get(action, 1)
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_gamification_tables(db)
         col = col_map.get(action)
         if col:
@@ -207,8 +206,7 @@ async def track_action(payload: dict = Body(...), user=Depends(require_user)):
 
 @router.get("/portfolios")
 async def get_portfolios(user=Depends(require_user)):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_gamification_tables(db)
         async with db.execute(
             "SELECT * FROM portfolios WHERE user_id=? ORDER BY created_at DESC LIMIT 20",
@@ -282,8 +280,7 @@ Make allocations sum to exactly 100%. Tailor specifically to the risk profile an
         result = _fallback_portfolio(risk, amount, focus)
 
     # Save to DB
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         await _ensure_gamification_tables(db)
         await db.execute(
             "INSERT INTO portfolios (user_id,name,risk_profile,horizon,amount,focus,result) VALUES (?,?,?,?,?,?,?)",

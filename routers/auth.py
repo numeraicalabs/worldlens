@@ -4,6 +4,7 @@ import secrets
 import string
 import aiosqlite
 from db import db_execute, db_fetchall, db_fetchone, db_fetchval
+from db import get_db
 from fastapi import APIRouter, HTTPException, Depends, Body
 from pydantic import BaseModel
 from typing import Optional
@@ -159,7 +160,7 @@ async def me(current_user=Depends(get_current_user)):
 @router.get("/registration-status")
 async def registration_status():
     open_flag = settings.registration_open
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         async with db.execute("SELECT value FROM app_settings WHERE key='registration_open'") as cur:
             row = await cur.fetchone()
             if row:
@@ -190,8 +191,7 @@ async def create_invite(data: InviteCreate, current_user=Depends(get_current_use
 async def list_invites(current_user=Depends(get_current_user)):
     if not current_user or not current_user.get("is_admin"):
         raise HTTPException(403, "Admin only")
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute("""
             SELECT i.id, i.code, i.label, i.email_hint, i.max_uses, i.use_count,
                    i.expires_at, i.created_at, u.email AS used_by_email
@@ -215,7 +215,7 @@ async def validate_code(body: dict = Body(...)):
     code = body.get("code","")
     if not code:
         raise HTTPException(400, "code required")
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         try:
             await _validate_invite(db, code)
             return {"valid": True}
@@ -228,7 +228,7 @@ async def toggle_registration(body: dict = Body(...), current_user=Depends(get_c
     if not current_user or not current_user.get("is_admin"):
         raise HTTPException(403, "Admin only")
     open_flag = bool(body.get("open", True))
-    async with aiosqlite.connect(settings.db_path) as db:
+    async with get_db() as db:
         await db.execute(
             "INSERT INTO app_settings (key, value) VALUES ('registration_open',?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()",
             ("true" if open_flag else "false",)
