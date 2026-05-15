@@ -238,23 +238,54 @@ async def db_executemany(sql: str, params_list: List[Tuple]) -> None:
 #       rows = await db.fetchall("SELECT * FROM users WHERE id=?", (uid,))
 # ─────────────────────────────────────────────────────────────────────────────
 
+class _CursorPromise:
+    """
+    Lazy cursor returned by db.execute(). Supports both:
+      - await db.execute(sql)            → returns _PGCursor
+      - async with db.execute(sql) as c: → c is _PGCursor
+    """
+    __slots__ = ('_coro', '_cursor')
+
+    def __init__(self, coro):
+        self._coro = coro
+        self._cursor = None
+
+    def __await__(self):
+        return self._coro.__await__()
+
+    async def __aenter__(self):
+        self._cursor = await self._coro
+        return self._cursor
+
+    async def __aexit__(self, *args):
+        return None
+
+
 class _PGCursor:
-    """Wraps asyncpg cursor to look like aiosqlite cursor."""
+    """
+    Wraps asyncpg result as aiosqlite-compatible cursor.
+    Supports BOTH usage patterns:
+      - cur = await db.execute(sql); rows = await cur.fetchall()
+      - async with db.execute(sql) as cur: rows = await cur.fetchall()
+    """
     def __init__(self, rows, lastrowid=None):
-        self._rows = rows
+        self._rows = rows or []
         self.lastrowid = lastrowid or 0
-        self.rowcount = len(rows) if rows else 0
+        self.rowcount = len(self._rows)
 
     async def fetchall(self):
-        return self._rows or []
+        return self._rows
 
     async def fetchone(self):
         return self._rows[0] if self._rows else None
 
     async def fetchval(self):
         if self._rows and self._rows[0]:
-            vals = list(dict(self._rows[0]).values())
-            return vals[0] if vals else None
+            r = self._rows[0]
+            if isinstance(r, dict):
+                vals = list(r.values())
+                return vals[0] if vals else None
+            return r
         return None
 
     def __aiter__(self):
@@ -262,11 +293,24 @@ class _PGCursor:
         return self
 
     async def __anext__(self):
-        if self._idx >= len(self._rows or []):
+        if self._idx >= len(self._rows):
             raise StopAsyncIteration
         row = self._rows[self._idx]
         self._idx += 1
         return row
+
+    # Async context manager support — for `async with db.execute(...) as cur:`
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return None
+
+    # Awaitable support — for `cur = await db.execute(...)`
+    def __await__(self):
+        async def _self():
+            return self
+        return _self().__await__()
 
 
 class _PGDb:
@@ -278,12 +322,19 @@ class _PGDb:
     def _adapt(self, sql: str) -> str:
         return _sqlite_to_pg(sql)
 
-    async def execute(self, sql: str, params: tuple = ()):
+    def execute(self, sql: str, params: tuple = ()):
+        """
+        Returns a _CursorPromise that works with both:
+          - await db.execute(...)
+          - async with db.execute(...) as cur:
+        """
+        return _CursorPromise(self._execute_impl(sql, params))
+
+    async def _execute_impl(self, sql: str, params: tuple = ()):
         pg_sql = self._adapt(sql)
         verb = pg_sql.strip()[:6].upper()
         try:
             if verb in ("INSERT", "UPDATE", "DELETE"):
-                # Try RETURNING id for INSERT
                 if verb == "INSERT" and "RETURNING" not in pg_sql.upper():
                     pg_sql_ret = pg_sql.rstrip(";") + " RETURNING id"
                     try:
@@ -356,7 +407,10 @@ class _DBCompat:
         self._db = db
         self.row_factory = None
 
-    async def execute(self, sql: str, params: tuple = ()):
+    def execute(self, sql: str, params: tuple = ()):
+        return _CursorPromise(self._execute_impl(sql, params))
+
+    async def _execute_impl(self, sql: str, params: tuple = ()):
         async with self._db.execute(sql, params) as cur:
             import aiosqlite as _aiosqlite
             self._db.row_factory = _aiosqlite.Row
