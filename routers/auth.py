@@ -105,7 +105,7 @@ async def register(data: UserRegisterWithInvite):
 
     if invite_row and new_id:
         await db_execute(
-            "UPDATE invites SET use_count=use_count+1, used_by=?, used_at=NOW() WHERE id=?",
+            "UPDATE invites SET use_count=use_count+1, used_by=?, used_at=datetime('now') WHERE id=?",
             (new_id, invite_row["id"])
         )
 
@@ -138,7 +138,12 @@ async def login(data: UserLogin):
     if not verify_password(data.password, user["password_hash"]):
         raise HTTPException(401, "Invalid credentials")
 
-    await db_execute("UPDATE users SET last_login=NOW() WHERE id=?", (user['id'],))
+    # Best-effort last_login update — non-blocking
+    try:
+        await db_execute("UPDATE users SET last_login=datetime('now') WHERE id=?", (user['id'],))
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("last_login update failed: %s", exc)
 
     token = create_token({"sub": str(user["id"])})
     return Token(
@@ -230,7 +235,7 @@ async def toggle_registration(body: dict = Body(...), current_user=Depends(get_c
     open_flag = bool(body.get("open", True))
     async with get_db() as db:
         await db.execute(
-            "INSERT INTO app_settings (key, value) VALUES ('registration_open',?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()",
+            "INSERT INTO app_settings (key, value) VALUES ('registration_open',?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=datetime('now')",
             ("true" if open_flag else "false",)
         )
         await db.commit()
