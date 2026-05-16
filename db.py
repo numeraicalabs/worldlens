@@ -118,7 +118,34 @@ def _sqlite_to_pg(sql: str) -> str:
     # 8. Boolean-style integers: PG accepts both, but be safe
     # (no-op — leave as is)
 
-    # 9. ? placeholders → $1, $2, ... (MUST be last, after all other ? substitutions)
+    # 9. DDL: column DEFAULT datetime('now') → DEFAULT NOW()
+    sql = re.sub(
+        r"DEFAULT\s+\(datetime\('now'\)\)",
+        "DEFAULT NOW()", sql, flags=re.IGNORECASE
+    )
+    sql = re.sub(
+        r"DEFAULT\s+datetime\('now'\)",
+        "DEFAULT NOW()", sql, flags=re.IGNORECASE
+    )
+
+    # 10. DDL: AUTOINCREMENT → SERIAL-style (already in PRIMARY KEY, strip AUTOINCREMENT)
+    sql = re.sub(r'\bAUTOINCREMENT\b', '', sql, flags=re.IGNORECASE)
+
+    # 11. DDL: INTEGER PRIMARY KEY → SERIAL PRIMARY KEY (without AUTOINCREMENT)
+    sql = re.sub(
+        r'\bINTEGER\s+PRIMARY\s+KEY\b(?!\s+AUTOINCREMENT)',
+        'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE
+    )
+
+    # 12. DDL: TEXT DEFAULT (datetime('now')) with parens
+    sql = re.sub(
+        r"DEFAULT\s+\(\s*datetime\([^)]*\)\s*\)",
+        "DEFAULT NOW()", sql, flags=re.IGNORECASE
+    )
+
+    # 13. ON CONFLICT(key) DO UPDATE SET ... (already PG syntax) — keep as is
+
+    # 14. ? placeholders → $1, $2, ... (MUST be last)
     counter = [0]
     def replace_q(m):
         counter[0] += 1
