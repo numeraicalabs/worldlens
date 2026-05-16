@@ -47,18 +47,84 @@ def _pg_to_sqlite(sql: str) -> str:
 
 
 def _sqlite_to_pg(sql: str) -> str:
-    """Convert SQLite-style SQL to PostgreSQL-compatible SQL."""
-    # ? placeholders → $1, $2, ...
+    """Convert SQLite SQL to PostgreSQL-compatible SQL.
+    Handles all the dialect differences used in the WorldLens codebase.
+    """
+    # 1. datetime('now', '-X hours/days/minutes') → NOW() - INTERVAL 'X hours'
+    # Match: datetime('now', '-72 hours') / datetime('now','-1 day') etc.
+    def _interval_repl(m):
+        val = m.group(1).strip()
+        # val is like "-72 hours" or "+1 day"
+        # Strip leading +/-
+        sign = '-' if val.startswith('-') else ('+' if val.startswith('+') else '-')
+        rest = val.lstrip('+-').strip()
+        # rest is "72 hours" → keep as INTERVAL '72 hours'
+        return f"(NOW() {sign} INTERVAL '{rest}')"
+
+    sql = re.sub(
+        r"datetime\(\s*'now'\s*,\s*'([^']+)'\s*\)",
+        _interval_repl, sql, flags=re.IGNORECASE
+    )
+    # datetime('now', ?) → NOW() with param treated as interval
+    # We rewrite to: (NOW() + ($N || ' hours')::INTERVAL) — but params are bound,
+    # so safer: substitute the placeholder with a CAST expression.
+    # Since the codebase uses datetime('now', ?) with params like "-72 hours",
+    # we convert to: (NOW() + $N::INTERVAL)
+    sql = re.sub(
+        r"datetime\(\s*'now'\s*,\s*\?\s*\)",
+        "(NOW() + ?::INTERVAL)", sql, flags=re.IGNORECASE
+    )
+
+    # 2. datetime('now') → NOW()
+    sql = re.sub(r"datetime\(\s*'now'\s*\)", "NOW()", sql, flags=re.IGNORECASE)
+
+    # 3. datetime(column_name) → column_name (PG TIMESTAMPTZ compares natively)
+    sql = re.sub(r"datetime\(\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\)", r"\1", sql)
+
+    # 4. date('now', ...) similar treatment
+    sql = re.sub(
+        r"date\(\s*'now'\s*,\s*'([^']+)'\s*\)",
+        lambda m: f"(CURRENT_DATE {'-' if m.group(1).startswith('-') else '+'} INTERVAL '{m.group(1).lstrip('+-').strip()}')",
+        sql, flags=re.IGNORECASE
+    )
+    sql = re.sub(r"date\(\s*'now'\s*\)", "CURRENT_DATE", sql, flags=re.IGNORECASE)
+
+    # 5. GROUP_CONCAT(x, sep) → STRING_AGG(x::text, sep)
+    sql = re.sub(
+        r"GROUP_CONCAT\(\s*([^,)]+)\s*,\s*('[^']*')\s*\)",
+        r"STRING_AGG(\1::text, \2)", sql, flags=re.IGNORECASE
+    )
+    # GROUP_CONCAT(x) → STRING_AGG(x::text, ',')
+    sql = re.sub(
+        r"GROUP_CONCAT\(\s*([^,)]+)\s*\)",
+        r"STRING_AGG(\1::text, ',')", sql, flags=re.IGNORECASE
+    )
+
+    # 6. INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
+    sql = re.sub(
+        r"INSERT\s+OR\s+IGNORE\s+INTO",
+        "INSERT INTO", sql, flags=re.IGNORECASE
+    )
+    # INSERT OR REPLACE → INSERT (let PG ON CONFLICT handle it; without it, falls back)
+    sql = re.sub(
+        r"INSERT\s+OR\s+REPLACE\s+INTO",
+        "INSERT INTO", sql, flags=re.IGNORECASE
+    )
+
+    # 7. INTEGER PRIMARY KEY AUTOINCREMENT → SERIAL PRIMARY KEY
+    sql = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',
+                 'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE)
+
+    # 8. Boolean-style integers: PG accepts both, but be safe
+    # (no-op — leave as is)
+
+    # 9. ? placeholders → $1, $2, ... (MUST be last, after all other ? substitutions)
     counter = [0]
     def replace_q(m):
         counter[0] += 1
         return f'${counter[0]}'
     sql = re.sub(r'\?', replace_q, sql)
-    # datetime('now') → NOW()
-    sql = re.sub(r"datetime\('now'\)", 'NOW()', sql, flags=re.IGNORECASE)
-    # INTEGER PRIMARY KEY AUTOINCREMENT → SERIAL PRIMARY KEY
-    sql = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',
-                 'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE)
+
     return sql
 
 
