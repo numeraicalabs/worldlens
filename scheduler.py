@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Optional
 
 import aiosqlite
+from db import get_db
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import settings
@@ -123,8 +124,7 @@ async def _poll_events():
             logger.warning("No events returned from fetch_all_events")
             return
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
 
             new_count = await _persist_events(events, db)
             await db.commit()
@@ -237,7 +237,7 @@ async def _poll_gdelt():
 
         # Persist (same INSERT OR IGNORE logic as RSS events)
         added = 0
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             for ev in enriched:
                 try:
                     async with db.execute("SELECT id FROM events WHERE id=?", (ev["id"],)) as cur:
@@ -283,8 +283,7 @@ async def _enrich_sentiment():
     from ai_layer import ai_sentiment, _ai_available
 
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """SELECT id, title, summary, category, source
                    FROM events
@@ -322,7 +321,7 @@ async def _enrich_sentiment():
                         row["category"],
                         row.get("source") or "",
                     )
-                async with aiosqlite.connect(settings.db_path) as db:
+                async with get_db() as db:
                     await db.execute(
                         """UPDATE events SET
                                sentiment_score=?, sentiment_tone=?,
@@ -364,7 +363,7 @@ async def _poll_finance():
     try:
         data = await fetch_finance()
         _finance_cache = data
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             for asset in data:
                 await db.execute(
                     """INSERT OR REPLACE INTO finance_cache
@@ -400,8 +399,7 @@ async def _generate_daily_briefs():
     """
     logger.info("Daily brief generation: starting")
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             # Active users who logged in within the last 7 days
             async with db.execute(
                 "SELECT id FROM users WHERE is_active=1 "
@@ -415,8 +413,7 @@ async def _generate_daily_briefs():
 
         for uid in user_ids:
             try:
-                async with aiosqlite.connect(settings.db_path) as db:
-                    db.row_factory = aiosqlite.Row
+                async with get_db() as db:
 
                     # Skip if already generated today
                     async with db.execute(
@@ -498,7 +495,7 @@ async def _generate_daily_briefs():
                     )
 
                 if text:
-                    async with aiosqlite.connect(settings.db_path) as db:
+                    async with get_db() as db:
                         await db.execute(
                             "INSERT OR REPLACE INTO daily_insights (user_id, date, insight) VALUES (?,?,?)",
                             (uid, today, text)
@@ -532,7 +529,7 @@ async def _poll_macro():
             logger.warning("Macro poll: no data returned")
             return
 
-        async with aiosqlite.connect(settings.db_path) as db:
+        async with get_db() as db:
             updated = 0
             for ind in indicators:
                 await db.execute("""
@@ -572,8 +569,7 @@ async def _check_alert_emails():
     Runs every 15 minutes — won't spam since events are deduplicated.
     """
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
 
             # Events in the last 15 minutes (fresh events only)
             async with db.execute("""
@@ -629,7 +625,7 @@ async def _check_alert_emails():
 
                 # Check we haven't sent this alert for this event already
                 # (simple dedup: skip if alert was triggered in last 2h)
-                async with aiosqlite.connect(settings.db_path) as db:
+                async with get_db() as db:
                     async with db.execute("""
                         SELECT id FROM activity_log
                         WHERE user_id=? AND action='alert_email_sent'
@@ -650,7 +646,7 @@ async def _check_alert_emails():
                 )
                 if ok:
                     # Log so we don't double-send
-                    async with aiosqlite.connect(settings.db_path) as db:
+                    async with get_db() as db:
                         await db.execute(
                             "INSERT INTO activity_log (user_id,action,section,detail) VALUES (?,?,?,?)",
                             (alert["user_id"], "alert_email_sent", "alerts",
@@ -679,8 +675,7 @@ async def _rebuild_ml_models():
 
     logger.info("ML rebuild: starting nightly TF-IDF update")
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT id FROM users WHERE is_active=1 "
                 "AND last_login > datetime('now','-14 days')"
@@ -690,8 +685,7 @@ async def _rebuild_ml_models():
         rebuilt = 0
         for uid in user_ids:
             try:
-                async with aiosqlite.connect(settings.db_path) as db:
-                    db.row_factory = aiosqlite.Row
+                async with get_db() as db:
                     async with db.execute("""
                         SELECT DISTINCT e.title, e.summary, e.category
                         FROM   activity_log al
@@ -710,7 +704,7 @@ async def _rebuild_ml_models():
                 if profile is None:
                     continue
 
-                async with aiosqlite.connect(settings.db_path) as db:
+                async with get_db() as db:
                     await db.execute("""
                         INSERT INTO user_models (user_id, model_type, model_data, updated_at)
                         VALUES (?, 'tfidf_vector', ?, datetime('now'))
@@ -805,8 +799,7 @@ def start():
         try:
             import aiosqlite
             from routers.finance_hub import save_daily_snapshot
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute("SELECT id FROM etf_portfolios") as c:
                     portfolios = [row["id"] for row in await c.fetchall()]
             for pid in portfolios:
@@ -922,8 +915,7 @@ def start():
     async def _daily_brain_digest():
         try:
             from brain_enhance import run_all_enhancements_for_user
-            async with aiosqlite.connect(settings.db_path) as db:
-                db.row_factory = aiosqlite.Row
+            async with get_db() as db:
                 async with db.execute(
                     "SELECT DISTINCT user_id FROM brain_entries "
                     "WHERE datetime(timestamp) > datetime('now','-7 days') "
@@ -1023,8 +1015,7 @@ async def _run_agent_digests():
     try:
         from datetime import date
         today = date.today().isoformat()
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT id FROM users WHERE is_active=1 "
                 "AND last_login > datetime('now','-7 days')"
@@ -1041,8 +1032,7 @@ async def _run_agent_digests():
             for bot_id in DEFAULT_BOTS:
                 try:
                     # Skip if already generated today
-                    async with aiosqlite.connect(settings.db_path) as db:
-                        db.row_factory = aiosqlite.Row
+                    async with get_db() as db:
                         async with db.execute(
                             "SELECT id FROM agent_digest_log "
                             "WHERE user_id=? AND bot_id=? AND digest_date=?",
@@ -1058,7 +1048,7 @@ async def _run_agent_digests():
                     events = await _get_bot_events(bot_id, config, limit=5)
                     await _generate_digest(bot_id, config, events)
 
-                    async with aiosqlite.connect(settings.db_path) as db:
+                    async with get_db() as db:
                         await db.execute(
                             "INSERT OR IGNORE INTO agent_digest_log "
                             "(user_id, bot_id, digest_date) VALUES (?, ?, ?)",
@@ -1084,8 +1074,7 @@ async def _run_friday_predictions():
         )
         week = _week_key()
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT id FROM users WHERE is_active=1 "
                 "AND last_login > datetime('now','-14 days')"
@@ -1097,7 +1086,7 @@ async def _run_friday_predictions():
             for bot_id in DEFAULT_BOTS:
                 try:
                     # Skip if already exists
-                    async with aiosqlite.connect(settings.db_path) as db:
+                    async with get_db() as db:
                         async with db.execute(
                             "SELECT id FROM agent_predictions "
                             "WHERE user_id=? AND bot_id=? AND week_key=?",
@@ -1114,7 +1103,7 @@ async def _run_friday_predictions():
                     pred   = await _generate_prediction(bot_id, config, events)
                     if pred:
                         import json
-                        async with aiosqlite.connect(settings.db_path) as db:
+                        async with get_db() as db:
                             await db.execute(
                                 "INSERT OR IGNORE INTO agent_predictions "
                                 "(user_id, bot_id, week_key, prediction_json) "
@@ -1144,8 +1133,7 @@ async def _run_monday_verify():
 
         last_week = _week_key(datetime.utcnow() - timedelta(weeks=1))
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT user_id, bot_id, prediction_json FROM agent_predictions "
                 "WHERE week_key=? AND verify_json IS NULL",
@@ -1161,7 +1149,7 @@ async def _run_monday_verify():
                 events    = await _get_bot_events(bot_id, config, limit=15)
                 prediction = json.loads(row["prediction_json"])
                 verify    = await _verify_prediction_ai(bot_id, prediction, events)
-                async with aiosqlite.connect(settings.db_path) as db:
+                async with get_db() as db:
                     await db.execute(
                         "UPDATE agent_predictions SET verify_json=?, verify_ts=datetime('now'), "
                         "accuracy_score=? WHERE user_id=? AND bot_id=? AND week_key=?",
@@ -1184,8 +1172,7 @@ async def _broadcast_tg_pnl():
         from routers.tradgentic.portfolio import list_bots as tg_list_bots, get_portfolio_stats
         from routers.tradgentic.market_data import fetch_multi
 
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 "SELECT DISTINCT user_id FROM tg_bots WHERE active=1"
             ) as cur:
