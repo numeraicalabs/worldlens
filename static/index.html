@@ -457,14 +457,14 @@
     <!-- MARKETS -->
     <span class="nav-group-label">Mercati</span>
 
-    <button class="ni ni-icon" data-v="macro" onclick="sv('macro',this)" title="Macro">
+    <button class="ni ni-icon" data-v="macro" onclick="sv('portfolio',document.querySelector('[data-v=portfolio]'));fhTab('intelligenza',document.querySelector('[data-tab=intelligenza]'));setTimeout(function(){fhIntTab('macro',document.querySelector('[data-itab=macro]'))},50)" title="Macro">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12L5 8l3 3 4-5 3-2"/><rect x="1" y="1" width="14" height="14" rx="1"/></svg>
       <span class="ni-lbl">Macro</span>
     </button>
 
-    <button class="ni ni-icon" data-v="markets" onclick="sv('markets',this)" title="Markets">
+    <button class="ni ni-icon" data-v="markets" onclick="sv('portfolio',document.querySelector('[data-v=portfolio]'));fhTab('mercati',document.querySelector('[data-tab=mercati]'))" title="Mercati">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l3-4 3 2 3-5 3 3"/></svg>
-      <span class="ni-lbl">Markets</span>
+      <span class="ni-lbl">Mercati</span>
     </button>
 
     <button class="ni ni-icon" data-v="portfolio" onclick="sv('portfolio',this)" title="Portfolio">
@@ -498,9 +498,9 @@
       <span id="opp-nav-badge" style="display:none;position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:#F59E0B;border:1.5px solid var(--bg0)"></span>
     </button>
 
-    <button class="ni ni-icon" data-v="insiders" onclick="sv('insiders',this)" title="Insiders">
+    <button class="ni ni-icon" data-v="insiders" onclick="sv('portfolio',document.querySelector('[data-v=portfolio]'));fhTab('intelligenza',document.querySelector('[data-tab=intelligenza]'))" title="Intelligenza">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/></svg>
-      <span class="ni-lbl">Insiders</span>
+      <span class="ni-lbl">Intelligenza</span>
     </button>
 
     <div class="nav-sep"></div>
@@ -605,27 +605,27 @@
 
         <!-- 2x3 KPI grid — mirrors d-sp, d-btc etc. -->
         <div class="msc-kpi-grid">
-          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
             <div class="msc-kpi-lbl">S&amp;P 500</div>
             <div class="msc-kpi-val" id="msc-sp">—</div>
             <div class="msc-kpi-chg" id="msc-sp-c">—</div>
           </div>
-          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
             <div class="msc-kpi-lbl">BTC/USD</div>
             <div class="msc-kpi-val" id="msc-btc">—</div>
             <div class="msc-kpi-chg" id="msc-btc-c">—</div>
           </div>
-          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
             <div class="msc-kpi-lbl">VIX</div>
             <div class="msc-kpi-val" id="msc-vix">—</div>
             <div class="msc-kpi-chg" id="msc-vix-c">—</div>
           </div>
-          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
             <div class="msc-kpi-lbl">GOLD/OZ</div>
             <div class="msc-kpi-val" id="msc-gold">—</div>
             <div class="msc-kpi-chg" id="msc-gold-c">—</div>
           </div>
-          <div class="msc-kpi" onclick="mobileNav('markets',null)">
+          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
             <div class="msc-kpi-lbl">DXY</div>
             <div class="msc-kpi-val" id="msc-dxy">—</div>
             <div class="msc-kpi-chg" id="msc-dxy-c">—</div>
@@ -759,7 +759,7 @@
   <div id="mob-kpi-card" style="display:none;background:var(--fire-bg-card,#1e2026);border-radius:14px;border:1px solid rgba(255,193,7,0.12);margin-top:12px;overflow:hidden">
     <div class="mob-feed-card-head">
       <span class="mob-feed-card-label">Mercati</span>
-      <button class="mob-feed-card-action" onclick="mobileNav('markets',null)">Vedi →</button>
+      <button class="mob-feed-card-action" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">Vedi →</button>
     </div>
     <div class="mob-kpi-scroll" id="mob-kpi-row">
       <!-- Populated by _syncMobileKPIs() -->
@@ -932,7 +932,7 @@
         <div class="fire-overline">/ 01 — MARKET PULSE</div>
         <h2 class="fire-title">Markets at a glance</h2>
       </div>
-      <a class="fire-link" onclick="sv('markets',document.querySelector('[data-v=markets]'))">FULL MARKETS ↗</a>
+      <a class="fire-link" onclick="sv('portfolio',document.querySelector('[data-v=portfolio]'));fhTab('mercati',document.querySelector('[data-tab=mercati]'))">FULL MARKETS ↗</a>
     </div>
 
     <div class="fire-kpi-grid">
@@ -942,7 +942,7 @@
         <div class="fire-kpi-chg up" id="d-hi">—</div>
         <div class="fire-kpi-spark" id="fire-spark-events"></div>
       </div>
-      <div class="fire-kpi" id="dbk-sp" onclick="sv('markets',document.querySelector('[data-v=markets]'))">
+      <div class="fire-kpi" id="dbk-sp" onclick="sv('portfolio',document.querySelector('[data-v=portfolio]'));fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
         <div class="fire-kpi-lbl">S&amp;P 500</div>
         <div class="fire-kpi-val" id="d-sp">—</div>
         <div class="fire-kpi-chg" id="d-sp-c">—</div>
@@ -1080,7 +1080,7 @@
         <div class="ic-header"><span class="ic-tag ic-tag-green">💹 MERCATI</span></div>
         <div class="ic-market-row" id="ic-market-row"></div>
         <div class="ic-summary" id="ic-markets-title"></div>
-        <div class="ic-footer"><button class="ic-btn" onclick="sv('markets',document.querySelector('[data-v=markets]'))">Full Markets →</button></div>
+        <div class="ic-footer"><button class="ic-btn" onclick="sv('portfolio',document.querySelector('[data-v=portfolio]'));fhTab('mercati',document.querySelector('[data-tab=mercati]'))">Full Markets →</button></div>
       </div>
       <div class="intel-card intel-card-kg" id="ic-kg">
         <div class="ic-header"><span class="ic-tag ic-tag-purple">🧠 BRAIN KG</span></div>
@@ -2480,12 +2480,13 @@
 
   <!-- ── Top bar ── -->
   <div class="fh-topbar">
-    <div class="fh-logo">💹 Finance Hub</div>
+    <div class="fh-logo">💹 Finance</div>
     <div class="fh-tabs" id="fh-tabs">
-      <button class="fh-tab on"  data-tab="portfolios" onclick="fhTab('portfolios',this)">Portafogli</button>
-      <button class="fh-tab"     data-tab="markets"    onclick="fhTab('markets',this)">Mercati</button>
-      <button class="fh-tab"     data-tab="watchlist"  onclick="fhTab('watchlist',this)">Watchlist</button>
-      <button class="fh-tab"     data-tab="lab"        onclick="fhTab('lab',this)">Lab AI</button>
+      <button class="fh-tab on"  data-tab="portfolios"  onclick="fhTab('portfolios',this)">Portafogli</button>
+      <button class="fh-tab"     data-tab="mercati"     onclick="fhTab('mercati',this)">Mercati</button>
+      <button class="fh-tab"     data-tab="intelligenza" onclick="fhTab('intelligenza',this)">Intelligenza</button>
+      <button class="fh-tab"     data-tab="watchlist"   onclick="fhTab('watchlist',this)">Watchlist</button>
+      <button class="fh-tab"     data-tab="lab"         onclick="fhTab('lab',this)">Lab AI</button>
     </div>
     <button class="fh-add-btn" id="fh-new-portfolio-btn" onclick="openNewPortfolioModal()" title="Nuovo portafoglio" aria-label="Nuovo portafoglio">＋</button>
   </div>
@@ -2640,6 +2641,21 @@
       </div>
     </div>
   </div><!-- /fh-panel-markets -->
+
+  <!-- ══ MERCATI TAB — embeds view-markets ══ -->
+  <div id="fh-panel-mercati" class="fh-panel">
+    <div id="fh-mercati-mount" style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column"></div>
+  </div>
+
+  <!-- ══ INTELLIGENZA TAB — insiders + macro ══ -->
+  <div id="fh-panel-intelligenza" class="fh-panel">
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--bd);flex-shrink:0">
+      <button class="fh-int-tab on" data-itab="insiders" onclick="fhIntTab('insiders',this)" style="flex:1;padding:10px 0;background:none;border:none;font-size:11px;font-weight:700;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent">🕵 Insider Trades</button>
+      <button class="fh-int-tab" data-itab="macro"    onclick="fhIntTab('macro',this)"    style="flex:1;padding:10px 0;background:none;border:none;font-size:11px;font-weight:700;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent">📊 Macro</button>
+      <button class="fh-int-tab" data-itab="supply"   onclick="fhIntTab('supply',this)"   style="flex:1;padding:10px 0;background:none;border:none;font-size:11px;font-weight:700;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent">🔗 Supply Chain</button>
+    </div>
+    <div id="fh-intelligenza-mount" style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column"></div>
+  </div>
 
   <!-- ══ WATCHLIST TAB ══ -->
   <div id="fh-panel-watchlist" class="fh-panel">
@@ -4104,7 +4120,7 @@
   <div class="more-drawer-handle"></div>
   <div class="more-drawer-grid">
 
-    <div class="more-drawer-item" onclick="mobileNav('markets',null)">
+    <div class="more-drawer-item" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M2 12l3-4 3 2 3-5 3 3"/>
       </svg><span>Markets</span>
@@ -4142,7 +4158,7 @@
       </svg><span>Portfolio</span>
     </div>
 
-    <div class="more-drawer-item" onclick="mobileNav('insiders',null)">
+    <div class="more-drawer-item" onclick="mobileNav('portfolio',null);fhTab('intelligenza',document.querySelector('[data-tab=intelligenza]'))">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/>
       </svg><span>Insiders</span>
