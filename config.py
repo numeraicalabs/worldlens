@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     # Set SUPABASE_URL in Render env vars:
     # postgresql://postgres:[password]@db.[ref].supabase.co:5432/postgres
     supabase_url: str = ""
+    admin_bootstrap_secret: str = ""
 
     # ── AI keys ───────────────────────────────────────────────────────
     # Set GEMINI_API_KEY on Render dashboard (Environment → Add env var)

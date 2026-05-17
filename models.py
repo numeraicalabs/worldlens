@@ -22,10 +22,22 @@ class UserOut(BaseModel):
     email: str
     username: str
     avatar_color: str
-    created_at: str
+    created_at: Optional[str] = ""   # str or datetime from PG — always serialised as str
     is_admin: int = 0
     is_active: int = 1
     role: Optional[str] = None
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    @classmethod
+    def _coerce_created_at(cls, v):
+        if v is None: return ""
+        if hasattr(v, "isoformat"): return v.isoformat()
+        return str(v)
+
+    def model_post_init(self, __context):
+        if self.created_at and hasattr(self.created_at, "isoformat"):
+            object.__setattr__(self, "created_at", self.created_at.isoformat())
 
 
 class Token(BaseModel):
