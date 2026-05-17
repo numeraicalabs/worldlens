@@ -38,16 +38,19 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)):
     except JWTError:
         return None
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT id, email, username, avatar_color, created_at, "
-            "is_admin, role, is_active, ai_provider, user_anthropic_key, user_gemini_key "
-            "FROM users WHERE id = ?",
-            (int(user_id),)
-        ) as cur:
-            row = await cur.fetchone()
-            return dict(row) if row else None
+    try:
+        from db import get_db
+        async with get_db() as db:
+            async with db.execute(
+                "SELECT id, email, username, avatar_color, created_at, "
+                "is_admin, role, is_active, ai_provider, user_anthropic_key, user_gemini_key "
+                "FROM users WHERE id = ?",
+                (int(user_id),)
+            ) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
+    except Exception:
+        return None
 
 
 async def require_user(current_user=Depends(get_current_user)):

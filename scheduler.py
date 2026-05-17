@@ -74,13 +74,13 @@ async def _persist_events(events, db) -> int:
                    (id, timestamp, title, summary, category, source,
                     latitude, longitude, country_code, country_name,
                     severity, impact, url, ai_impact_score, related_markets,
-                    topic_vector, source_count, source_list, sent_credibility,
-                    sentiment_score, sentiment_tone, keywords, narrative_id,
-                    timeline_band, heat_index, market_impact)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    source_count, source_list, heat_index,
+                    ai_tags, keywords)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(id) DO NOTHING""",
                 (
                     ev["id"],
-                    ev["timestamp"],
+                    ev.get("timestamp", ""),
                     ev["title"],
                     ev.get("summary", ""),
                     ev["category"],
@@ -94,17 +94,11 @@ async def _persist_events(events, db) -> int:
                     ev.get("url", ""),
                     ev.get("ai_impact_score", 5.0),
                     json.dumps(ev.get("related_markets", [])),
-                    json.dumps(ev.get("topic_vector", [])),
                     ev.get("source_count", 1),
                     json.dumps(ev.get("source_list", [ev.get("source", "")])),
-                    ev.get("sent_credibility", 0.75),
-                    ev.get("sentiment_score", 0.0),
-                    ev.get("sentiment_tone", "neutral"),
-                    json.dumps(ev.get("keywords", [])),
-                    ev.get("narrative_id", ""),
-                    ev.get("timeline_band", "geopolitical"),
                     ev.get("heat_index", 0.0),
-                    ev.get("market_impact", 0.0),
+                    json.dumps(ev.get("ai_tags", [])),
+                    json.dumps(ev.get("keywords", [])),
                 ),
             )
             new_count += 1
@@ -245,11 +239,12 @@ async def _poll_gdelt():
                             continue
                     await db.execute(
                         """INSERT INTO events
-                           (id,timestamp,title,summary,category,source,
-                            latitude,longitude,country_code,country_name,
-                            severity,impact,url,ai_impact_score,related_markets,
-                            topic_vector,source_count,source_list,sent_credibility)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                           (id, timestamp, title, summary, category, source,
+                            latitude, longitude, country_code, country_name,
+                            severity, impact, url, ai_impact_score, related_markets,
+                            source_count, source_list, heat_index, ai_tags, keywords)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                           ON CONFLICT(id) DO NOTHING""",
                         (ev["id"], ev.get("timestamp"), ev.get("title",""),
                          ev.get("summary",""), ev.get("category","GEOPOLITICS"),
                          ev.get("source","GDELT"),
@@ -258,10 +253,12 @@ async def _poll_gdelt():
                          ev.get("severity",5.0), score_to_impact(ev.get("severity",5.0)),
                          ev.get("url",""), ev.get("ai_impact_score",5.0),
                          json.dumps(ev.get("related_markets",[])),
-                         json.dumps([]),   # topic_vector computed in enrich job
                          ev.get("source_count",1),
                          json.dumps([ev.get("source","GDELT")]),
-                         ev.get("sent_credibility",0.70))
+                         ev.get("heat_index",0.0),
+                         json.dumps(ev.get("ai_tags",[])),
+                         json.dumps(ev.get("keywords",[])),
+                         )
                     )
                     added += 1
                 except Exception as e:
