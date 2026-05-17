@@ -7,7 +7,7 @@ import aiosqlite
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Optional
 from db import get_db
-from fastapi import APIRouter, Depends, Body, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Body, Query
 from auth import require_user
 from config import settings
 from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async, _get_user_ai_keys
