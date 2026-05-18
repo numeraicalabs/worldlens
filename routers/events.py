@@ -58,12 +58,11 @@ async def get_events(
 
         async with get_db() as db:
             async with db.execute(
-                "SELECT *, CASE category "
+                "SELECT * FROM events WHERE " + " AND ".join(where) +
+                " ORDER BY (severity * CASE category "
                 "WHEN 'ECONOMICS' THEN 1.2 WHEN 'FINANCE' THEN 1.2 "
                 "WHEN 'CONFLICT' THEN 1.1 WHEN 'GEOPOLITICS' THEN 1.0 "
-                "WHEN 'ENERGY' THEN 1.0 ELSE 0.9 END AS cat_weight "
-                "FROM events WHERE " + " AND ".join(where) +
-                " ORDER BY (severity * cat_weight) DESC, timestamp DESC LIMIT ? OFFSET ?", params
+                "WHEN 'ENERGY' THEN 1.0 ELSE 0.9 END) DESC, timestamp DESC LIMIT ? OFFSET ?", params
             ) as cur:
                 rows = await cur.fetchall()
 
