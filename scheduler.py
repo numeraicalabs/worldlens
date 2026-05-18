@@ -59,49 +59,74 @@ def get_finance_cache():
 # ── Event persistence ─────────────────────────────────────
 
 async def _persist_events(events, db) -> int:
-    """Insert new events. Returns count of newly inserted rows."""
-    new_count = 0
-    for ev in events:
-        try:
-            # Check if already exists
-            async with db.execute("SELECT id FROM events WHERE id=?", (ev["id"],)) as cur:
-                exists = await cur.fetchone()
-            if exists:
-                continue
+    """Insert new events. Returns count of newly inserted rows.
+    
+    Uses per-event get_db() context to avoid asyncpg transaction abort:
+    on PostgreSQL, a single failed INSERT aborts the entire transaction,
+    causing all subsequent inserts to fail with InFailedSqlTransaction.
+    By opening a fresh connection per event (or using SAVEPOINT), each
+    insert is isolated.
+    """
+    # Collect existing ids in one query to avoid N+1 selects
+    try:
+        all_ids = [ev["id"] for ev in events if ev.get("id")]
+        if not all_ids:
+            return 0
+        placeholders = ",".join(["?" for _ in all_ids])
+        async with get_db() as _check_db:
+            async with _check_db.execute(
+                f"SELECT id FROM events WHERE id IN ({placeholders})", all_ids
+            ) as cur:
+                existing = {r[0] for r in await cur.fetchall()}
+    except Exception as e:
+        logger.warning("_persist_events: failed to fetch existing ids: %s", e)
+        existing = set()
 
-            await db.execute(
-                """INSERT INTO events
-                   (id, timestamp, title, summary, category, source,
-                    latitude, longitude, country_code, country_name,
-                    severity, impact, url, ai_impact_score, related_markets,
-                    source_count, source_list, heat_index,
-                    ai_tags, keywords)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(id) DO NOTHING""",
-                (
-                    ev["id"],
-                    ev.get("timestamp", ""),
-                    ev["title"],
-                    ev.get("summary", ""),
-                    ev["category"],
-                    ev["source"],
-                    ev.get("latitude", 0.0),
-                    ev.get("longitude", 0.0),
-                    ev.get("country_code", "XX"),
-                    ev.get("country_name", ""),
-                    ev.get("severity", 5.0),
-                    ev.get("impact", "Medium"),
-                    ev.get("url", ""),
-                    ev.get("ai_impact_score", 5.0),
-                    json.dumps(ev.get("related_markets", [])),
-                    ev.get("source_count", 1),
-                    json.dumps(ev.get("source_list", [ev.get("source", "")])),
-                    ev.get("heat_index", 0.0),
-                    json.dumps(ev.get("ai_tags", [])),
-                    json.dumps(ev.get("keywords", [])),
-                ),
-            )
-            new_count += 1
+    new_events = [ev for ev in events if ev.get("id") and ev["id"] not in existing]
+    logger.info("_persist_events: %d new (of %d), %d already exist", len(new_events), len(events), len(existing))
+
+    if not new_events:
+        return 0
+
+    new_count = 0
+    for ev in new_events:
+        # Each event gets its own db context to isolate transaction failures
+        try:
+            async with get_db() as _db:
+                await _db.execute(
+                    """INSERT INTO events
+                       (id, timestamp, title, summary, category, source,
+                        latitude, longitude, country_code, country_name,
+                        severity, impact, url, ai_impact_score, related_markets,
+                        source_count, source_list, heat_index,
+                        ai_tags, keywords)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                       ON CONFLICT(id) DO NOTHING""",
+                    (
+                        str(ev["id"]),
+                        str(ev.get("timestamp") or ""),
+                        str(ev.get("title") or ""),
+                        str(ev.get("summary") or ""),
+                        str(ev.get("category") or "GEOPOLITICS"),
+                        str(ev.get("source") or "RSS"),
+                        float(ev.get("latitude") or 0.0),
+                        float(ev.get("longitude") or 0.0),
+                        str(ev.get("country_code") or "XX"),
+                        str(ev.get("country_name") or ""),
+                        float(ev.get("severity") or 5.0),
+                        str(ev.get("impact") or "Medium"),
+                        str(ev.get("url") or ""),
+                        float(ev.get("ai_impact_score") or 5.0),
+                        json.dumps(ev.get("related_markets") or []),
+                        int(ev.get("source_count") or 1),
+                        json.dumps(ev.get("source_list") or [ev.get("source") or "RSS"]),
+                        float(ev.get("heat_index") or 0.0),
+                        json.dumps(ev.get("ai_tags") or []),
+                        json.dumps(ev.get("keywords") or []),
+                    ),
+                )
+                await _db.commit()
+                new_count += 1
         except Exception as e:
             logger.warning("Event insert error [%s]: %s", ev.get("id", "?"), e)
 
@@ -118,10 +143,10 @@ async def _poll_events():
             logger.warning("No events returned from fetch_all_events")
             return
 
-        async with get_db() as db:
+        # _persist_events uses its own per-event db contexts internally
+        new_count = await _persist_events(events, None)
 
-            new_count = await _persist_events(events, db)
-            await db.commit()
+        async with get_db() as db:
 
             # ── Category-aware trim ─────────────────────────────
             # Keep max_events_per_category per category (weighted by priority),
