@@ -900,9 +900,11 @@ function renderFeed() {
       +'</div>'
       +'</div>';
   }).join('');
-  el('fmain').innerHTML = html||'<div style="color:var(--t3);text-align:center;margin-top:36px">No events match filters</div>';
+  var _fmain = el('fmain');
+  if (!_fmain) return;
+  _fmain.innerHTML = html||'<div style="color:var(--t3);text-align:center;margin-top:36px">No events match filters</div>';
   // Delegated click for cards (not buttons)
-  el('fmain').querySelectorAll('.evcard[data-eid]').forEach(function(card) {
+  _fmain.querySelectorAll('.evcard[data-eid]').forEach(function(card) {
     card.addEventListener('click', function(e) {
       if (e.target.closest('.impact-btn')) return;
       goEv(this.dataset.eid);
