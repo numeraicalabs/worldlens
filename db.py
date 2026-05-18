@@ -354,15 +354,43 @@ class _CursorPromise:
         return None
 
 
+class _Row(dict):
+    """
+    Dict subclass that ALSO supports integer indexing.
+    Returned by all get_db() queries so code using row[0], row[1] still works.
+    Examples:
+        row["id"]   → dict access ✓
+        row[0]      → first value  ✓
+        row[1]      → second value ✓
+    """
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            try:
+                return list(self.values())[key]
+            except IndexError:
+                raise KeyError(key)
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        if isinstance(key, int):
+            try:
+                return list(self.values())[key]
+            except IndexError:
+                return default
+        return super().get(key, default)
+
+
 class _PGCursor:
     """
     Wraps asyncpg result as aiosqlite-compatible cursor.
     Supports BOTH usage patterns:
       - cur = await db.execute(sql); rows = await cur.fetchall()
       - async with db.execute(sql) as cur: rows = await cur.fetchall()
+    Rows are _Row instances supporting both dict and integer indexing.
     """
     def __init__(self, rows, lastrowid=None):
-        self._rows = rows or []
+        self._rows = [_Row(r) if isinstance(r, dict) and not isinstance(r, _Row) else r
+                      for r in (rows or [])]
         self.lastrowid = lastrowid or 0
         self.rowcount = len(self._rows)
 
@@ -373,12 +401,10 @@ class _PGCursor:
         return self._rows[0] if self._rows else None
 
     async def fetchval(self):
-        if self._rows and self._rows[0]:
+        if self._rows and self._rows[0] is not None:
             r = self._rows[0]
-            if isinstance(r, dict):
-                vals = list(r.values())
-                return vals[0] if vals else None
-            return r
+            vals = list(r.values()) if isinstance(r, dict) else [r]
+            return vals[0] if vals else None
         return None
 
     def __aiter__(self):
@@ -507,7 +533,7 @@ class _DBCompat:
         async with self._db.execute(sql, params) as cur:
             import aiosqlite as _aiosqlite
             self._db.row_factory = _aiosqlite.Row
-            rows = [dict(r) for r in await cur.fetchall()]
+            rows = [_Row(dict(r)) for r in await cur.fetchall()]
             return _PGCursor(rows, cur.lastrowid)
 
     async def executemany(self, sql: str, params_list):
@@ -1078,6 +1104,24 @@ async def ensure_full_schema():
             # ── Column migrations (ADD IF NOT EXISTS) ─────────────────────────
             # etf_holdings: support both naming conventions
             col_migrations = [
+                # users: columns that may be missing from initial Supabase migration
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS affinity_vector TEXT DEFAULT '{}'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS severity_threshold REAL DEFAULT 7.0",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'UTC'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_enabled INTEGER DEFAULT 1",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_done INTEGER DEFAULT 0",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS tutorial_done INTEGER DEFAULT 0",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT DEFAULT '[]'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS regions TEXT DEFAULT '[]'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS market_prefs TEXT DEFAULT '[]'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS experience_level TEXT DEFAULT 'beginner'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_provider TEXT DEFAULT 'gemini'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_anthropic_key TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_gemini_key TEXT DEFAULT ''",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT DEFAULT 'it'",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ",
+                # etf_holdings: support both naming conventions
                 "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS isin TEXT DEFAULT ''",
                 "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS shares REAL DEFAULT 0",
                 "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS avg_price REAL DEFAULT 0",
@@ -1085,11 +1129,22 @@ async def ensure_full_schema():
                 "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS purchase_date TEXT",
                 "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS asset_class TEXT DEFAULT 'equity'",
                 "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'EUR'",
-                # Sync quantity ↔ shares and avg_buy_price ↔ avg_price via triggers or just alias
                 "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS quantity REAL DEFAULT 0",
                 "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS avg_buy_price REAL DEFAULT 0",
-                # etf_portfolios: add name column alias
+                # etf_portfolios
                 "ALTER TABLE etf_portfolios ADD COLUMN IF NOT EXISTS strategy TEXT DEFAULT 'custom'",
+                # events: extra columns used by scheduler
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS ai_tags TEXT DEFAULT '[]'",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS keywords TEXT DEFAULT '[]'",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS heat_index REAL DEFAULT 0",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS ai_impact_score REAL DEFAULT 5.0",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS source_count INTEGER DEFAULT 1",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS source_list TEXT DEFAULT '[]'",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS related_markets TEXT DEFAULT '[]'",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS ai_summary TEXT DEFAULT ''",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS ai_market_note TEXT DEFAULT ''",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS sentiment_score REAL DEFAULT 0",
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS sentiment_tone TEXT DEFAULT 'neutral'",
             ]
             for migration in col_migrations:
                 try:
