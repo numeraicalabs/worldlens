@@ -143,23 +143,33 @@ async def _poll_events():
             }
             default_slots = int(settings.max_events_per_category * 0.3)
             for cat, slots in CATEGORY_SLOTS.items():
-                # Real CTE for full PostgreSQL compatibility
-                await db.execute(
-                    """WITH keep AS (
-                           SELECT id FROM events WHERE category = ?
-                           ORDER BY severity DESC, timestamp DESC LIMIT ?
-                       )
-                       DELETE FROM events WHERE category = ? AND id NOT IN (SELECT id FROM keep)""",
-                    (cat, slots, cat),
-                )
-            # Final overall cap by recency — CTE version
-            await db.execute(
-                """WITH keep AS (
-                       SELECT id FROM events ORDER BY timestamp DESC LIMIT ?
-                   )
-                   DELETE FROM events WHERE id NOT IN (SELECT id FROM keep)""",
+                # 2-step DELETE: SELECT ids to keep first, then DELETE the rest
+                # This avoids nested subquery + LIMIT which PostgreSQL rejects
+                async with db.execute(
+                    "SELECT id FROM events WHERE category = ? ORDER BY severity DESC, timestamp DESC LIMIT ?",
+                    (cat, slots),
+                ) as _cur:
+                    keep_ids = [r[0] for r in await _cur.fetchall()]
+                if keep_ids:
+                    placeholders = ",".join(["?" for _ in keep_ids])
+                    await db.execute(
+                        f"DELETE FROM events WHERE category = ? AND id NOT IN ({placeholders})",
+                        [cat] + keep_ids,
+                    )
+                # If no keep_ids (category has 0 events), skip to avoid deleting everything
+
+            # Final overall cap by recency — 2-step version
+            async with db.execute(
+                "SELECT id FROM events ORDER BY timestamp DESC LIMIT ?",
                 (settings.max_events,),
-            )
+            ) as _cur:
+                keep_ids = [r[0] for r in await _cur.fetchall()]
+            if keep_ids:
+                placeholders = ",".join(["?" for _ in keep_ids])
+                await db.execute(
+                    f"DELETE FROM events WHERE id NOT IN ({placeholders})",
+                    keep_ids,
+                )
             await db.commit()
 
             # Count total events in DB
