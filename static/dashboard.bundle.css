@@ -2827,3 +2827,66 @@
 .fh-pa-sig-score { font-size: 11px; font-weight: 700; font-family: var(--fm); min-width: 32px; text-align: right; }
 .fh-pa-sig-dir   { font-size: 9px; padding: 1px 6px; border-radius: 100px; white-space: nowrap; }
 .fh-pa-sig-pnl   { font-size: 10px; font-weight: 700; font-family: var(--fm); min-width: 42px; text-align: right; }
+
+/* ── Finance Hub: Mercati + Intelligenza tab panels ── */
+
+/* Mounted view fills the panel completely */
+#fh-panel-mercati,
+#fh-panel-intelligenza {
+  position: relative;
+}
+
+#fh-mercati-mount,
+#fh-intelligenza-mount {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Intelligenza sub-tab bar */
+.fh-int-tab {
+  flex: 1;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--t3);
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+  text-align: center;
+}
+.fh-int-tab.on,
+.fh-int-tab:hover {
+  color: var(--t1);
+}
+.fh-int-tab.on {
+  border-bottom-color: var(--via);
+  color: var(--via);
+}
+
+/* Mounted views inside Finance Hub: override .view sizing */
+#fh-mercati-mount > #view-markets,
+#fh-mercati-mount > #view-insiders,
+#fh-mercati-mount > #view-macro,
+#fh-mercati-mount > #view-supplychain,
+#fh-intelligenza-mount > #view-markets,
+#fh-intelligenza-mount > #view-insiders,
+#fh-intelligenza-mount > #view-macro,
+#fh-intelligenza-mount > #view-supplychain {
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Finance Hub top bar: 5 tabs need tighter spacing */
+@media (max-width: 400px) {
+  .fh-tab { font-size: 9px !important; padding: 4px 3px !important; }
+}

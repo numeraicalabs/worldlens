@@ -399,7 +399,7 @@ function enterApp() {
   // Load data then render
   Promise.all([loadEvs(), loadFin(), loadUD(), loadMacro()]).then(function() {
     initCats();
-    connectWS();
+    try { connectWS(); } catch(e) { console.warn('connectWS:', e.message); }
     renderDash();
     renderFeed();
     if (typeof initAgentDash  === 'function') initAgentDash();
@@ -506,8 +506,8 @@ function loadRegionRisks() {
 function connectWS() {
   var proto = location.protocol==='https:'?'wss:':'ws:';
   G.ws = new WebSocket(proto+'//'+location.host+'/ws');
-  G.ws.onopen = function() { el('wsd').classList.add('on'); setEl('wst','Live'); };
-  G.ws.onclose = function() { el('wsd').classList.remove('on'); setEl('wst','Reconnecting'); setTimeout(connectWS,5000); };
+  G.ws.onopen = function() { var d=el('wsd'); if(d)d.classList.add('on'); setEl('wst','Live'); };
+  G.ws.onclose = function() { var d=el('wsd'); if(d)d.classList.remove('on'); setEl('wst','Reconnecting'); setTimeout(connectWS,5000); };
   G.ws.onmessage = function(e) {
     try {
       var m = JSON.parse(e.data);
@@ -3817,7 +3817,7 @@ function setLandingLang(lang){
 
 /* Fetch live crisis count */
 function updateLiveCount(){
-  fetch('/api/events/stats').then(function(r){ return r.ok?r.json():null; }).then(function(d){
+  fetch('/api/events/stats/summary').then(function(r){ return r.ok?r.json():null; }).then(function(d){
     if(!d) return;
     var n = (d.total_48h || d.total || d.count || 47) + ' crisi live';
     var n2 = (d.total_48h || d.total || d.count || 47) + ' crisi monitorate in questo momento';
@@ -3868,7 +3868,7 @@ setTimeout(updateNavClock, 500);
 
 function updateNavEventCount(){
   if(!G.token) return;
-  rq('/api/events/stats').then(function(d){
+  rq('/api/events/stats/summary').then(function(d){
     if(!d||d._network||d._timeout) return;
     var el = document.getElementById('nav-ev-count');
     if(el) el.textContent = (d.total_24h || d.today || d.total || '—');
