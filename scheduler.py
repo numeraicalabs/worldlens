@@ -104,7 +104,7 @@ async def _persist_events(events, db) -> int:
                        ON CONFLICT(id) DO NOTHING""",
                     (
                         str(ev["id"]),
-                        str(ev.get("timestamp") or ""),
+                        (str(ev.get("timestamp")) if ev.get("timestamp") else None),
                         str(ev.get("title") or ""),
                         str(ev.get("summary") or ""),
                         str(ev.get("category") or "GEOPOLITICS"),
