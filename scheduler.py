@@ -103,7 +103,7 @@ async def _persist_events(events, db) -> int:
             )
             new_count += 1
         except Exception as e:
-            logger.debug("Event insert error [%s]: %s", ev.get("id", "?"), e)
+            logger.warning("Event insert error [%s]: %s", ev.get("id", "?"), e)
 
     return new_count
 
