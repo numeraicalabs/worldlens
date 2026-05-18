@@ -883,3 +883,55 @@ async def get_event(event_id: str):
     except Exception as e:
         logger.warning("get_event DB error %s: %s", event_id, e)
         raise HTTPException(503, "Database unavailable")
+
+
+@router.get("/debug/insert-test")
+async def debug_insert_test():
+    """Diagnostic: attempts a test INSERT into events and returns the exact error."""
+    import time, json as _json
+    test_id = f"debug-test-{int(time.time())}"
+    result = {"test_id": test_id, "select_ok": False, "insert_ok": False,
+              "select_error": None, "insert_error": None, "columns_ok": False}
+    try:
+        async with get_db() as db:
+            # Test SELECT
+            try:
+                async with db.execute("SELECT COUNT(*) FROM events") as cur:
+                    row = await cur.fetchone()
+                    result["select_ok"] = True
+                    result["events_count"] = list(row.values())[0] if row else 0
+            except Exception as e:
+                result["select_error"] = str(e)
+
+            # Test INSERT with all 20 columns
+            try:
+                await db.execute(
+                    """INSERT INTO events
+                       (id, timestamp, title, summary, category, source,
+                        latitude, longitude, country_code, country_name,
+                        severity, impact, url, ai_impact_score, related_markets,
+                        source_count, source_list, heat_index, ai_tags, keywords)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                       ON CONFLICT(id) DO NOTHING""",
+                    (test_id, "2026-01-01T00:00:00", "Debug Test Event",
+                     "Test summary", "GEOPOLITICS", "DEBUG",
+                     0.0, 0.0, "XX", "Test Country",
+                     5.0, "Medium", "https://example.com",
+                     5.0, _json.dumps([]), 1, _json.dumps(["DEBUG"]),
+                     0.0, _json.dumps([]), _json.dumps([])),
+                )
+                await db.commit()
+                result["insert_ok"] = True
+            except Exception as e:
+                result["insert_error"] = str(e)
+
+            # Cleanup
+            try:
+                await db.execute("DELETE FROM events WHERE id=?", (test_id,))
+                await db.commit()
+            except Exception:
+                pass
+
+    except Exception as e:
+        result["outer_error"] = str(e)
+    return result
