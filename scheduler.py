@@ -166,7 +166,7 @@ async def _poll_events():
 
             # Count total events in DB
             async with db.execute("SELECT COUNT(*) FROM events") as cur:
-                total = (await cur.fetchone())[0]
+                _row = await cur.fetchone(); total = list(_row.values())[0] if _row else 0
 
         logger.info(
             "Events: %d new | %d total in DB | %d fetched this cycle",
@@ -208,7 +208,8 @@ async def _poll_gdelt():
     try:
         from analysis.gdelt_client import gdelt_fetch_all
         from scrapers.events import _dedup_events, classify, score_to_impact
-        from geocoder import find_country_enhanced, get_coords, get_name
+        from scrapers.events import find_country_enhanced
+        from geocoder import get_coords, get_name
         import json
 
         gdelt_raw = await gdelt_fetch_all(timespan=settings.gdelt_timespan)
@@ -407,7 +408,7 @@ async def _generate_daily_briefs():
                 "SELECT id FROM users WHERE is_active=1 "
                 "AND last_login > datetime('now','-7 days')"
             ) as cur:
-                user_ids = [r[0] for r in await cur.fetchall()]
+                user_ids = [list(r.values())[0] for r in await cur.fetchall()]
 
         logger.info("Daily brief: generating for %d active users", len(user_ids))
         generated = 0
@@ -682,7 +683,7 @@ async def _rebuild_ml_models():
                 "SELECT id FROM users WHERE is_active=1 "
                 "AND last_login > datetime('now','-14 days')"
             ) as cur:
-                user_ids = [r[0] for r in await cur.fetchall()]
+                user_ids = [list(r.values())[0] for r in await cur.fetchall()]
 
         rebuilt = 0
         for uid in user_ids:
@@ -1022,7 +1023,7 @@ async def _run_agent_digests():
                 "SELECT id FROM users WHERE is_active=1 "
                 "AND last_login > datetime('now','-7 days')"
             ) as cur:
-                user_ids = [r[0] for r in await cur.fetchall()]
+                user_ids = [list(r.values())[0] for r in await cur.fetchall()]
 
         from routers.agents import (
             DEFAULT_BOTS, _load_user_config, _get_bot_events,
@@ -1081,7 +1082,7 @@ async def _run_friday_predictions():
                 "SELECT id FROM users WHERE is_active=1 "
                 "AND last_login > datetime('now','-14 days')"
             ) as cur:
-                user_ids = [r[0] for r in await cur.fetchall()]
+                user_ids = [list(r.values())[0] for r in await cur.fetchall()]
 
         count = 0
         for uid in user_ids:
@@ -1181,7 +1182,7 @@ async def _broadcast_tg_pnl():
                 user_rows = await cur.fetchall()
 
         for row in user_rows:
-            uid   = row[0]
+            uid   = list(row.values())[0] if isinstance(row, dict) else row[0]
             bots  = await tg_list_bots(uid)
             pnls  = []
             for b in bots:
