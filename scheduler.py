@@ -143,23 +143,21 @@ async def _poll_events():
             }
             default_slots = int(settings.max_events_per_category * 0.3)
             for cat, slots in CATEGORY_SLOTS.items():
-                # Use CTE for PG compatibility (avoids LIMIT in subquery)
+                # Real CTE for full PostgreSQL compatibility
                 await db.execute(
-                    """DELETE FROM events WHERE category = ? AND id NOT IN (
-                           SELECT id FROM (
-                               SELECT id FROM events WHERE category = ?
-                               ORDER BY severity DESC, timestamp DESC LIMIT ?
-                           ) AS keep
-                       )""",
-                    (cat, cat, slots),
+                    """WITH keep AS (
+                           SELECT id FROM events WHERE category = ?
+                           ORDER BY severity DESC, timestamp DESC LIMIT ?
+                       )
+                       DELETE FROM events WHERE category = ? AND id NOT IN (SELECT id FROM keep)""",
+                    (cat, slots, cat),
                 )
-            # Final overall cap by recency
+            # Final overall cap by recency — CTE version
             await db.execute(
-                """DELETE FROM events WHERE id NOT IN (
-                       SELECT id FROM (
-                           SELECT id FROM events ORDER BY timestamp DESC LIMIT ?
-                       ) AS keep
-                   )""",
+                """WITH keep AS (
+                       SELECT id FROM events ORDER BY timestamp DESC LIMIT ?
+                   )
+                   DELETE FROM events WHERE id NOT IN (SELECT id FROM keep)""",
                 (settings.max_events,),
             )
             await db.commit()
