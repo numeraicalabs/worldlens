@@ -165,8 +165,34 @@ function sv(name, btn) {
   if (name==='portfolio') loadPortfolios();
   if (name==='feed') track('feed_opened', 'feed', '');
   if (name==='graph') track('graph_opened', 'graph', '');
-  if (name==='markets') track('markets_opened', 'markets', '');
-  if (name==='insiders') track('insiders_opened', 'insiders', '');
+  if (name==='markets') {
+    // Redirect to Finance Hub → Mercati tab
+    var portBtn = document.querySelector('[data-v=portfolio]');
+    var mktBtn  = document.querySelector('[data-tab=mercati]');
+    var portEl  = document.getElementById('view-portfolio');
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
+    document.querySelectorAll('.ni[data-v]').forEach(function(b){ b.classList.remove('on'); });
+    if (portEl) portEl.classList.add('on');
+    if (portBtn) portBtn.classList.add('on');
+    G.currentView = 'portfolio';
+    fhTab('mercati', mktBtn);
+    track('markets_opened', 'markets', '');
+    return;
+  }
+  if (name==='insiders') {
+    // Redirect to Finance Hub → Intelligenza tab
+    var portBtn2 = document.querySelector('[data-v=portfolio]');
+    var intBtn   = document.querySelector('[data-tab=intelligenza]');
+    var portEl2  = document.getElementById('view-portfolio');
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
+    document.querySelectorAll('.ni[data-v]').forEach(function(b){ b.classList.remove('on'); });
+    if (portEl2) portEl2.classList.add('on');
+    if (portBtn2) portBtn2.classList.add('on');
+    G.currentView = 'portfolio';
+    fhTab('intelligenza', intBtn);
+    track('insiders_opened', 'insiders', '');
+    return;
+  }
   if (name==='ai') track('ai_opened', 'ai', '');
   if (name==='tradgentic') {
     if (typeof initTradgentic === 'function') initTradgentic();
@@ -4645,11 +4671,109 @@ function fhTab(name, btn){
   document.querySelectorAll('.fh-panel').forEach(function(p){ p.classList.remove('on'); });
   var panel = document.getElementById('fh-panel-'+name);
   if(panel) panel.classList.add('on');
-  if(name==='portfolios') loadFHPortfolios();
-  if(name==='markets')    loadFHMarkets();
-  if(name==='watchlist')  loadFHWatchlist();
-  if(name==='lab')        fhInitLab();
+
+  if(name==='portfolios')   loadFHPortfolios();
+  if(name==='markets')      loadFHMarkets();   // legacy FH mini-markets (kept as fallback)
+  if(name==='watchlist')    loadFHWatchlist();
+  if(name==='lab')          fhInitLab();
+  if(name==='mercati')      _fhMountView('markets',   'fh-mercati-mount',     function(){ if(typeof initMarkets==='function') initMarkets(); });
+  if(name==='intelligenza') _fhMountIntelligenza();
 }
+
+/* ─── View-mount helpers ─────────────────────────────────────────────────── */
+
+/**
+ * Move an existing .view element (e.g. view-markets) into a Finance Hub panel
+ * mount point so it renders inside the tab without duplicating HTML or JS.
+ * The view is moved back to #content when Finance Hub is left.
+ */
+var _fhMountedViews = {};
+
+function _fhMountView(viewId, mountId, onMount) {
+  var viewEl  = document.getElementById('view-' + viewId);
+  var mountEl = document.getElementById(mountId);
+  if (!viewEl || !mountEl) return;
+
+  // Already mounted?
+  if (mountEl.contains(viewEl)) {
+    // Just ensure visible and trigger onMount
+    viewEl.style.display = 'flex';
+    if (onMount) onMount();
+    return;
+  }
+
+  // Move from #content into mount point
+  var origParent = viewEl.parentNode;
+  _fhMountedViews[viewId] = origParent;
+  // Remove .view class constraints so it fills the mount point naturally
+  viewEl.style.cssText = 'flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;width:100%';
+  mountEl.appendChild(viewEl);
+  if (onMount) onMount();
+}
+
+function _fhUnmountViews() {
+  // When navigating away from Finance Hub, restore views to #content
+  Object.keys(_fhMountedViews).forEach(function(viewId) {
+    var viewEl  = document.getElementById('view-' + viewId);
+    var origParent = _fhMountedViews[viewId];
+    if (viewEl && origParent && !origParent.contains(viewEl)) {
+      viewEl.style.cssText = '';  // restore class-driven styling
+      origParent.appendChild(viewEl);
+    }
+  });
+  _fhMountedViews = {};
+}
+
+var _fhIntCurrentTab = 'insiders';
+
+function _fhMountIntelligenza() {
+  var mountEl = document.getElementById('fh-intelligenza-mount');
+  if (!mountEl) return;
+  _fhLoadIntTab(_fhIntCurrentTab);
+}
+
+function fhIntTab(tab, btn) {
+  document.querySelectorAll('.fh-int-tab').forEach(function(b){
+    b.style.color = 'var(--t3)';
+    b.style.borderBottomColor = 'transparent';
+  });
+  if (btn) {
+    btn.style.color = 'var(--t1)';
+    btn.style.borderBottomColor = 'var(--via)';
+  }
+  _fhIntCurrentTab = tab;
+  _fhLoadIntTab(tab);
+}
+
+function _fhLoadIntTab(tab) {
+  if (tab === 'insiders') {
+    _fhMountView('insiders', 'fh-intelligenza-mount', function(){
+      if (typeof initInsiders === 'function') initInsiders();
+      else if (typeof loadInsiderTrades === 'function') loadInsiderTrades();
+    });
+  } else if (tab === 'macro') {
+    _fhMountView('macro', 'fh-intelligenza-mount', function(){
+      if (typeof renderMacro === 'function') renderMacro();
+      if (typeof loadRegionRisks === 'function') loadRegionRisks();
+    });
+  } else if (tab === 'supply') {
+    _fhMountView('supplychain', 'fh-intelligenza-mount', function(){
+      if (typeof loadSupplyChain === 'function') loadSupplyChain();
+    });
+  }
+}
+
+/* Hook sv() to unmount views when leaving Finance Hub */
+(function(){
+  var _origSv = window.sv;
+  if (_origSv && !_origSv._fhPatched) {
+    window.sv = function(name, btn) {
+      if (name !== 'portfolio') _fhUnmountViews();
+      return _origSv.apply(this, arguments);
+    };
+    window.sv._fhPatched = true;
+  }
+})();
 
 /* ─── State ─── */
 var _fhPortfolios = [];
@@ -6141,3 +6265,212 @@ function _setPA(id, val) {
   };
 })();
 
+
+/* ════════════════════════════════════════════════════════════════════
+   ADMIN PANEL — enterAdmin / exitAdmin / admNav / adminBtnInject
+   ════════════════════════════════════════════════════════════════════ */
+
+function adminBtnInject() {
+  // Show admin entry button in profile if user is admin
+  if (!window.G || !G.user || !G.user.is_admin) return;
+
+  // Add button to profile header if not already there
+  var existing = document.getElementById('admin-entry-btn');
+  if (existing) return;
+
+  var btn = document.createElement('button');
+  btn.id = 'admin-entry-btn';
+  btn.className = 'btn btn-ai btn-sm';
+  btn.textContent = '🛡 Admin Panel';
+  btn.style.cssText = 'margin-top:4px;font-size:11px;padding:5px 12px';
+  btn.onclick = function() { enterAdmin(); };
+
+  // Try to insert near profile edit button
+  var target = document.querySelector('.prof-hdr [onclick*="toggleEdit"]')
+    || document.querySelector('.prof-hdr')
+    || document.querySelector('#view-profile > div');
+  if (target) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-top:6px';
+    wrap.appendChild(btn);
+    target.parentNode && target.parentNode.insertBefore(wrap, target.nextSibling);
+  }
+
+  // Also add to mobile more-drawer if present
+  var drawer = document.querySelector('#wl-more-drawer .more-drawer-grid');
+  if (drawer && !document.getElementById('admin-drawer-item')) {
+    var item = document.createElement('div');
+    item.id = 'admin-drawer-item';
+    item.className = 'more-drawer-item';
+    item.innerHTML = '<span style="font-size:20px">🛡</span><span>Admin</span>';
+    item.onclick = function() { closeMoreDrawer(); enterAdmin(); };
+    drawer.appendChild(item);
+  }
+}
+
+function enterAdmin() {
+  var shell = document.getElementById('admin-shell');
+  if (!shell) return;
+  shell.classList.add('on');
+  admNav('overview', document.querySelector('.adm-nav-btn'));
+}
+
+function exitAdmin() {
+  var shell = document.getElementById('admin-shell');
+  if (shell) shell.classList.remove('on');
+}
+
+function admNav(section, btn) {
+  // Update active button
+  document.querySelectorAll('.adm-nav-btn').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  if (btn) btn.classList.add('active');
+
+  // Show/hide panels
+  document.querySelectorAll('.adm-panel').forEach(function(p) {
+    p.classList.remove('active');
+  });
+  var panel = document.getElementById('adm-' + section);
+  if (panel) panel.classList.add('active');
+
+  // Load section data
+  if (section === 'overview')  loadAdminOverview();
+  if (section === 'users')     loadAdminUsers();
+  if (section === 'events')    loadAdminEvents();
+  if (section === 'invites')   loadAdminInvites();
+  if (section === 'activity')  loadAdminActivity();
+  if (section === 'ai')        loadAdminAI();
+  if (section === 'settings')  loadAdminSettings();
+  if (section === 'brain')     loadAdminBrain();
+}
+
+function loadAdminOverview() {
+  rq('/api/admin/overview').then(function(r) {
+    if (!r) return;
+    var el = function(id) { return document.getElementById(id); };
+    if (el('adm-users-count'))  el('adm-users-count').textContent  = r.total_users  || 0;
+    if (el('adm-events-count')) el('adm-events-count').textContent = r.total_events || 0;
+    if (el('adm-online-count')) el('adm-online-count').textContent = r.online_users || 0;
+    if (el('adm-version'))      el('adm-version').textContent      = r.version      || '—';
+  });
+}
+
+function loadAdminUsers() {
+  rq('/api/admin/users').then(function(r) {
+    var list = document.getElementById('adm-users-list');
+    if (!list || !r || !r.users) return;
+    list.innerHTML = r.users.map(function(u) {
+      var dt = u.created_at ? String(u.created_at).slice(0,10) : '—';
+      return '<tr>'
+        + '<td style="padding:6px 8px">' + _esc(u.username) + '</td>'
+        + '<td style="padding:6px 8px;color:var(--t3)">' + _esc(u.email) + '</td>'
+        + '<td style="padding:6px 8px">' + dt + '</td>'
+        + '<td style="padding:6px 8px">' + (u.is_admin ? '👑' : '') + '</td>'
+        + '<td style="padding:6px 8px">'
+        +   '<button class="btn btn-g btn-sm" onclick="admToggleAdmin(' + u.id + ',' + (u.is_admin?'true':'false') + ')" style="font-size:9px;padding:2px 6px">'
+        +   (u.is_admin ? 'Revoke Admin' : 'Make Admin') + '</button>'
+        + '</td>'
+        + '</tr>';
+    }).join('');
+  });
+}
+
+function admToggleAdmin(uid, isAdmin) {
+  if (!confirm((isAdmin ? 'Revoca' : 'Promuovi') + ' admin per utente #' + uid + '?')) return;
+  rq('/api/admin/users/' + uid + '/toggle-admin', {method:'POST'})
+    .then(function() { loadAdminUsers(); });
+}
+
+function loadAdminEvents() {
+  rq('/api/admin/events-stats').then(function(r) {
+    if (!r) return;
+    var el = function(id) { return document.getElementById(id); };
+    if (el('adm-ev-total'))    el('adm-ev-total').textContent    = r.total    || 0;
+    if (el('adm-ev-today'))    el('adm-ev-today').textContent    = r.today    || 0;
+    if (el('adm-ev-category')) el('adm-ev-category').innerHTML   =
+      Object.entries(r.by_category || {})
+        .sort(function(a,b){return b[1]-a[1];})
+        .slice(0,8)
+        .map(function(e){ return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px"><span>'+_esc(e[0])+'</span><span style="color:var(--via)">'+e[1]+'</span></div>'; })
+        .join('');
+  });
+}
+
+function loadAdminInvites() {
+  rq('/api/auth/invites').then(function(r) {
+    var list = document.getElementById('adm-invites-list');
+    if (!list || !r || !r.invites) return;
+    list.innerHTML = r.invites.length === 0
+      ? '<div style="color:var(--t3);font-size:12px;padding:10px 0">Nessun invite.</div>'
+      : r.invites.map(function(inv) {
+          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+            + '<code style="font-size:11px;color:var(--via)">' + _esc(inv.code) + '</code>'
+            + '<span style="font-size:10px;color:var(--t3);flex:1">' + (inv.label||'') + '</span>'
+            + '<span style="font-size:10px;color:var(--t3)">' + inv.use_count + '/' + inv.max_uses + '</span>'
+            + '<button class="btn btn-g btn-sm" onclick="admDeleteInvite(' + inv.id + ')" style="font-size:9px;padding:1px 6px">✕</button>'
+            + '</div>';
+        }).join('');
+  });
+}
+
+function admCreateInvite() {
+  var label = (document.getElementById('adm-invite-label')||{}).value || '';
+  var maxUses = parseInt((document.getElementById('adm-invite-max')||{}).value || '1');
+  rq('/api/auth/invites', {method:'POST', body:{label, max_uses: maxUses}})
+    .then(function(r) {
+      if (r && r.code) { toast('Invite creato: ' + r.code, 'ok'); loadAdminInvites(); }
+    });
+}
+
+function admDeleteInvite(id) {
+  rq('/api/auth/invites/' + id, {method:'DELETE'}).then(loadAdminInvites);
+}
+
+function loadAdminActivity() {
+  rq('/api/admin/activity?limit=50').then(function(r) {
+    var list = document.getElementById('adm-activity-list');
+    if (!list || !r || !r.activity) return;
+    list.innerHTML = r.activity.map(function(a) {
+      var dt = a.created_at ? String(a.created_at).slice(0,16).replace('T',' ') : '—';
+      return '<div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px">'
+        + '<span style="color:var(--t3)">' + dt + '</span> '
+        + '<span style="color:var(--via)">' + _esc(a.action||'') + '</span> '
+        + '<span style="color:var(--t2)">' + _esc(a.detail||'') + '</span>'
+        + '</div>';
+    }).join('');
+  });
+}
+
+function loadAdminAI() {
+  rq('/api/admin/ai-status').then(function(r) {
+    if (!r) return;
+    var el = function(id){ return document.getElementById(id); };
+    if (el('adm-ai-provider'))  el('adm-ai-provider').textContent  = r.provider  || '—';
+    if (el('adm-ai-available')) el('adm-ai-available').textContent = r.available ? '✅ Online' : '❌ Offline';
+    if (el('adm-ai-calls'))     el('adm-ai-calls').textContent     = r.calls_today || 0;
+  });
+}
+
+function loadAdminSettings() {}  // Rendered statically in HTML
+
+function loadAdminBrain() {
+  rq('/api/brain/stats').then(function(r) {
+    if (!r) return;
+    var el = function(id){ return document.getElementById(id); };
+    if (el('adm-brain-nodes'))   el('adm-brain-nodes').textContent   = r.total_nodes   || 0;
+    if (el('adm-brain-entries')) el('adm-brain-entries').textContent = r.total_entries || 0;
+  });
+}
+
+function promoteAdmin() {
+  var emailEl = document.getElementById('adm-promote-email');
+  if (!emailEl) return;
+  var email = emailEl.value.trim();
+  if (!email) { toast('Inserisci email', 'err'); return; }
+  rq('/api/admin/promote', {method:'POST', body:{email}})
+    .then(function(r) {
+      if (r && r.ok) { toast(email + ' promosso admin ✓', 'ok'); emailEl.value=''; }
+      else { toast((r&&r.detail)||'Errore', 'err'); }
+    });
+}
