@@ -48,15 +48,30 @@ def _pg_to_sqlite(sql: str) -> str:
 
 def _sqlite_to_pg(sql: str) -> str:
     """Convert SQLite-style SQL to PostgreSQL-compatible SQL."""
-    # ? placeholders → $1, $2, ...
+
+    # datetime('now', 'literal interval') -> (NOW() - INTERVAL 'X unit')
+    def _interval_replace(m):
+        val = m.group(1).strip().strip("'").lstrip('-').strip()
+        return f"(NOW() - INTERVAL '{val}')"
+    sql = re.sub(
+        r"datetime\s*\(\s*'now'\s*,\s*'(-[\w\s]+)'\s*\)",
+        _interval_replace, sql, flags=re.IGNORECASE
+    )
+
+    # datetime('now') -> NOW()
+    sql = re.sub(r"datetime\('now'\)", 'NOW()', sql, flags=re.IGNORECASE)
+
+    # datetime(column) -> column  (SQLite cast, not needed in PG)
+    sql = re.sub(r'datetime\((\w+)\)', r'\1', sql, flags=re.IGNORECASE)
+
+    # ? placeholders -> $1, $2, ...
     counter = [0]
     def replace_q(m):
         counter[0] += 1
         return f'${counter[0]}'
     sql = re.sub(r'\?', replace_q, sql)
-    # datetime('now') → NOW()
-    sql = re.sub(r"datetime\('now'\)", 'NOW()', sql, flags=re.IGNORECASE)
-    # INTEGER PRIMARY KEY AUTOINCREMENT → SERIAL PRIMARY KEY
+
+    # INTEGER PRIMARY KEY AUTOINCREMENT -> SERIAL PRIMARY KEY
     sql = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',
                  'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE)
     return sql
