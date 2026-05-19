@@ -12,9 +12,28 @@ from config import settings
 router = APIRouter(prefix="/api/events", tags=["events"])
 
 
+def _json_safe(obj):
+    """Recursively convert datetime objects to ISO strings for JSON serialization."""
+    import datetime as _dt
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)):
+        return obj.isoformat()
+    return obj
+
+
 def _parse_ev(r: dict) -> dict:
+    import datetime as _dt
     ev = dict(r)
-    for field in ("related_markets", "ai_tags", "keywords", "source_list", "ner_entities"):
+    # Convert datetime objects to ISO strings (asyncpg returns datetime, not str)
+    for k, v in ev.items():
+        if isinstance(v, (_dt.datetime, _dt.date)):
+            ev[k] = v.isoformat()
+    # Parse JSON text fields
+    for field in ("related_markets", "ai_tags", "keywords", "source_list", "ner_entities",
+                  "topic_vector", "sentiment_entities"):
         try:
             ev[field] = json.loads(ev.get(field) or "[]")
         except Exception:
@@ -92,7 +111,7 @@ async def stats_summary():
             ) as c:
                 by_cat = {r[0]: r[1] for r in await c.fetchall()}
             async with db.execute(
-                "SELECT country_code, country_name, COUNT(*) as n, AVG(severity) as s "
+                "SELECT country_code, MAX(country_name) as country_name, COUNT(*) as n, AVG(severity) as s "
                 "FROM events WHERE country_code!='XX' GROUP BY country_code ORDER BY n DESC LIMIT 10"
             ) as c:
                 hotspots = [{"code": r[0], "name": r[1], "count": r[2], "avg_severity": round(r[3] or 5, 1)} for r in await c.fetchall()]
@@ -104,7 +123,7 @@ async def stats_summary():
         return {
             "total_events": total, "last_24h": last24, "high_impact_24h": high24,
             "by_category": by_cat, "hotspots": hotspots,
-            "avg_severity": round(avg_sev, 1),
+            "avg_severity": round(float(avg_sev or 5.0), 1),
             "global_risk_index": round(min(100, avg_sev * 10), 1),
         }
     except Exception as e:
@@ -123,7 +142,7 @@ async def get_heatmap():
     try:
         async with get_db() as db:
             async with db.execute(
-                "SELECT country_code, country_name, COUNT(*) as event_count, "
+                "SELECT country_code, MAX(country_name) as country_name, COUNT(*) as event_count, "
                 "AVG(severity) as avg_severity, MAX(severity) as max_severity, "
                 "SUM(CASE WHEN impact='High' THEN 1 ELSE 0 END) as high_count "
                 "FROM events WHERE country_code!='XX' "
@@ -131,7 +150,7 @@ async def get_heatmap():
                 "GROUP BY country_code ORDER BY avg_severity DESC"
             ) as cur:
                 rows = await cur.fetchall()
-        return [dict(r) for r in rows]
+        return [_json_safe(dict(r)) for r in rows]
     except Exception as e:
         logger.warning("get_heatmap DB error: %s", e)
         return []
@@ -148,7 +167,7 @@ async def get_region_risk(country_code: str):
             ) as c:
                 cached = await c.fetchone()
             if cached:
-                return dict(cached)
+                return _json_safe(dict(cached))
             async with db.execute(
                 "SELECT * FROM events WHERE country_code=? AND timestamp > NOW() - INTERVAL '72 hours' ORDER BY severity DESC LIMIT 15", (cc,)
             ) as c:
@@ -358,7 +377,7 @@ async def batch_sentiment(hours: int = 24, limit: int = 50):
                 (f"-{hours} hours", limit)
             ) as c:
                 rows = await c.fetchall()
-        return [dict(r) for r in rows]
+        return [_json_safe(dict(r)) for r in rows]
     except Exception as e:
         logger.warning("batch_sentiment DB error: %s", e)
         return []
@@ -621,7 +640,7 @@ async def get_personalized_events(
                         (f"-{hours} hours", limit)
                     ) as cur:
                         rows = [_parse_ev(dict(r)) for r in await cur.fetchall()]
-                return JSONResponse({"events": rows, "personalized": False})
+                return JSONResponse(_json_safe({"events": rows, "personalized": False}))
             except Exception:
                 return JSONResponse({"events": [], "personalized": False})
 
