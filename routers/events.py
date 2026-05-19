@@ -41,8 +41,9 @@ async def get_events(
     min_severity: float = Query(None),
 ):
     try:
-        where = ["datetime(timestamp) > datetime('now', ?)"]
-        params = ["-" + str(hours) + " hours"]
+        # Use inline interval (no param) for PG/SQLite compatibility
+        where = [f"timestamp > NOW() - INTERVAL '{hours} hours'"]
+        params = []
         if category:
             where.append("category = ?"); params.append(category.upper())
         if impact:
@@ -79,11 +80,11 @@ async def stats_summary():
             async with db.execute("SELECT COUNT(*) FROM events") as c:
                 total = (await c.fetchone())[0]
             async with db.execute(
-                "SELECT COUNT(*) FROM events WHERE datetime(timestamp) > datetime('now','-24 hours')"
+                "SELECT COUNT(*) FROM events WHERE timestamp > NOW() - INTERVAL '24 hours'"
             ) as c:
                 last24 = (await c.fetchone())[0]
             async with db.execute(
-                "SELECT COUNT(*) FROM events WHERE impact='High' AND datetime(timestamp) > datetime('now','-24 hours')"
+                "SELECT COUNT(*) FROM events WHERE impact='High' AND timestamp > NOW() - INTERVAL '24 hours'"
             ) as c:
                 high24 = (await c.fetchone())[0]
             async with db.execute(
@@ -96,7 +97,7 @@ async def stats_summary():
             ) as c:
                 hotspots = [{"code": r[0], "name": r[1], "count": r[2], "avg_severity": round(r[3] or 5, 1)} for r in await c.fetchall()]
             async with db.execute(
-                "SELECT AVG(severity) FROM events WHERE datetime(timestamp) > datetime('now','-24 hours')"
+                "SELECT AVG(severity) FROM events WHERE timestamp > NOW() - INTERVAL '24 hours'"
             ) as c:
                 avg_sev = (await c.fetchone())[0] or 5.0
 
@@ -126,7 +127,7 @@ async def get_heatmap():
                 "AVG(severity) as avg_severity, MAX(severity) as max_severity, "
                 "SUM(CASE WHEN impact='High' THEN 1 ELSE 0 END) as high_count "
                 "FROM events WHERE country_code!='XX' "
-                "AND datetime(timestamp) > datetime('now','-72 hours') "
+                "AND timestamp > NOW() - INTERVAL '72 hours' "
                 "GROUP BY country_code ORDER BY avg_severity DESC"
             ) as cur:
                 rows = await cur.fetchall()
@@ -142,14 +143,14 @@ async def get_region_risk(country_code: str):
     try:
         async with get_db() as db:
             async with db.execute(
-                "SELECT * FROM region_risk WHERE country_code=? AND datetime(updated_at) > datetime('now','-1 hour')",
+                "SELECT * FROM region_risk WHERE country_code=? AND updated_at > NOW() - INTERVAL '1 hour'",
                 (cc,)
             ) as c:
                 cached = await c.fetchone()
             if cached:
                 return dict(cached)
             async with db.execute(
-                "SELECT * FROM events WHERE country_code=? AND datetime(timestamp) > datetime('now','-72 hours') ORDER BY severity DESC LIMIT 15", (cc,)
+                "SELECT * FROM events WHERE country_code=? AND timestamp > NOW() - INTERVAL '72 hours' ORDER BY severity DESC LIMIT 15", (cc,)
             ) as c:
                 events = [dict(r) for r in await c.fetchall()]
 
@@ -352,7 +353,7 @@ async def batch_sentiment(hours: int = 24, limit: int = 50):
             async with db.execute(
                 "SELECT id, sentiment_score, sentiment_tone, sentiment_intensity, "
                 "sentiment_info_type FROM events "
-                "WHERE datetime(timestamp) > datetime('now',?) AND sentiment_tone != '' "
+                "WHERE timestamp > NOW() - INTERVAL '24 hours' AND sentiment_tone != '' "
                 "ORDER BY timestamp DESC LIMIT ?",
                 (f"-{hours} hours", limit)
             ) as c:
@@ -430,7 +431,7 @@ async def get_event_relationships(event_id: str, hours: int = Query(72), limit: 
             async with db.execute(
                 "SELECT id, title, summary, category, severity, timestamp, "
                 "country_code, topic_vector FROM events "
-                "WHERE id!=? AND datetime(timestamp) > datetime('now',?) "
+                "WHERE id!=? AND timestamp > NOW() - INTERVAL '24 hours' "
                 "ORDER BY severity DESC LIMIT 50",
                 (event_id, f"-{hours} hours")
             ) as c:
@@ -469,7 +470,7 @@ async def get_graph_nodes(hours: int = Query(48), min_severity: float = Query(5.
                 "SELECT id, title, category, severity, impact, country_code, country_name, "
                 "timestamp, latitude, longitude, sentiment_score, sentiment_tone, "
                 "related_event_ids, relationship_types, topic_vector, source_count "
-                "FROM events WHERE datetime(timestamp) > datetime('now',?) "
+                "FROM events WHERE timestamp > NOW() - INTERVAL '24 hours' "
                 "AND severity >= ? ORDER BY severity DESC LIMIT ?",
                 (f"-{hours} hours", min_severity, limit)
             ) as c:
@@ -615,7 +616,7 @@ async def get_personalized_events(
             try:
                 async with get_db() as db:
                     async with db.execute(
-                        "SELECT * FROM events WHERE datetime(timestamp) > datetime('now',?) "
+                        "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '24 hours' "
                         "ORDER BY severity DESC LIMIT ?",
                         (f"-{hours} hours", limit)
                     ) as cur:
@@ -634,7 +635,7 @@ async def get_personalized_events(
                 JOIN   events e ON e.id = al.detail
                 WHERE  al.user_id=?
                   AND  al.action IN ('event_opened','event_saved','event_dwell_30s')
-                  AND  al.created_at > datetime('now','-30 days')
+                  AND  al.created_at > NOW() - INTERVAL '30 days'
                 GROUP  BY e.category
                 ORDER  BY cnt DESC
             """, (uid,)) as cur:
@@ -647,7 +648,7 @@ async def get_personalized_events(
 
             async with db.execute(
                 "SELECT * FROM events "
-                "WHERE datetime(timestamp) > datetime('now',?) "
+                "WHERE timestamp > NOW() - INTERVAL '24 hours' "
                 "ORDER BY (severity * COALESCE(heat_index,severity)) DESC "
                 "LIMIT 300",
                 (f"-{hours} hours",)
@@ -753,7 +754,7 @@ async def get_asset_drivers(
                        timestamp, url, sentiment_tone, source_count,
                        related_markets, heat_index
                 FROM   events
-                WHERE  datetime(timestamp) > datetime('now', ?)
+                WHERE  timestamp > NOW() - INTERVAL '72 hours'
                   AND  (
                         related_markets LIKE ?
                      OR related_markets LIKE ?
@@ -816,7 +817,7 @@ async def export_events_csv(
     if not user:
         raise HTTPException(401, "Authentication required for export")
     try:
-        where  = ["datetime(timestamp) > datetime('now',?)"]
+        where  = ["timestamp > NOW() - INTERVAL '24 hours'"]
         params = [f"-{hours} hours"]
         if category:
             where.append("category = ?"); params.append(category.upper())
