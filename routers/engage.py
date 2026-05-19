@@ -184,7 +184,7 @@ async def get_daily_insight(user=Depends(require_user)):
         try:
             async with get_db() as db:
                 await db.execute(
-                    "INSERT INTO daily_insights (user_id, date, insight) VALUES (?,?,?)",
+                    "INSERT INTO daily_insights (user_id, date, insight) VALUES (?,?,?)" " ON CONFLICT (user_id, date) DO UPDATE SET insight=EXCLUDED.insight",
                     (user["id"], today, text)
                 )
                 await db.commit()
@@ -453,7 +453,7 @@ async def get_weekly_report(user=Depends(require_user)):
     async with get_db() as db:
         await _ensure_tables(db)
         await db.execute(
-            "INSERT INTO weekly_reports (user_id, week_start, report) VALUES (?,?,?)",
+            "INSERT INTO weekly_reports (user_id, week_start, report) VALUES (?,?,?)" " ON CONFLICT (user_id, week_start) DO UPDATE SET report=EXCLUDED.report",
             (user["id"], week_start, report_json)
         )
         await db.commit()
@@ -504,7 +504,7 @@ async def set_layout(payload: dict = Body(...), user=Depends(require_user)):
     async with get_db() as db:
         await _ensure_tables(db)
         await db.execute(
-            "INSERT INTO layout_prefs (user_id, layout_type) VALUES (?,?)",
+            "INSERT INTO layout_prefs (user_id, layout_type) VALUES (?,?)" " ON CONFLICT (user_id) DO UPDATE SET layout_type=EXCLUDED.layout_type",
             (user["id"], layout)
         )
         await db.commit()

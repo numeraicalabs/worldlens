@@ -38,65 +38,42 @@ router = APIRouter(prefix="/api/brain", tags=["brain"])
 
 # ── Schema ──────────────────────────────────────────────────────────────────
 
-BRAIN_SCHEMA = """
-CREATE TABLE IF NOT EXISTS brain_entries (
-    id          SERIAL PRIMARY KEY,
-    user_id     INTEGER NOT NULL,
-    content     TEXT NOT NULL,
-    source      TEXT NOT NULL DEFAULT 'manual',   -- event|watchlist|market|ew|alert|question|analysis|interaction
-    topic       TEXT DEFAULT '',                   -- finance|geopolitics|macro|security|tech|...
-    weight      REAL DEFAULT 1.0,                  -- higher = more important
-    context     TEXT DEFAULT '{}',                 -- JSON metadata
-    timestamp   TEXT DEFAULT (NOW()),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
-CREATE VIRTUAL TABLE IF NOT EXISTS brain_fts USING fts5(
-    content,
-    topic,
-    source,
-    content=brain_entries,
-    content_rowid=id,
-    tokenize='porter unicode61'
-);
-
-CREATE TRIGGER IF NOT EXISTS brain_entries_ai
-    AFTER INSERT ON brain_entries BEGIN
-    INSERT INTO brain_fts(rowid, content, topic, source)
-    VALUES (new.id, new.content, new.topic, new.source);
-END;
-
-CREATE TRIGGER IF NOT EXISTS brain_entries_ad
-    AFTER DELETE ON brain_entries BEGIN
-    INSERT INTO brain_fts(brain_fts, rowid, content, topic, source)
-    VALUES ('delete', old.id, old.content, old.topic, old.source);
-END;
-
-CREATE TABLE IF NOT EXISTS brain_sessions (
-    id          SERIAL PRIMARY KEY,
-    user_id     INTEGER NOT NULL,
-    session_date TEXT DEFAULT (CURRENT_DATE),
-    interactions INTEGER DEFAULT 0,
-    entries_added INTEGER DEFAULT 0,
-    topics_touched TEXT DEFAULT '[]',
-    UNIQUE(user_id, session_date),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_brain_user ON brain_entries(user_id);
-CREATE INDEX IF NOT EXISTS idx_brain_source ON brain_entries(source);
-CREATE INDEX IF NOT EXISTS idx_brain_topic ON brain_entries(topic);
-CREATE INDEX IF NOT EXISTS idx_brain_ts ON brain_entries(timestamp DESC);
-"""
+# BRAIN_SCHEMA: PostgreSQL-compatible only (no FTS5/triggers - those are SQLite-only)
+# brain_sessions.session_date is created via pg_compat.ensure_session_date() at startup
+BRAIN_SCHEMA_PG = [
+    """CREATE TABLE IF NOT EXISTS brain_entries (
+        id          SERIAL PRIMARY KEY,
+        user_id     INTEGER NOT NULL,
+        content     TEXT NOT NULL,
+        source      TEXT NOT NULL DEFAULT 'manual',
+        topic       TEXT DEFAULT '',
+        weight      REAL DEFAULT 1.0,
+        context     TEXT DEFAULT '{}',
+        timestamp   TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS brain_sessions (
+        id            SERIAL PRIMARY KEY,
+        user_id       INTEGER NOT NULL,
+        session_date  TEXT DEFAULT '',
+        interactions  INTEGER DEFAULT 0,
+        entries_added INTEGER DEFAULT 0,
+        topics_touched TEXT DEFAULT '[]',
+        UNIQUE(user_id, session_date)
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_brain_user   ON brain_entries(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_brain_source ON brain_entries(source)",
+    "CREATE INDEX IF NOT EXISTS idx_brain_topic  ON brain_entries(topic)",
+    "CREATE INDEX IF NOT EXISTS idx_brain_ts     ON brain_entries(timestamp DESC)",
+]
 
 # ── DB helpers ───────────────────────────────────────────────────────────────
 
-async def ensure_brain_tables(db: aiosqlite.Connection):
-    for stmt in BRAIN_SCHEMA.split(";"):
-        s = stmt.strip()
-        if s:
+async def ensure_brain_tables(db=None):
+    """Create brain tables using get_db() - PostgreSQL compatible."""
+    async with get_db() as _db:
+        for stmt in BRAIN_SCHEMA_PG:
             try:
-                await db.execute(s)
+                await _db.execute(stmt)
             except Exception as e:
                 logger.debug("brain schema stmt: %s — %s", s[:60], e)
     await db.commit()
@@ -195,9 +172,7 @@ async def brain_ingest(
     except Exception as e:
         logger.warning("brain_ingest error user=%s: %s", user_id, e)
         return False
-    finally:
-        if close_after:
-            await db.close()
+    # cleanup handled by get_db() context manager
 
 
 async def brain_search(
@@ -224,31 +199,31 @@ async def brain_search(
                     SELECT b.id, b.content, b.source, b.topic, b.weight, b.timestamp,
                            1.0 as score
                     FROM brain_entries b
-                    WHERE b.content ILIKE '%' || $1 || '%' AND b.user_id=$2 AND b.source=$3
+                    WHERE b.content ILIKE '%' || ? || '%' AND b.user_id=? AND b.source=?
                     ORDER BY b.weight DESC, b.timestamp DESC
                     LIMIT ?
                 """
-                params = (clean_query, user_id, source_filter, top_k)
+                params = (clean_query, user_id, source_filter, int(top_k))
             elif topic_filter:
                 sql = """
                     SELECT b.id, b.content, b.source, b.topic, b.weight, b.timestamp,
                            1.0 as score
                     FROM brain_entries b
-                    WHERE b.content ILIKE '%' || $1 || '%' AND b.user_id=$2 AND b.topic=$3
+                    WHERE b.content ILIKE '%' || ? || '%' AND b.user_id=? AND b.topic=?
                     ORDER BY b.weight DESC, b.timestamp DESC
                     LIMIT ?
                 """
-                params = (clean_query, user_id, topic_filter, top_k)
+                params = (clean_query, user_id, topic_filter, int(top_k))
             else:
                 sql = """
                     SELECT b.id, b.content, b.source, b.topic, b.weight, b.timestamp,
                            1.0 as score
                     FROM brain_entries b
-                    WHERE b.content ILIKE '%' || $1 || '%' AND b.user_id=$2
+                    WHERE b.content ILIKE '%' || ? || '%' AND b.user_id=?
                     ORDER BY b.weight DESC, b.timestamp DESC
                     LIMIT ?
                 """
-                params = (clean_query, user_id, top_k)
+                params = (clean_query, user_id, int(top_k))
 
             async with db.execute(sql, params) as cur:
                 rows = await cur.fetchall()
@@ -410,7 +385,7 @@ async def reset_brain(user=Depends(require_user)):
         await db.execute("DELETE FROM brain_entries WHERE user_id=?", (user["id"],))
         await db.execute("DELETE FROM brain_sessions WHERE user_id=?", (user["id"],))
         # Rebuild FTS index
-        await db.execute("INSERT INTO brain_fts(brain_fts) VALUES('rebuild')")
+        pass  # FTS rebuild not needed in PostgreSQL
         await db.commit()
     return {"ok": True}
 
@@ -503,7 +478,7 @@ async def admin_reset_user_brain(user_id: int, _=Depends(require_admin)):
         await ensure_brain_tables(db)
         await db.execute("DELETE FROM brain_entries WHERE user_id=?", (user_id,))
         await db.execute("DELETE FROM brain_sessions WHERE user_id=?", (user_id,))
-        await db.execute("INSERT INTO brain_fts(brain_fts) VALUES('rebuild')")
+        pass  # FTS rebuild not needed in PostgreSQL
         await db.commit()
     return {"ok": True, "user_id": user_id}
 

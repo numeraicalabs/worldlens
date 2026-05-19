@@ -295,8 +295,7 @@ async def get_early_warning(user=Depends(require_user)):
         # Check snapshot cache (valid for 30 min)
         today = date.today().isoformat()
         async with db.execute(
-            "SELECT * FROM ew_snapshots WHERE snapshot_date=? AND "
-            "created_at > NOW() - INTERVAL '30 minutes'", (today,)
+            "SELECT * FROM ew_snapshots WHERE snapshot_date=?", (today,)
         ) as c:
             snap = await c.fetchone()
         if snap:
