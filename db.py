@@ -47,111 +47,18 @@ def _pg_to_sqlite(sql: str) -> str:
 
 
 def _sqlite_to_pg(sql: str) -> str:
-    """Convert SQLite SQL to PostgreSQL-compatible SQL.
-    Handles all the dialect differences used in the WorldLens codebase.
-    """
-    # 1. datetime('now', '-X hours/days/minutes') → NOW() - INTERVAL 'X hours'
-    # Match: datetime('now', '-72 hours') / datetime('now','-1 day') etc.
-    def _interval_repl(m):
-        val = m.group(1).strip()
-        # val is like "-72 hours" or "+1 day"
-        # Strip leading +/-
-        sign = '-' if val.startswith('-') else ('+' if val.startswith('+') else '-')
-        rest = val.lstrip('+-').strip()
-        # rest is "72 hours" → keep as INTERVAL '72 hours'
-        return f"(NOW() {sign} INTERVAL '{rest}')"
-
-    sql = re.sub(
-        r"datetime\(\s*'now'\s*,\s*'([^']+)'\s*\)",
-        _interval_repl, sql, flags=re.IGNORECASE
-    )
-    # datetime('now', ?) → NOW() with param treated as interval
-    # We rewrite to: (NOW() + ($N || ' hours')::INTERVAL) — but params are bound,
-    # so safer: substitute the placeholder with a CAST expression.
-    # Since the codebase uses datetime('now', ?) with params like "-72 hours",
-    # we convert to: (NOW() + $N::INTERVAL)
-    sql = re.sub(
-        r"datetime\(\s*'now'\s*,\s*\?\s*\)",
-        "(NOW() + ?::INTERVAL)", sql, flags=re.IGNORECASE
-    )
-
-    # 2. datetime('now') → NOW()
-    sql = re.sub(r"datetime\(\s*'now'\s*\)", "NOW()", sql, flags=re.IGNORECASE)
-
-    # 3. datetime(column_name) → column_name (PG TIMESTAMPTZ compares natively)
-    sql = re.sub(r"datetime\(\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\)", r"\1", sql)
-
-    # 4. date('now', ...) similar treatment
-    sql = re.sub(
-        r"date\(\s*'now'\s*,\s*'([^']+)'\s*\)",
-        lambda m: f"(CURRENT_DATE {'-' if m.group(1).startswith('-') else '+'} INTERVAL '{m.group(1).lstrip('+-').strip()}')",
-        sql, flags=re.IGNORECASE
-    )
-    sql = re.sub(r"date\(\s*'now'\s*\)", "CURRENT_DATE", sql, flags=re.IGNORECASE)
-
-    # 5. GROUP_CONCAT(x, sep) → STRING_AGG(x::text, sep)
-    sql = re.sub(
-        r"GROUP_CONCAT\(\s*([^,)]+)\s*,\s*('[^']*')\s*\)",
-        r"STRING_AGG(\1::text, \2)", sql, flags=re.IGNORECASE
-    )
-    # GROUP_CONCAT(x) → STRING_AGG(x::text, ',')
-    sql = re.sub(
-        r"GROUP_CONCAT\(\s*([^,)]+)\s*\)",
-        r"STRING_AGG(\1::text, ',')", sql, flags=re.IGNORECASE
-    )
-
-    # 6. INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
-    sql = re.sub(
-        r"INSERT\s+OR\s+IGNORE\s+INTO",
-        "INSERT INTO", sql, flags=re.IGNORECASE
-    )
-    # INSERT OR REPLACE → INSERT (let PG ON CONFLICT handle it; without it, falls back)
-    sql = re.sub(
-        r"INSERT\s+OR\s+REPLACE\s+INTO",
-        "INSERT INTO", sql, flags=re.IGNORECASE
-    )
-
-    # 7. INTEGER PRIMARY KEY AUTOINCREMENT → SERIAL PRIMARY KEY
-    sql = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',
-                 'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE)
-
-    # 8. Boolean-style integers: PG accepts both, but be safe
-    # (no-op — leave as is)
-
-    # 9. DDL: column DEFAULT datetime('now') → DEFAULT NOW()
-    sql = re.sub(
-        r"DEFAULT\s+\(datetime\('now'\)\)",
-        "DEFAULT NOW()", sql, flags=re.IGNORECASE
-    )
-    sql = re.sub(
-        r"DEFAULT\s+datetime\('now'\)",
-        "DEFAULT NOW()", sql, flags=re.IGNORECASE
-    )
-
-    # 10. DDL: AUTOINCREMENT → SERIAL-style (already in PRIMARY KEY, strip AUTOINCREMENT)
-    sql = re.sub(r'\bAUTOINCREMENT\b', '', sql, flags=re.IGNORECASE)
-
-    # 11. DDL: INTEGER PRIMARY KEY → SERIAL PRIMARY KEY (without AUTOINCREMENT)
-    sql = re.sub(
-        r'\bINTEGER\s+PRIMARY\s+KEY\b(?!\s+AUTOINCREMENT)',
-        'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE
-    )
-
-    # 12. DDL: TEXT DEFAULT (datetime('now')) with parens
-    sql = re.sub(
-        r"DEFAULT\s+\(\s*datetime\([^)]*\)\s*\)",
-        "DEFAULT NOW()", sql, flags=re.IGNORECASE
-    )
-
-    # 13. ON CONFLICT(key) DO UPDATE SET ... (already PG syntax) — keep as is
-
-    # 14. ? placeholders → $1, $2, ... (MUST be last)
+    """Convert SQLite-style SQL to PostgreSQL-compatible SQL."""
+    # ? placeholders → $1, $2, ...
     counter = [0]
     def replace_q(m):
         counter[0] += 1
         return f'${counter[0]}'
     sql = re.sub(r'\?', replace_q, sql)
-
+    # datetime('now') → NOW()
+    sql = re.sub(r"datetime\('now'\)", 'NOW()', sql, flags=re.IGNORECASE)
+    # INTEGER PRIMARY KEY AUTOINCREMENT → SERIAL PRIMARY KEY
+    sql = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',
+                 'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE)
     return sql
 
 
@@ -322,283 +229,6 @@ async def db_executemany(sql: str, params_list: List[Tuple]) -> None:
 # ── Schema management ──────────────────────────────────────────────────────────
 
 # Full unified schema — works on both Postgres and SQLite
-
-# ─────────────────────────────────────────────────────────────────────────────
-# UNIFIED DB CONNECTION — routes to PG (Supabase) or SQLite transparently
-# Usage in routers:
-#   from db import get_db
-#   async with get_db() as db:
-#       rows = await db.fetchall("SELECT * FROM users WHERE id=?", (uid,))
-# ─────────────────────────────────────────────────────────────────────────────
-
-class _CursorPromise:
-    """
-    Lazy cursor returned by db.execute(). Supports both:
-      - await db.execute(sql)            → returns _PGCursor
-      - async with db.execute(sql) as c: → c is _PGCursor
-    """
-    __slots__ = ('_coro', '_cursor')
-
-    def __init__(self, coro):
-        self._coro = coro
-        self._cursor = None
-
-    def __await__(self):
-        return self._coro.__await__()
-
-    async def __aenter__(self):
-        self._cursor = await self._coro
-        return self._cursor
-
-    async def __aexit__(self, *args):
-        return None
-
-
-class _Row(dict):
-    """
-    Dict subclass that ALSO supports integer indexing.
-    Returned by all get_db() queries so code using row[0], row[1] still works.
-    Examples:
-        row["id"]   → dict access ✓
-        row[0]      → first value  ✓
-        row[1]      → second value ✓
-    """
-    def __getitem__(self, key):
-        if isinstance(key, int):
-            try:
-                return list(self.values())[key]
-            except IndexError:
-                raise KeyError(key)
-        return super().__getitem__(key)
-
-    def get(self, key, default=None):
-        if isinstance(key, int):
-            try:
-                return list(self.values())[key]
-            except IndexError:
-                return default
-        return super().get(key, default)
-
-
-class _PGCursor:
-    """
-    Wraps asyncpg result as aiosqlite-compatible cursor.
-    Supports BOTH usage patterns:
-      - cur = await db.execute(sql); rows = await cur.fetchall()
-      - async with db.execute(sql) as cur: rows = await cur.fetchall()
-    Rows are _Row instances supporting both dict and integer indexing.
-    """
-    def __init__(self, rows, lastrowid=None):
-        self._rows = [_Row(r) if isinstance(r, dict) and not isinstance(r, _Row) else r
-                      for r in (rows or [])]
-        self.lastrowid = lastrowid or 0
-        self.rowcount = len(self._rows)
-
-    async def fetchall(self):
-        return self._rows
-
-    async def fetchone(self):
-        return self._rows[0] if self._rows else None
-
-    async def fetchval(self):
-        if self._rows and self._rows[0] is not None:
-            r = self._rows[0]
-            vals = list(r.values()) if isinstance(r, dict) else [r]
-            return vals[0] if vals else None
-        return None
-
-    def __aiter__(self):
-        self._idx = 0
-        return self
-
-    async def __anext__(self):
-        if self._idx >= len(self._rows):
-            raise StopAsyncIteration
-        row = self._rows[self._idx]
-        self._idx += 1
-        return row
-
-    # Async context manager support — for `async with db.execute(...) as cur:`
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        return None
-
-    # Awaitable support — for `cur = await db.execute(...)`
-    def __await__(self):
-        async def _self():
-            return self
-        return _self().__await__()
-
-
-class _PGDb:
-    """Wraps asyncpg connection to be aiosqlite-compatible."""
-    def __init__(self, conn):
-        self._conn = conn
-        self.row_factory = None  # ignored, PG always returns dicts
-
-    def _adapt(self, sql: str) -> str:
-        return _sqlite_to_pg(sql)
-
-    def execute(self, sql: str, params: tuple = ()):
-        """
-        Returns a _CursorPromise that works with both:
-          - await db.execute(...)
-          - async with db.execute(...) as cur:
-        """
-        return _CursorPromise(self._execute_impl(sql, params))
-
-    async def _execute_impl(self, sql: str, params: tuple = ()):
-        pg_sql = self._adapt(sql)
-        verb = pg_sql.strip()[:6].upper()
-        try:
-            if verb in ("INSERT", "UPDATE", "DELETE"):
-                if verb == "INSERT" and "RETURNING" not in pg_sql.upper():
-                    pg_sql_ret = pg_sql.rstrip(";") + " RETURNING id"
-                    try:
-                        row = await self._conn.fetchrow(pg_sql_ret, *params)
-                        lastrowid = row["id"] if row and "id" in row else 0
-                        return _PGCursor([], lastrowid)
-                    except Exception:
-                        pass
-                await self._conn.execute(pg_sql, *params)
-                return _PGCursor([])
-            else:
-                rows = await self._conn.fetch(pg_sql, *params)
-                dicts = [dict(r) for r in rows]
-                return _PGCursor(dicts)
-        except Exception as e:
-            logger.debug("_PGDb.execute [%s...]: %s", pg_sql[:60], e)
-            return _PGCursor([])
-
-    async def executemany(self, sql: str, params_list):
-        pg_sql = self._adapt(sql)
-        for params in params_list:
-            try:
-                await self._conn.execute(pg_sql, *params)
-            except Exception as e:
-                logger.debug("_PGDb.executemany: %s", e)
-
-    async def executescript(self, script: str):
-        stmts = [s.strip() for s in script.split(";") if s.strip()]
-        for stmt in stmts:
-            try:
-                await self._conn.execute(self._adapt(stmt))
-            except Exception as e:
-                msg = str(e).lower()
-                if "already exists" not in msg and "duplicate" not in msg:
-                    logger.debug("executescript stmt: %s", e)
-
-    async def commit(self):
-        pass  # asyncpg auto-commits in non-transaction mode
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        pass
-
-    def __aiter__(self):
-        raise NotImplementedError
-
-
-class _SQLiteCompat:
-    """Thin wrapper around aiosqlite that exposes the same interface."""
-    def __init__(self, path: str):
-        self._path = path
-        self._db = None
-
-    async def __aenter__(self):
-        import aiosqlite as _aiosqlite
-        self._db = await _aiosqlite.connect(self._path)
-        self._db.row_factory = _aiosqlite.Row
-        return _DBCompat(self._db)
-
-    async def __aexit__(self, *args):
-        if self._db:
-            await self._db.close()
-
-
-class _DBCompat:
-    """Unified cursor/execute interface backed by aiosqlite."""
-    def __init__(self, db):
-        self._db = db
-        self.row_factory = None
-
-    def execute(self, sql: str, params: tuple = ()):
-        return _CursorPromise(self._execute_impl(sql, params))
-
-    async def _execute_impl(self, sql: str, params: tuple = ()):
-        async with self._db.execute(sql, params) as cur:
-            import aiosqlite as _aiosqlite
-            self._db.row_factory = _aiosqlite.Row
-            rows = [_Row(dict(r)) for r in await cur.fetchall()]
-            return _PGCursor(rows, cur.lastrowid)
-
-    async def executemany(self, sql: str, params_list):
-        await self._db.executemany(sql, params_list)
-
-    async def executescript(self, script: str):
-        await self._db.executescript(script)
-
-    async def commit(self):
-        await self._db.commit()
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        pass
-
-
-class _get_db_ctx:
-    """
-    Async context manager returned by get_db().
-    Routes to Supabase PG when available, falls back to SQLite.
-    """
-    def __init__(self):
-        self._pg_ctx = None
-        self._sq_ctx = None
-        self._db = None
-
-    async def __aenter__(self):
-        pool = await _get_pg_pool()
-        if pool:
-            conn = await pool.acquire()
-            self._pg_ctx = conn
-            self._pool = pool
-            return _PGDb(conn)
-        else:
-            import aiosqlite as _aiosqlite
-            from config import settings as _settings
-            self._sq_ctx = await _aiosqlite.connect(_settings.db_path)
-            self._sq_ctx.row_factory = _aiosqlite.Row
-            return _DBCompat(self._sq_ctx)
-
-    async def __aexit__(self, *args):
-        if self._pg_ctx:
-            try:
-                await self._pool.release(self._pg_ctx)
-            except Exception:
-                pass
-        if self._sq_ctx:
-            try:
-                await self._sq_ctx.close()
-            except Exception:
-                pass
-
-
-def get_db() -> _get_db_ctx:
-    """
-    Usage:
-        async with get_db() as db:
-            result = await db.execute("SELECT * FROM users WHERE id=?", (uid,))
-            rows = await result.fetchall()
-    """
-    return _get_db_ctx()
-
-
 FULL_SCHEMA_PG = """
 CREATE TABLE IF NOT EXISTS users (
     id                  SERIAL PRIMARY KEY,
@@ -838,243 +468,6 @@ CREATE TABLE IF NOT EXISTS brain_sessions (
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, session_id)
 );
-
-CREATE TABLE IF NOT EXISTS etf_portfolios_meta (
-    portfolio_id        INTEGER PRIMARY KEY REFERENCES etf_portfolios(id) ON DELETE CASCADE,
-    base_currency       TEXT NOT NULL DEFAULT 'EUR',
-    benchmark_ticker    TEXT DEFAULT 'VWCE',
-    description         TEXT DEFAULT '',
-    color               TEXT DEFAULT '#7C3AED',
-    icon                TEXT DEFAULT '💼',
-    is_public           BOOLEAN DEFAULT FALSE,
-    updated_at          TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS portfolio_snapshots (
-    id              SERIAL PRIMARY KEY,
-    portfolio_id    INTEGER NOT NULL REFERENCES etf_portfolios(id) ON DELETE CASCADE,
-    snap_date       TEXT NOT NULL,
-    total_value     REAL NOT NULL DEFAULT 0,
-    total_cost      REAL NOT NULL DEFAULT 0,
-    total_return_pct REAL DEFAULT 0,
-    today_return_pct REAL DEFAULT 0,
-    num_holdings    INTEGER DEFAULT 0,
-    created_at      TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(portfolio_id, snap_date)
-);
-
-CREATE TABLE IF NOT EXISTS holding_prices (
-    id          SERIAL PRIMARY KEY,
-    holding_id  INTEGER NOT NULL REFERENCES etf_holdings(id) ON DELETE CASCADE,
-    price_date  TEXT NOT NULL,
-    price_usd   REAL NOT NULL DEFAULT 0,
-    price_eur   REAL NOT NULL DEFAULT 0,
-    value_eur   REAL NOT NULL DEFAULT 0,
-    created_at  TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(holding_id, price_date)
-);
-
-CREATE TABLE IF NOT EXISTS trade_ideas (
-    id                  SERIAL PRIMARY KEY,
-    event_id            TEXT NOT NULL DEFAULT '',
-    event_title         TEXT NOT NULL DEFAULT '',
-    event_category      TEXT NOT NULL DEFAULT '',
-    event_severity      REAL NOT NULL DEFAULT 5,
-    ticker              TEXT NOT NULL,
-    asset_name          TEXT NOT NULL DEFAULT '',
-    direction           TEXT NOT NULL DEFAULT 'LONG',
-    entry_low           REAL,
-    entry_high          REAL,
-    target_pct          REAL,
-    stop_pct            REAL,
-    timeframe           TEXT NOT NULL DEFAULT '5-15 days',
-    confidence          REAL NOT NULL DEFAULT 0.5,
-    opp_score           INTEGER NOT NULL DEFAULT 0,
-    rationale           TEXT NOT NULL DEFAULT '',
-    risks               TEXT DEFAULT '[]',
-    catalysts           TEXT DEFAULT '[]',
-    status              TEXT DEFAULT 'active',
-    created_at          TIMESTAMPTZ DEFAULT NOW(),
-    expires_at          TIMESTAMPTZ,
-    price_at_generation REAL,
-    price_current       REAL,
-    pnl_pct             REAL,
-    max_favorable_pct   REAL,
-    tracked_at          TIMESTAMPTZ,
-    outcome_note        TEXT DEFAULT ''
-);
-
-CREATE TABLE IF NOT EXISTS anomaly_alerts (
-    id              SERIAL PRIMARY KEY,
-    ticker          TEXT NOT NULL,
-    asset_name      TEXT NOT NULL DEFAULT '',
-    alert_type      TEXT NOT NULL,
-    severity        TEXT NOT NULL DEFAULT 'medium',
-    title           TEXT NOT NULL,
-    detail          TEXT NOT NULL DEFAULT '',
-    current_val     REAL,
-    reference_val   REAL,
-    change_pct      REAL,
-    related_event_id TEXT DEFAULT '',
-    acknowledged    BOOLEAN DEFAULT FALSE,
-    created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS opp_scores (
-    event_id    TEXT PRIMARY KEY,
-    score       INTEGER NOT NULL DEFAULT 0,
-    scored_at   TIMESTAMPTZ DEFAULT NOW(),
-    ideas_count INTEGER DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS idea_portfolio_links (
-    id              SERIAL PRIMARY KEY,
-    idea_id         INTEGER NOT NULL REFERENCES trade_ideas(id) ON DELETE CASCADE,
-    portfolio_id    INTEGER NOT NULL REFERENCES etf_portfolios(id) ON DELETE CASCADE,
-    holding_id      INTEGER,
-    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    shares          REAL NOT NULL DEFAULT 0,
-    entry_price     REAL NOT NULL DEFAULT 0,
-    linked_at       TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS brain_summaries (
-    id          SERIAL PRIMARY KEY,
-    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    topic       TEXT NOT NULL,
-    summary     TEXT NOT NULL DEFAULT '',
-    entry_count INTEGER DEFAULT 0,
-    generated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(user_id, topic)
-);
-
-CREATE TABLE IF NOT EXISTS brain_agent_sessions (
-    id          TEXT PRIMARY KEY,
-    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title       TEXT DEFAULT 'New Session',
-    message_count INTEGER DEFAULT 0,
-    last_template TEXT DEFAULT '',
-    created_at  TIMESTAMPTZ DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS brain_agent_messages (
-    id          TEXT PRIMARY KEY,
-    session_id  TEXT NOT NULL REFERENCES brain_agent_sessions(id) ON DELETE CASCADE,
-    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role        TEXT NOT NULL DEFAULT 'user',
-    content     TEXT NOT NULL,
-    template    TEXT DEFAULT '',
-    sources_json TEXT DEFAULT '[]',
-    created_at  TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS brain_agent_template_stats (
-    id          SERIAL PRIMARY KEY,
-    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    template    TEXT NOT NULL,
-    uses        INTEGER DEFAULT 1,
-    last_used   TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(user_id, template)
-);
-
-CREATE TABLE IF NOT EXISTS events (
-    id              TEXT PRIMARY KEY,
-    timestamp       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    title           TEXT NOT NULL,
-    summary         TEXT DEFAULT '',
-    category        TEXT NOT NULL DEFAULT 'GEOPOLITICS',
-    source          TEXT NOT NULL DEFAULT 'gdelt',
-    latitude        REAL NOT NULL DEFAULT 0,
-    longitude       REAL NOT NULL DEFAULT 0,
-    country_code    TEXT DEFAULT '',
-    country_name    TEXT DEFAULT '',
-    severity        REAL DEFAULT 5.0,
-    impact          TEXT DEFAULT 'Medium',
-    url             TEXT DEFAULT '',
-    source_count    INTEGER DEFAULT 1,
-    heat_index      REAL DEFAULT 0,
-    related_markets TEXT DEFAULT '',
-    ai_summary      TEXT DEFAULT '',
-    ai_impact_score REAL,
-    ai_market_note  TEXT DEFAULT '',
-    ai_tags         TEXT DEFAULT '',
-    source_list     TEXT DEFAULT '[]',
-    created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS finance_cache (
-    symbol      TEXT PRIMARY KEY,
-    name        TEXT DEFAULT '',
-    price       REAL,
-    change_pct  REAL DEFAULT 0,
-    change_abs  REAL DEFAULT 0,
-    history     TEXT DEFAULT '[]',
-    category    TEXT DEFAULT 'index',
-    updated_at  TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS region_risk (
-    country_code TEXT PRIMARY KEY,
-    country_name TEXT DEFAULT '',
-    risk_score   REAL DEFAULT 5.0,
-    trend        TEXT DEFAULT 'Stable',
-    assessment   TEXT DEFAULT '',
-    event_count  INTEGER DEFAULT 0,
-    updated_at   TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS macro_indicators (
-    id          SERIAL PRIMARY KEY,
-    name        TEXT NOT NULL,
-    value       REAL,
-    previous    REAL,
-    unit        TEXT DEFAULT '',
-    category    TEXT DEFAULT 'economy',
-    country     TEXT DEFAULT 'Global',
-    source      TEXT DEFAULT '',
-    updated_at  TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(name, country)
-);
-
-CREATE TABLE IF NOT EXISTS global_cache (
-    id              SERIAL PRIMARY KEY,
-    cache_date      TEXT NOT NULL UNIQUE,
-    global_brief    TEXT NOT NULL DEFAULT '',
-    macro_narrative TEXT NOT NULL DEFAULT '[]',
-    ew_assessment   TEXT NOT NULL DEFAULT '',
-    top_events      TEXT NOT NULL DEFAULT '[]',
-    kg_connections  TEXT NOT NULL DEFAULT '[]',
-    market_snapshot TEXT NOT NULL DEFAULT '[]',
-    created_at      TIMESTAMPTZ DEFAULT NOW(),
-    ai_enhanced     BOOLEAN DEFAULT FALSE
-);
-
-CREATE TABLE IF NOT EXISTS etf_community_posts (
-    id          SERIAL PRIMARY KEY,
-    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    user_name   TEXT NOT NULL DEFAULT '',
-    avatar      TEXT NOT NULL DEFAULT 'U',
-    content     TEXT NOT NULL,
-    likes       INTEGER DEFAULT 0,
-    created_at  TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS etf_settings (
-    id          SERIAL PRIMARY KEY,
-    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    key         TEXT NOT NULL,
-    value       TEXT,
-    UNIQUE(user_id, key)
-);
-
-CREATE TABLE IF NOT EXISTS user_models (
-    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    model_type  TEXT NOT NULL,
-    model_data  TEXT DEFAULT '',
-    updated_at  TIMESTAMPTZ DEFAULT NOW(),
-    PRIMARY KEY (user_id, model_type)
-);
 """
 
 
@@ -1100,63 +493,172 @@ async def ensure_full_schema():
                     msg = str(e).lower()
                     if 'already exists' not in msg and 'duplicate' not in msg:
                         errors.append(f"{stmt[:40]}... → {e}")
-
-            # ── Column migrations (ADD IF NOT EXISTS) ─────────────────────────
-            # etf_holdings: support both naming conventions
-            col_migrations = [
-                # users: columns that may be missing from initial Supabase migration
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS affinity_vector TEXT DEFAULT '{}'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS severity_threshold REAL DEFAULT 7.0",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT ''",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'UTC'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS notifications_enabled INTEGER DEFAULT 1",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_done INTEGER DEFAULT 0",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS tutorial_done INTEGER DEFAULT 0",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS interests TEXT DEFAULT '[]'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS regions TEXT DEFAULT '[]'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS market_prefs TEXT DEFAULT '[]'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS experience_level TEXT DEFAULT 'beginner'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_provider TEXT DEFAULT 'gemini'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_anthropic_key TEXT DEFAULT ''",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS user_gemini_key TEXT DEFAULT ''",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT DEFAULT 'it'",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ",
-                # etf_holdings: support both naming conventions
-                "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS isin TEXT DEFAULT ''",
-                "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS shares REAL DEFAULT 0",
-                "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS avg_price REAL DEFAULT 0",
-                "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS current_price REAL",
-                "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS purchase_date TEXT",
-                "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS asset_class TEXT DEFAULT 'equity'",
-                "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'EUR'",
-                "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS quantity REAL DEFAULT 0",
-                "ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS avg_buy_price REAL DEFAULT 0",
-                # etf_portfolios
-                "ALTER TABLE etf_portfolios ADD COLUMN IF NOT EXISTS strategy TEXT DEFAULT 'custom'",
-                # events: extra columns used by scheduler
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS ai_tags TEXT DEFAULT '[]'",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS keywords TEXT DEFAULT '[]'",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS heat_index REAL DEFAULT 0",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS ai_impact_score REAL DEFAULT 5.0",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS source_count INTEGER DEFAULT 1",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS source_list TEXT DEFAULT '[]'",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS related_markets TEXT DEFAULT '[]'",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS ai_summary TEXT DEFAULT ''",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS ai_market_note TEXT DEFAULT ''",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS sentiment_score REAL DEFAULT 0",
-                "ALTER TABLE events ADD COLUMN IF NOT EXISTS sentiment_tone TEXT DEFAULT 'neutral'",
-            ]
-            for migration in col_migrations:
-                try:
-                    await conn.execute(migration)
-                except Exception as e:
-                    msg = str(e).lower()
-                    if 'already exists' not in msg:
-                        logger.debug("Column migration: %s → %s", migration[:50], e)
-
         if errors:
             for err in errors[:5]:
                 logger.debug("Schema DDL warning: %s", err)
-        logger.info("Full schema ensured on PostgreSQL (%d statements)", len(statements))
+        logger.info("Full schema ensured on PostgreSQL (%d tables)", len(statements))
     else:
         logger.info("Supabase not available — SQLite schema managed by database.py")
+
+
+# ── get_db() context manager ───────────────────────────────────────────────────
+# Used by all routers and scheduler via: async with get_db() as db: ...
+# Routes to Supabase PostgreSQL when available, SQLite otherwise.
+# Provides a unified interface compatible with both backends.
+
+from contextlib import asynccontextmanager
+
+class _PgDbWrapper:
+    """Wraps an asyncpg connection in autocommit-like mode.
+    
+    Each execute() is independent. commit() is a no-op since asyncpg
+    on Supabase runs in autocommit by default when not in a transaction block.
+    This avoids double-commit issues when callers call db.commit() explicitly.
+    """
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        pass  # Connection returned to pool by acquire() context manager
+
+    def execute(self, sql: str, params=None):
+        return _PgCursor(self._conn, sql, params or [])
+
+    async def commit(self):
+        pass  # No-op: asyncpg executes each statement immediately
+
+
+class _PgCursor:
+    """Async context manager for a single PG query."""
+
+    def __init__(self, conn, sql, params):
+        self._conn = conn
+        self._sql = _sqlite_to_pg(sql)
+        self._params = params
+        self._rows = []
+
+    async def __aenter__(self):
+        try:
+            self._rows = await self._conn.fetch(self._sql, *self._params)
+        except Exception as e:
+            logger.debug("_PgCursor error: %s | sql: %s", e, self._sql[:120])
+            raise
+        return self
+
+    async def __aexit__(self, *a):
+        pass
+
+    async def fetchone(self):
+        if not self._rows:
+            return None
+        return _Row(dict(self._rows[0]))
+
+    async def fetchall(self):
+        return [_Row(dict(r)) for r in self._rows]
+
+    # Support await db.execute(...) without context manager (fire-and-forget)
+    def __await__(self):
+        return self._run().__await__()
+
+    async def _run(self):
+        try:
+            await self._conn.execute(self._sql, *self._params)
+        except Exception as e:
+            logger.debug("_PgCursor._run error: %s | sql: %s", e, self._sql[:120])
+            raise
+
+
+class _Row(dict):
+    """Dict subclass that supports both row["col"] and row[0] access."""
+    def __init__(self, d):
+        super().__init__(d)
+        self._keys = list(d.keys())
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return super().__getitem__(self._keys[key])
+        return super().__getitem__(key)
+
+    def values(self):
+        return super().values()
+
+
+class _SqliteDbWrapper:
+    """Wraps aiosqlite connection with _Row support."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        pass
+
+    def execute(self, sql: str, params=None):
+        return _SqliteCursor(self._conn, sql, params or [])
+
+    async def commit(self):
+        await self._conn.commit()
+
+
+class _SqliteCursor:
+    def __init__(self, conn, sql, params):
+        self._conn = conn
+        self._sql = sql
+        self._params = params
+        self._cur = None
+
+    async def __aenter__(self):
+        self._cur = await self._conn.execute(self._sql, self._params)
+        return self
+
+    async def __aexit__(self, *a):
+        if self._cur:
+            await self._cur.close()
+
+    async def fetchone(self):
+        if not self._cur:
+            return None
+        row = await self._cur.fetchone()
+        return _Row(dict(row)) if row else None
+
+    async def fetchall(self):
+        if not self._cur:
+            return []
+        rows = await self._cur.fetchall()
+        return [_Row(dict(r)) for r in rows]
+
+    def __await__(self):
+        return self._run().__await__()
+
+    async def _run(self):
+        await self._conn.execute(self._sql, self._params)
+
+
+@asynccontextmanager
+async def get_db():
+    """
+    Universal DB context manager.
+    Uses Supabase PostgreSQL when available, SQLite otherwise.
+    
+    Usage:
+        async with get_db() as db:
+            async with db.execute("SELECT ...", (params,)) as cur:
+                rows = await cur.fetchall()
+            await db.commit()
+    """
+    pool = await _get_pg_pool()
+    if pool:
+        async with pool.acquire() as conn:
+            wrapper = _PgDbWrapper(conn)
+            async with wrapper:
+                yield wrapper
+    else:
+        async with aiosqlite.connect(settings.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            yield _SqliteDbWrapper(conn)
