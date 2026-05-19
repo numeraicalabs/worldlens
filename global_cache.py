@@ -24,15 +24,23 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Any
 
-from db import get_db
 import aiosqlite
 from config import settings
+from db import get_db
 
 logger = logging.getLogger(__name__)
 
+def _json_safe(obj):
+    import datetime as _dt
+    if isinstance(obj, dict): return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)): return obj.isoformat()
+    return obj
+
+
 CACHE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS global_cache (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    id           SERIAL PRIMARY KEY,
     cache_date   TEXT NOT NULL UNIQUE,
     global_brief TEXT NOT NULL DEFAULT '',
     macro_narrative TEXT NOT NULL DEFAULT '[]',
@@ -40,7 +48,7 @@ CREATE TABLE IF NOT EXISTS global_cache (
     top_events      TEXT NOT NULL DEFAULT '[]',
     kg_connections  TEXT NOT NULL DEFAULT '[]',
     market_snapshot TEXT NOT NULL DEFAULT '[]',
-    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at   TEXT NOT NULL DEFAULT (NOW()),
     ai_enhanced  INTEGER NOT NULL DEFAULT 0
 );
 """
@@ -392,7 +400,7 @@ async def _get_kg_connections_today() -> List[Dict]:
                        JOIN kg_nodes n2 ON n2.id = e.tgt_id
                        ORDER BY e.weight DESC, e.id DESC
                        LIMIT 8""")
-                return [dict(r) for r in rows]
+                return [_json_safe(dict(r)) for r in rows]
         else:
             async with get_db() as db:
                 async with db.execute(
@@ -404,7 +412,7 @@ async def _get_kg_connections_today() -> List[Dict]:
                        ORDER BY e.weight DESC
                        LIMIT 8"""
                 ) as c:
-                    return [dict(r) for r in await c.fetchall()]
+                    return [_json_safe(dict(r)) for r in await c.fetchall()]
     except Exception as e:
         logger.debug("_get_kg_connections_today: %s", e)
         return []
@@ -424,7 +432,7 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
     today = date.today().isoformat()
 
     async with get_db() as db:
-        await db.executescript(CACHE_SCHEMA)
+        pass  # schema handled by get_db() / Supabase migration
         await db.commit()
 
         if not force:
@@ -446,16 +454,16 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
             """SELECT id, title, summary, ai_summary, category, country_name,
                       severity, source_url, timestamp
                FROM events
-               WHERE datetime(timestamp) > datetime('now','-72 hours')
+               WHERE timestamp > NOW() - INTERVAL '72 hours'
                ORDER BY severity DESC LIMIT 20"""
         ) as c:
-            events = [dict(r) for r in await c.fetchall()]
+            events = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         async with db.execute(
             "SELECT name, value, previous, unit, country FROM macro_indicators "
             "ORDER BY updated_at DESC LIMIT 15"
         ) as c:
-            indicators = [dict(r) for r in await c.fetchall()]
+            indicators = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     # Resolve AI
     has_ai = await ai_available_async()
@@ -551,7 +559,7 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
                     "ai_enhanced=EXCLUDED.ai_enhanced",
                     today, brief, json.dumps(macro_cards), ew_text,
                     json.dumps(deduped_events[:10]), json.dumps(kg_conn),
-                    json.dumps(market_snap), int(has_ai)
+                    json.dumps(market_snap), 1 if has_ai else 0
                 )
                 logger.info("Global cache saved to PostgreSQL")
         except Exception as _e:
@@ -559,12 +567,12 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
     
     # Also save to SQLite as local cache
     async with get_db() as db:
-        await db.executescript(CACHE_SCHEMA)
+        pass  # schema handled by get_db() / Supabase migration
         await db.execute(
-            """INSERT OR REPLACE INTO global_cache
+            """INSERT INTO global_cache
                (cache_date, global_brief, macro_narrative, ew_assessment,
                 top_events, kg_connections, market_snapshot, ai_enhanced)
-               VALUES (?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?)""" + " ON CONFLICT (cache_date) DO UPDATE SET global_brief=EXCLUDED.global_brief, macro_narrative=EXCLUDED.macro_narrative, ew_assessment=EXCLUDED.ew_assessment, top_events=EXCLUDED.top_events, ai_enhanced=EXCLUDED.ai_enhanced",
             (today, brief, json.dumps(macro_cards), ew_text,
              json.dumps(deduped_events[:10]), json.dumps(kg_conn),
              json.dumps(market_snap), int(has_ai))
@@ -607,7 +615,7 @@ async def get_global_cache(force_refresh: bool = False) -> Optional[Dict]:
             except Exception: pass
         # SQLite fallback
         async with get_db() as db:
-            await db.executescript(CACHE_SCHEMA)
+            pass  # schema handled by get_db() / Supabase migration
             await db.commit()
             async with db.execute(
                 "SELECT * FROM global_cache WHERE cache_date=?", (today,)
