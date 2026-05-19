@@ -565,9 +565,8 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
         except Exception as _e:
             logger.warning("global_cache PG save: %s", _e)
     
-    # Also save to SQLite as local cache
+    # Save via get_db() (routes to Supabase or SQLite)
     async with get_db() as db:
-        pass  # schema handled by get_db() / Supabase migration
         await db.execute(
             """INSERT INTO global_cache
                (cache_date, global_brief, macro_narrative, ew_assessment,
@@ -613,10 +612,8 @@ async def get_global_cache(force_refresh: bool = False) -> Optional[Dict]:
                         d["market_snapshot"] = json.loads(d.get("market_snapshot") or "[]")
                         return d
             except Exception: pass
-        # SQLite fallback
+        # Fallback: read via get_db() (works for both PG and SQLite)
         async with get_db() as db:
-            pass  # schema handled by get_db() / Supabase migration
-            await db.commit()
             async with db.execute(
                 "SELECT * FROM global_cache WHERE cache_date=?", (today,)
             ) as c:

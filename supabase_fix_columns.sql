@@ -70,3 +70,74 @@ ALTER TABLE crisis_signals    ALTER COLUMN created_at TYPE TIMESTAMPTZ USING cre
 ALTER TABLE crisis_signals    ALTER COLUMN updated_at TYPE TIMESTAMPTZ USING updated_at::TIMESTAMPTZ;
 ALTER TABLE supply_chain_risks ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at::TIMESTAMPTZ;
 ALTER TABLE supply_chain_risks ALTER COLUMN updated_at TYPE TIMESTAMPTZ USING updated_at::TIMESTAMPTZ;
+
+-- global_cache table (create if not exists)
+CREATE TABLE IF NOT EXISTS global_cache (
+    id              SERIAL PRIMARY KEY,
+    cache_date      TEXT NOT NULL UNIQUE,
+    global_brief    TEXT NOT NULL DEFAULT '',
+    macro_narrative TEXT NOT NULL DEFAULT '[]',
+    ew_assessment   TEXT NOT NULL DEFAULT '',
+    top_events      TEXT NOT NULL DEFAULT '[]',
+    kg_connections  TEXT NOT NULL DEFAULT '[]',
+    market_snapshot TEXT NOT NULL DEFAULT '[]',
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    ai_enhanced     SMALLINT NOT NULL DEFAULT 0
+);
+
+-- macro_indicators table (create if not exists)  
+CREATE TABLE IF NOT EXISTS macro_indicators (
+    id          SERIAL PRIMARY KEY,
+    name        TEXT NOT NULL,
+    value       REAL,
+    previous    REAL,
+    unit        TEXT DEFAULT '',
+    country     TEXT DEFAULT 'Global',
+    category    TEXT DEFAULT 'macro',
+    trend       TEXT DEFAULT 'stable',
+    source      TEXT DEFAULT 'auto',
+    updated_at  TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(name, country)
+);
+CREATE INDEX IF NOT EXISTS idx_macro_country ON macro_indicators(country);
+CREATE INDEX IF NOT EXISTS idx_macro_updated ON macro_indicators(updated_at DESC);
+
+-- activity_log: add missing columns
+ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS section TEXT DEFAULT '';
+ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS detail  TEXT DEFAULT '';
+
+-- saved_events table
+CREATE TABLE IF NOT EXISTS saved_events (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    event_id   TEXT NOT NULL,
+    note       TEXT DEFAULT '',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, event_id)
+);
+
+-- ai_feedback table
+CREATE TABLE IF NOT EXISTS ai_feedback (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    question   TEXT NOT NULL,
+    answer     TEXT NOT NULL,
+    context    TEXT DEFAULT '',
+    rating     INTEGER NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- app_settings table
+CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT DEFAULT '',
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Verifica finale
+SELECT table_name, COUNT(*) as cols
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name IN ('global_cache','macro_indicators','activity_log',
+                     'saved_events','ai_feedback','app_settings')
+GROUP BY table_name ORDER BY table_name;
