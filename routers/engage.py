@@ -6,106 +6,89 @@ import logging
 import aiosqlite
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict
-from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
+from db import get_db
 from ai_layer import _call_claude, _parse_json, ai_available_async, _get_user_ai_keys
 from routers.brain import brain_ingest
 
 logger = logging.getLogger(__name__)
 
+def _json_safe(obj):
+    """Convert datetime objects to ISO strings for JSON serialization."""
+    import datetime as _dt
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)):
+        return obj.isoformat()
+    return obj
+
+
 router = APIRouter(prefix="/api/engage", tags=["engage"])
 
 # ── DB helpers ────────────────────────────────────────
-async def _ensure_tables(db):
-    await db.executescript("""
-    CREATE TABLE IF NOT EXISTS daily_insights (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        insight TEXT NOT NULL,
-        relevance_score REAL DEFAULT 5.0,
-        created_at TEXT DEFAULT (datetime('now')),
-        UNIQUE(user_id, date),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-    CREATE TABLE IF NOT EXISTS daily_missions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        mission_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        xp_reward INTEGER DEFAULT 10,
-        completed INTEGER DEFAULT 0,
-        completed_at TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        UNIQUE(user_id, date, mission_id)
-    );
-    CREATE TABLE IF NOT EXISTS predictions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        question TEXT NOT NULL,
-        event_id TEXT,
-        event_title TEXT,
-        direction TEXT NOT NULL,
-        asset TEXT DEFAULT 'Oil',
-        created_at TEXT DEFAULT (datetime('now')),
-        resolves_at TEXT NOT NULL,
-        outcome TEXT,
-        user_correct INTEGER,
-        xp_awarded INTEGER DEFAULT 0,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-    CREATE TABLE IF NOT EXISTS weekly_reports (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        week_start TEXT NOT NULL,
-        report TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        UNIQUE(user_id, week_start),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-    CREATE TABLE IF NOT EXISTS layout_prefs (
-        user_id INTEGER PRIMARY KEY,
-        layout_type TEXT DEFAULT 'default',
-        updated_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-    """)
-    await db.commit()
-
-
-MISSION_POOL = [
-    {"id": "explore_3",     "title": "Explorer",       "description": "Open 3 events on the map",            "xp": 15, "type": "map_view",    "target": 3},
-    {"id": "ai_query_2",    "title": "AI Analyst",     "description": "Ask the AI Copilot 2 questions",      "xp": 20, "type": "ai_query",   "target": 2},
-    {"id": "score_event",   "title": "Risk Scorer",    "description": "Score 1 event with AI",               "xp": 25, "type": "event_score","target": 1},
-    {"id": "macro_visit",   "title": "Macro Reader",   "description": "Visit the Macro Dashboard",           "xp": 10, "type": "macro_visit","target": 1},
-    {"id": "add_watchlist", "title": "Curator",        "description": "Add 1 item to your Watchlist",        "xp": 15, "type": "watchlist",  "target": 1},
-    {"id": "portfolio_gen", "title": "Fund Builder",   "description": "Generate an AI Portfolio",            "xp": 30, "type": "portfolio",  "target": 1},
-    {"id": "predict",       "title": "Forecaster",     "description": "Make a market prediction",            "xp": 20, "type": "prediction", "target": 1},
-    {"id": "feed_filter",   "title": "Filter Pro",     "description": "Filter the feed by impact level",     "xp": 10, "type": "feed_filter","target": 1},
-    {"id": "heatmap_view",  "title": "Risk Analyst",   "description": "Enable the Risk Heatmap on the map",  "xp": 15, "type": "heatmap",   "target": 1},
-]
-
-BADGE_EXTRA = [
-    {"id": "geopolitical_analyst",  "name": "Geopolitical Analyst",  "icon": "🌐", "desc": "Explored 20+ geopolitical events", "category": "geo"},
-    {"id": "macro_watcher",         "name": "Macro Watcher",         "icon": "📊", "desc": "Visited macro 10+ times",           "category": "macro"},
-    {"id": "energy_expert",         "name": "Energy Expert",         "icon": "⚡", "desc": "Followed 5 energy events",           "category": "energy"},
-    {"id": "market_strategist",     "name": "Market Strategist",     "icon": "📈", "desc": "Generated 3 portfolios",            "category": "finance"},
-    {"id": "predictor_3",           "name": "Fortune Teller",        "icon": "🔮", "desc": "Made 3 correct predictions",        "category": "prediction"},
-    {"id": "week_streak",           "name": "Dedicated",             "icon": "🗓️", "desc": "Completed missions 5 days in a row","category": "streak"},
-    {"id": "global_traveler",       "name": "Global Traveler",       "icon": "✈️", "desc": "Explored 30 countries on the map",  "category": "explore"},
-    {"id": "insight_collector",     "name": "Insight Collector",     "icon": "💡", "desc": "Read 7 daily insights",             "category": "engage"},
-]
-
-INSIGHT_SYSTEM = (
-    "You are a concise intelligence analyst. Write a single personalized insight for a user "
-    "based on their recent activity. Use second person ('you'/'your'). 2-3 sentences max. "
-    "Be specific about regions, events, or market trends. Sound smart but accessible."
-)
-
+async def _ensure_tables(db=None):
+    """Create tables if not exist — uses get_db() for Supabase compatibility."""
+    tables = [
+        """CREATE TABLE IF NOT EXISTS daily_insights (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            insight TEXT NOT NULL,
+            relevance_score REAL DEFAULT 5.0,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(user_id, date)
+        )""",
+        """CREATE TABLE IF NOT EXISTS daily_missions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            mission_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            xp_reward INTEGER DEFAULT 10,
+            completed INTEGER DEFAULT 0,
+            completed_at TEXT,
+            UNIQUE(user_id, date, mission_id)
+        )""",
+        """CREATE TABLE IF NOT EXISTS predictions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            question TEXT NOT NULL,
+            event_id TEXT,
+            event_title TEXT,
+            direction TEXT NOT NULL,
+            asset TEXT DEFAULT 'Oil',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            resolves_at TEXT NOT NULL,
+            outcome TEXT,
+            user_correct INTEGER,
+            xp_awarded INTEGER DEFAULT 0
+        )""",
+        """CREATE TABLE IF NOT EXISTS weekly_reports (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            week_start TEXT NOT NULL,
+            report TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(user_id, week_start)
+        )""",
+        """CREATE TABLE IF NOT EXISTS layout_prefs (
+            user_id INTEGER PRIMARY KEY,
+            layout_type TEXT DEFAULT 'default',
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
+    ]
+    async with get_db() as _db:
+        for sql in tables:
+            try:
+                await _db.execute(sql)
+            except Exception:
+                pass
+        await _db.commit()
 
 # ── AI Daily Insight ──────────────────────────────────
 @router.get("/insight/today")
@@ -140,16 +123,16 @@ async def get_daily_insight(user=Depends(require_user)):
             # Recent high events
             async with db.execute(
                 "SELECT title, category, country_name, severity FROM events "
-                "WHERE datetime(timestamp) > datetime('now','-48 hours') "
+                "WHERE timestamp > NOW() - INTERVAL '48 hours' "
                 "ORDER BY severity DESC LIMIT 10"
             ) as c:
-                events = [dict(r) for r in await c.fetchall()]
+                events = [_json_safe(dict(r)) for r in await c.fetchall()]
 
             # Recent watchlist
             async with db.execute(
                 "SELECT label, type FROM watchlist WHERE user_id=? LIMIT 8", (user["id"],)
             ) as c:
-                wl = [dict(r) for r in await c.fetchall()]
+                wl = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # Build prompt — sanitize None/missing fields
         ev_text = "\n".join([
@@ -201,7 +184,7 @@ async def get_daily_insight(user=Depends(require_user)):
         try:
             async with get_db() as db:
                 await db.execute(
-                    "INSERT OR REPLACE INTO daily_insights (user_id, date, insight) VALUES (?,?,?)",
+                    "INSERT INTO daily_insights (user_id, date, insight) VALUES (?,?,?)",
                     (user["id"], today, text)
                 )
                 await db.commit()
@@ -251,7 +234,7 @@ async def get_today_missions(user=Depends(require_user)):
             chosen = rng.sample(MISSION_POOL, min(3, len(MISSION_POOL)))
             for m in chosen:
                 await db.execute(
-                    "INSERT OR IGNORE INTO daily_missions (user_id,date,mission_id,title,description,xp_reward) VALUES (?,?,?,?,?,?)",
+                    "INSERT INTO daily_missions (user_id,date,mission_id,title,description,xp_reward) VALUES (?,?,?,?,?,?)",
                     (user["id"], today, m["id"], m["title"], m["description"], m["xp"])
                 )
             await db.commit()
@@ -260,7 +243,7 @@ async def get_today_missions(user=Depends(require_user)):
             ) as c:
                 rows = await c.fetchall()
 
-    missions = [dict(r) for r in rows]
+    missions = [_json_safe(dict(r)) for r in rows]
     completed = sum(1 for m in missions if m["completed"])
     return {"missions": missions, "completed": completed, "total": len(missions), "date": today}
 
@@ -281,7 +264,7 @@ async def complete_mission(mission_id: str, user=Depends(require_user)):
         if m["completed"]:
             return {"status": "already_done", "xp": 0}
         await db.execute(
-            "UPDATE daily_missions SET completed=1, completed_at=datetime('now') WHERE id=?",
+            "UPDATE daily_missions SET completed=1, completed_at=NOW() WHERE id=?",
             (m["id"],)
         )
         # Award XP
@@ -326,7 +309,7 @@ async def get_predictions(user=Depends(require_user)):
             correct = int(r[1] or 0)
     accuracy = round(correct / total_resolved * 100) if total_resolved > 0 else 0
     return {
-        "predictions": [dict(r) for r in rows],
+        "predictions": [_json_safe(dict(r)) for r in rows],
         "stats": {"total": total_resolved, "correct": correct, "accuracy": accuracy}
     }
 
@@ -410,7 +393,7 @@ async def get_weekly_report(user=Depends(require_user)):
 
         async with db.execute(
             "SELECT COUNT(*), AVG(severity) FROM events WHERE "
-            "datetime(timestamp) > datetime('now','-7 days')"
+            "timestamp > NOW() - INTERVAL '7 days'"
         ) as c:
             r = await c.fetchone()
             global_events = r[0] or 0
@@ -418,7 +401,7 @@ async def get_weekly_report(user=Depends(require_user)):
 
         async with db.execute(
             "SELECT category, COUNT(*) FROM events WHERE "
-            "datetime(timestamp) > datetime('now','-7 days') "
+            "timestamp > NOW() - INTERVAL '7 days' "
             "GROUP BY category ORDER BY 2 DESC LIMIT 3"
         ) as c:
             top_cats = [row[0] for row in await c.fetchall()]
@@ -426,7 +409,7 @@ async def get_weekly_report(user=Depends(require_user)):
         async with db.execute(
             "SELECT label, type FROM watchlist WHERE user_id=? LIMIT 5", (user["id"],)
         ) as c:
-            wl = [dict(r) for r in await c.fetchall()]
+            wl = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     # Build report
     stats = {
@@ -470,7 +453,7 @@ async def get_weekly_report(user=Depends(require_user)):
     async with get_db() as db:
         await _ensure_tables(db)
         await db.execute(
-            "INSERT OR REPLACE INTO weekly_reports (user_id, week_start, report) VALUES (?,?,?)",
+            "INSERT INTO weekly_reports (user_id, week_start, report) VALUES (?,?,?)",
             (user["id"], week_start, report_json)
         )
         await db.commit()
@@ -521,7 +504,7 @@ async def set_layout(payload: dict = Body(...), user=Depends(require_user)):
     async with get_db() as db:
         await _ensure_tables(db)
         await db.execute(
-            "INSERT OR REPLACE INTO layout_prefs (user_id, layout_type) VALUES (?,?)",
+            "INSERT INTO layout_prefs (user_id, layout_type) VALUES (?,?)",
             (user["id"], layout)
         )
         await db.commit()
@@ -534,35 +517,35 @@ async def get_risk_radar(user=Depends(require_user)):
     """Get data for the shareable Global Risk Radar snapshot."""
     async with get_db() as db:
         async with db.execute(
-            "SELECT COUNT(*) FROM events WHERE datetime(timestamp) > datetime('now','-24 hours')"
+            "SELECT COUNT(*) FROM events WHERE timestamp > NOW() - INTERVAL '24 hours'"
         ) as c:
             events_24h = (await c.fetchone())[0]
         async with db.execute(
-            "SELECT COUNT(*) FROM events WHERE impact='High' AND datetime(timestamp) > datetime('now','-24 hours')"
+            "SELECT COUNT(*) FROM events WHERE impact='High' AND timestamp > NOW() - INTERVAL '24 hours'"
         ) as c:
             high_24h = (await c.fetchone())[0]
         async with db.execute(
-            "SELECT AVG(severity) FROM events WHERE datetime(timestamp) > datetime('now','-24 hours')"
+            "SELECT AVG(severity) FROM events WHERE timestamp > NOW() - INTERVAL '24 hours'"
         ) as c:
             avg_sev = (await c.fetchone())[0] or 5.0
         async with db.execute(
-            "SELECT country_name, country_code, COUNT(*) as n, AVG(severity) as s "
-            "FROM events WHERE country_code!='XX' AND datetime(timestamp) > datetime('now','-24 hours') "
+            "SELECT MAX(country_name) as country_name, country_code, COUNT(*) as n, AVG(severity) as s "
+            "FROM events WHERE country_code!='XX' AND timestamp > NOW() - INTERVAL '24 hours' "
             "GROUP BY country_code ORDER BY s DESC LIMIT 5"
         ) as c:
-            hotspots = [dict(r) for r in await c.fetchall()]
+            hotspots = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute(
             "SELECT category, COUNT(*) as n FROM events "
-            "WHERE datetime(timestamp) > datetime('now','-24 hours') "
+            "WHERE timestamp > NOW() - INTERVAL '24 hours' "
             "GROUP BY category ORDER BY n DESC LIMIT 5"
         ) as c:
-            top_cats = [dict(r) for r in await c.fetchall()]
+            top_cats = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute(
             "SELECT title, category, country_name, severity FROM events "
-            "WHERE impact='High' AND datetime(timestamp) > datetime('now','-24 hours') "
+            "WHERE impact='High' AND timestamp > NOW() - INTERVAL '24 hours' "
             "ORDER BY severity DESC LIMIT 3"
         ) as c:
-            critical = [dict(r) for r in await c.fetchall()]
+            critical = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     risk_index = round(min(100, avg_sev * 10), 1)
     level = "CRITICAL" if risk_index > 60 else "ELEVATED" if risk_index > 35 else "STABLE"

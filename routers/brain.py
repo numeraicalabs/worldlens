@@ -16,26 +16,38 @@ from typing import Optional, List, Dict, Any
 
 import aiosqlite
 from db import db_execute, db_fetchall, db_fetchone, db_fetchval
-from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException, BackgroundTasks
 from auth import require_user, require_admin
 from config import settings
+from db import get_db
 
 logger = logging.getLogger(__name__)
+
+def _json_safe(obj):
+    """Convert datetime objects to ISO strings for JSON serialization."""
+    import datetime as _dt
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)):
+        return obj.isoformat()
+    return obj
+
 router = APIRouter(prefix="/api/brain", tags=["brain"])
 
 # ── Schema ──────────────────────────────────────────────────────────────────
 
 BRAIN_SCHEMA = """
 CREATE TABLE IF NOT EXISTS brain_entries (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          SERIAL PRIMARY KEY,
     user_id     INTEGER NOT NULL,
     content     TEXT NOT NULL,
     source      TEXT NOT NULL DEFAULT 'manual',   -- event|watchlist|market|ew|alert|question|analysis|interaction
     topic       TEXT DEFAULT '',                   -- finance|geopolitics|macro|security|tech|...
     weight      REAL DEFAULT 1.0,                  -- higher = more important
     context     TEXT DEFAULT '{}',                 -- JSON metadata
-    timestamp   TEXT DEFAULT (datetime('now')),
+    timestamp   TEXT DEFAULT (NOW()),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -61,9 +73,9 @@ CREATE TRIGGER IF NOT EXISTS brain_entries_ad
 END;
 
 CREATE TABLE IF NOT EXISTS brain_sessions (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          SERIAL PRIMARY KEY,
     user_id     INTEGER NOT NULL,
-    session_date TEXT DEFAULT (date('now')),
+    session_date TEXT DEFAULT (CURRENT_DATE),
     interactions INTEGER DEFAULT 0,
     entries_added INTEGER DEFAULT 0,
     topics_touched TEXT DEFAULT '[]',
@@ -152,38 +164,33 @@ async def brain_ingest(
     topic = await _classify_topic(content)
     ctx_json = json.dumps(context or {})
 
-    close_after = db is None
-    if db is None:
-        db = await get_db()
-        await ensure_brain_tables(db)
-
     try:
         # Dedup: skip if same content ingested in last 24h
-        dup_check = hashlib.md5(f"{user_id}:{content[:120]}".encode()).hexdigest()
-        async with db.execute(
-            "SELECT id FROM brain_entries WHERE user_id=? AND "
-            "substr(content,1,120)=? AND "
-            "datetime(timestamp) > datetime('now','-24 hours')",
-            (user_id, content[:120])
-        ) as cur:
-            if await cur.fetchone():
-                return False  # already ingested recently
+        async with get_db() as _db:
+            async with _db.execute(
+                "SELECT id FROM brain_entries WHERE user_id=? AND "
+                "substr(content,1,120)=? AND "
+                "timestamp > NOW() - INTERVAL '24 hours'",
+                (user_id, content[:120])
+            ) as cur:
+                if await cur.fetchone():
+                    return False  # already ingested recently
 
-        await db.execute(
-            "INSERT INTO brain_entries (user_id, content, source, topic, weight, context) "
-            "VALUES (?,?,?,?,?,?)",
-            (user_id, content, source, topic, weight, ctx_json)
-        )
+            await _db.execute(
+                "INSERT INTO brain_entries (user_id, content, source, topic, weight, context) "
+                "VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+                (user_id, content, source, topic, weight, ctx_json)
+            )
 
-        # Update session stats
-        today = date.today().isoformat()
-        await db.execute(
-            "INSERT INTO brain_sessions (user_id, session_date, entries_added) "
-            "VALUES (?,?,1) ON CONFLICT(user_id,session_date) DO UPDATE SET "
-            "entries_added=entries_added+1, interactions=interactions+1",
-            (user_id, today)
-        )
-        await db.commit()
+            # Update session stats
+            today = date.today().isoformat()
+            await _db.execute(
+                "INSERT INTO brain_sessions (user_id, session_date, entries_added) "
+                "VALUES (?,?,1) ON CONFLICT(user_id,session_date) DO UPDATE SET "
+                "entries_added=entries_added+1, interactions=interactions+1",
+                (user_id, today)
+            )
+            await _db.commit()
         return True
     except Exception as e:
         logger.warning("brain_ingest error user=%s: %s", user_id, e)
@@ -215,33 +222,30 @@ async def brain_search(
             if source_filter:
                 sql = """
                     SELECT b.id, b.content, b.source, b.topic, b.weight, b.timestamp,
-                           bm25(brain_fts) as score
-                    FROM brain_fts
-                    JOIN brain_entries b ON brain_fts.rowid = b.id
-                    WHERE brain_fts MATCH ? AND b.user_id=? AND b.source=?
-                    ORDER BY b.weight * (-score) DESC
+                           1.0 as score
+                    FROM brain_entries b
+                    WHERE b.content ILIKE '%' || $1 || '%' AND b.user_id=$2 AND b.source=$3
+                    ORDER BY b.weight DESC, b.timestamp DESC
                     LIMIT ?
                 """
                 params = (clean_query, user_id, source_filter, top_k)
             elif topic_filter:
                 sql = """
                     SELECT b.id, b.content, b.source, b.topic, b.weight, b.timestamp,
-                           bm25(brain_fts) as score
-                    FROM brain_fts
-                    JOIN brain_entries b ON brain_fts.rowid = b.id
-                    WHERE brain_fts MATCH ? AND b.user_id=? AND b.topic=?
-                    ORDER BY b.weight * (-score) DESC
+                           1.0 as score
+                    FROM brain_entries b
+                    WHERE b.content ILIKE '%' || $1 || '%' AND b.user_id=$2 AND b.topic=$3
+                    ORDER BY b.weight DESC, b.timestamp DESC
                     LIMIT ?
                 """
                 params = (clean_query, user_id, topic_filter, top_k)
             else:
                 sql = """
                     SELECT b.id, b.content, b.source, b.topic, b.weight, b.timestamp,
-                           bm25(brain_fts) as score
-                    FROM brain_fts
-                    JOIN brain_entries b ON brain_fts.rowid = b.id
-                    WHERE brain_fts MATCH ? AND b.user_id=?
-                    ORDER BY b.weight * (-score) DESC
+                           1.0 as score
+                    FROM brain_entries b
+                    WHERE b.content ILIKE '%' || $1 || '%' AND b.user_id=$2
+                    ORDER BY b.weight DESC, b.timestamp DESC
                     LIMIT ?
                 """
                 params = (clean_query, user_id, top_k)
@@ -249,7 +253,7 @@ async def brain_search(
             async with db.execute(sql, params) as cur:
                 rows = await cur.fetchall()
 
-            return [dict(r) for r in rows]
+            return [_json_safe(dict(r)) for r in rows]
     except Exception as e:
         logger.warning("brain_search error user=%s query=%s: %s", user_id, query[:40], e)
         return []
@@ -344,29 +348,29 @@ async def brain_stats(user=Depends(require_user)):
                 "SELECT source, COUNT(*) as n FROM brain_entries WHERE user_id=? "
                 "GROUP BY source ORDER BY n DESC", (uid,)
             ) as c:
-                by_source = [dict(r) for r in await c.fetchall()]
+                by_source = [_json_safe(dict(r)) for r in await c.fetchall()]
 
             # By topic
             async with db.execute(
                 "SELECT topic, COUNT(*) as n FROM brain_entries WHERE user_id=? "
                 "GROUP BY topic ORDER BY n DESC LIMIT 8", (uid,)
             ) as c:
-                by_topic = [dict(r) for r in await c.fetchall()]
+                by_topic = [_json_safe(dict(r)) for r in await c.fetchall()]
 
             # Growth last 14 days
             async with db.execute(
                 "SELECT date(timestamp) as day, COUNT(*) as n FROM brain_entries "
-                "WHERE user_id=? AND datetime(timestamp) > datetime('now','-14 days') "
+                "WHERE user_id=? AND timestamp > NOW() - INTERVAL '14 days' "
                 "GROUP BY day ORDER BY day ASC", (uid,)
             ) as c:
-                growth = [dict(r) for r in await c.fetchall()]
+                growth = [_json_safe(dict(r)) for r in await c.fetchall()]
 
             # Recent entries preview
             async with db.execute(
                 "SELECT content, source, topic, timestamp FROM brain_entries "
                 "WHERE user_id=? ORDER BY timestamp DESC LIMIT 5", (uid,)
             ) as c:
-                recent = [dict(r) for r in await c.fetchall()]
+                recent = [_json_safe(dict(r)) for r in await c.fetchall()]
 
             # Session today
             async with db.execute(
@@ -426,7 +430,7 @@ async def admin_brain_stats(_=Depends(require_admin)):
             "SELECT user_id, COUNT(*) as entries, MAX(timestamp) as last_active "
             "FROM brain_entries GROUP BY user_id ORDER BY entries DESC LIMIT 20"
         ) as c:
-            by_user = [dict(r) for r in await c.fetchall()]
+            by_user = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # Enrich with usernames
         user_ids = [r["user_id"] for r in by_user]
@@ -445,19 +449,19 @@ async def admin_brain_stats(_=Depends(require_admin)):
         async with db.execute(
             "SELECT source, COUNT(*) as n FROM brain_entries GROUP BY source ORDER BY n DESC"
         ) as c:
-            by_source = [dict(r) for r in await c.fetchall()]
+            by_source = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         async with db.execute(
             "SELECT topic, COUNT(*) as n FROM brain_entries GROUP BY topic ORDER BY n DESC"
         ) as c:
-            by_topic = [dict(r) for r in await c.fetchall()]
+            by_topic = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         async with db.execute(
             "SELECT date(timestamp) as day, COUNT(*) as n FROM brain_entries "
-            "WHERE datetime(timestamp) > datetime('now','-30 days') "
+            "WHERE timestamp > NOW() - INTERVAL '30 days' "
             "GROUP BY day ORDER BY day ASC"
         ) as c:
-            growth = [dict(r) for r in await c.fetchall()]
+            growth = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     return {
         "total_entries": total,
@@ -513,7 +517,7 @@ async def admin_user_brain_entries(user_id: int, limit: int = 50, _=Depends(requ
             "SELECT * FROM brain_entries WHERE user_id=? ORDER BY timestamp DESC LIMIT ?",
             (user_id, limit)
         ) as c:
-            entries = [dict(r) for r in await c.fetchall()]
+            entries = [_json_safe(dict(r)) for r in await c.fetchall()]
     return {"entries": entries, "count": len(entries)}
 
 
@@ -521,47 +525,9 @@ async def admin_user_brain_entries(user_id: int, limit: int = 50, _=Depends(requ
 
 @router.get("/summaries")
 async def get_summaries(user=Depends(require_user)):
-    """Layer 2: Get all cached topic summaries.
-    If brain is empty, return summaries derived from global events."""
+    """Layer 2: Get all cached topic summaries."""
     from brain_enhance import get_topic_summaries
-    summaries = await get_topic_summaries(user["id"])
-    if summaries:
-        return summaries
-
-    # Brain is empty — build minimal summaries from global events DB
-    try:
-        import aiosqlite
-        from config import settings as _s
-        async with get_db() as _db:
-            async with _db.execute(
-                """SELECT category, COUNT(*) as cnt,
-                          GROUP_CONCAT(title, '|') as titles
-                   FROM events
-                   WHERE datetime(timestamp) > datetime('now','-7 days')
-                   GROUP BY category ORDER BY cnt DESC LIMIT 6"""
-            ) as _c:
-                rows = [dict(r) for r in await _c.fetchall()]
-
-        _topic_map = {
-            "ECONOMICS": "macro", "FINANCE": "finance",
-            "CONFLICT": "geopolitics", "GEOPOLITICS": "geopolitics",
-            "ENERGY": "energy", "TECHNOLOGY": "tech",
-            "POLITICS": "politics", "SECURITY": "security",
-        }
-        fallback = {}
-        for row in rows:
-            cat = row["category"]
-            topic = _topic_map.get(cat, cat.lower())
-            titles = [t for t in (row["titles"] or "").split("|") if t][:3]
-            if titles:
-                fallback[topic] = {
-                    "summary": "Attività recente: " + "; ".join(titles),
-                    "count": row["cnt"],
-                    "ts": "",
-                }
-        return fallback
-    except Exception:
-        return {}
+    return await get_topic_summaries(user["id"])
 
 
 @router.post("/summaries/refresh")
@@ -620,7 +586,7 @@ async def get_kg_explanations(node: str = "", user=Depends(require_user)):
                 "SELECT edge_sig, explanation, generated_at FROM kg_edge_explanations "
                 "ORDER BY generated_at DESC LIMIT 20"
             ) as c:
-                explanations = [dict(r) for r in await c.fetchall()]
+                explanations = [_json_safe(dict(r)) for r in await c.fetchall()]
     return {"explanations": explanations, "count": len(explanations)}
 
 

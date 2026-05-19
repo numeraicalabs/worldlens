@@ -2,20 +2,17 @@
 from __future__ import annotations
 import json
 import aiosqlite
-from db import get_db
 from fastapi import APIRouter, Depends, HTTPException, Body
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from typing import Optional
 from auth import require_user
 from scheduler import get_finance_cache
 from models import WatchlistItem, AlertCreate
 from config import settings
+from db import get_db
 from ai_layer import ai_watchlist_digest, ai_available_async, _get_user_ai_keys, _call_claude
 
 finance_router = APIRouter(prefix="/api/finance", tags=["finance"])
 user_router = APIRouter(prefix="/api/user", tags=["user"])
-
 
 
 # ── Finance ──────────────────────────────────────────
@@ -55,7 +52,7 @@ async def get_profile(user=Depends(require_user)):
         async with db.execute("SELECT COUNT(*) FROM alerts WHERE user_id=? AND active=1", (user["id"],)) as c:
             u["alert_count"] = (await c.fetchone())[0]
         async with db.execute(
-            "SELECT COUNT(*) FROM events WHERE datetime(timestamp) > datetime('now','-24 hours')"
+            "SELECT COUNT(*) FROM events WHERE timestamp > NOW() - INTERVAL '24 hours'"
         ) as c:
             u["events_today"] = (await c.fetchone())[0]
     return u
@@ -111,7 +108,7 @@ async def complete_onboarding(payload: dict = Body(...), user=Depends(require_us
             }
             for t, val, label in REGION_CODES.get(region, []):
                 await db.execute(
-                    "INSERT OR IGNORE INTO watchlist (user_id,type,value,label) VALUES (?,?,?,?)",
+                    "INSERT INTO watchlist (user_id,type,value,label) VALUES (?,?,?,?)",
                     (user["id"], t, val, label)
                 )
         for market in market_prefs:
@@ -124,7 +121,7 @@ async def complete_onboarding(payload: dict = Body(...), user=Depends(require_us
             }
             for t, val, label in MARKET_ASSETS.get(market, []):
                 await db.execute(
-                    "INSERT OR IGNORE INTO watchlist (user_id,type,value,label) VALUES (?,?,?,?)",
+                    "INSERT INTO watchlist (user_id,type,value,label) VALUES (?,?,?,?)",
                     (user["id"], t, val, label)
                 )
         await db.commit()
@@ -147,7 +144,7 @@ async def get_watchlist(user=Depends(require_user)):
             async with db.execute(
                 "SELECT * FROM watchlist WHERE user_id=? ORDER BY type, label", (user["id"],)
             ) as c:
-                return [dict(r) for r in await c.fetchall()]
+                return [_json_safe(dict(r)) for r in await c.fetchall()]
     except Exception:
         return []
 
@@ -156,7 +153,7 @@ async def get_watchlist(user=Depends(require_user)):
 async def add_watchlist(item: WatchlistItem, user=Depends(require_user)):
     async with get_db() as db:
         await db.execute(
-            "INSERT OR IGNORE INTO watchlist (user_id,type,value,label) VALUES (?,?,?,?)",
+            "INSERT INTO watchlist (user_id,type,value,label) VALUES (?,?,?,?)",
             (user["id"], item.type, item.value, item.label or item.value)
         )
         await db.commit()
@@ -175,7 +172,7 @@ async def del_watchlist(item_id: int, user=Depends(require_user)):
 async def watchlist_digest(user=Depends(require_user)):
     async with get_db() as db:
         async with db.execute("SELECT * FROM watchlist WHERE user_id=?", (user["id"],)) as c:
-            items = [dict(r) for r in await c.fetchall()]
+            items = [_json_safe(dict(r)) for r in await c.fetchall()]
         codes = [i["value"] for i in items if i["type"] == "country"]
         evs = []
         if codes:
@@ -183,7 +180,7 @@ async def watchlist_digest(user=Depends(require_user)):
             async with db.execute(
                 "SELECT * FROM events WHERE country_code IN (" + ph + ") ORDER BY timestamp DESC LIMIT 10", codes
             ) as c:
-                evs = [dict(r) for r in await c.fetchall()]
+                evs = [_json_safe(dict(r)) for r in await c.fetchall()]
     text = await ai_watchlist_digest(items, evs)
     return {"digest": text or "Configure an AI provider in Admin → Settings to enable personalized digests.", "items": items}
 
@@ -196,7 +193,7 @@ async def get_alerts(user=Depends(require_user)):
             async with db.execute(
                 "SELECT * FROM alerts WHERE user_id=? ORDER BY created_at DESC", (user["id"],)
             ) as c:
-                return [dict(r) for r in await c.fetchall()]
+                return [_json_safe(dict(r)) for r in await c.fetchall()]
     except Exception:
         return []
 

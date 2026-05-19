@@ -6,66 +6,84 @@ import logging
 import aiosqlite
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Optional
-from db import get_db
-from fastapi import APIRouter, BackgroundTasks, Depends, Body, Query
+from fastapi import APIRouter, Depends, Body, Query
 from auth import require_user
 from config import settings
+from db import get_db
 from ai_layer import _call_claude, _parse_json, _ai_available, ai_available_async, _get_user_ai_keys
 from routers.brain import brain_ingest, brain_context_for_prompt
 
 router = APIRouter(prefix="/api/intelligence", tags=["intelligence"])
 logger = logging.getLogger(__name__)
 
-# ── DB setup ─────────────────────────────────────────
-async def _ensure_tables(db):
-    await db.executescript("""
-    CREATE TABLE IF NOT EXISTS crisis_signals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        signal_type TEXT NOT NULL,
-        region TEXT NOT NULL,
-        country_code TEXT DEFAULT 'XX',
-        severity REAL DEFAULT 5.0,
-        description TEXT NOT NULL,
-        indicators TEXT DEFAULT '{}',
-        confidence REAL DEFAULT 0.5,
-        status TEXT DEFAULT 'active',
-        ai_assessment TEXT DEFAULT '',
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS supply_chain_risks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        risk_type TEXT NOT NULL,
-        location TEXT NOT NULL,
-        country_code TEXT DEFAULT 'XX',
-        latitude REAL DEFAULT 0.0,
-        longitude REAL DEFAULT 0.0,
-        severity REAL DEFAULT 5.0,
-        title TEXT NOT NULL,
-        description TEXT DEFAULT '',
-        affected_sectors TEXT DEFAULT '[]',
-        affected_routes TEXT DEFAULT '[]',
-        estimated_duration TEXT DEFAULT 'Unknown',
-        status TEXT DEFAULT 'active',
-        source TEXT DEFAULT 'AI Analysis',
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS ew_snapshots (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        snapshot_date TEXT NOT NULL UNIQUE,
-        global_ew_score REAL DEFAULT 5.0,
-        sentiment_trend REAL DEFAULT 0.0,
-        macro_stress REAL DEFAULT 5.0,
-        market_stress REAL DEFAULT 5.0,
-        event_velocity REAL DEFAULT 0.0,
-        ai_assessment TEXT DEFAULT '',
-        top_risks TEXT DEFAULT '[]',
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    """)
-    await db.commit()
+def _json_safe(obj):
+    """Convert datetime objects to ISO strings for JSON serialization."""
+    import datetime as _dt
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)):
+        return obj.isoformat()
+    return obj
 
+
+# ── DB setup ─────────────────────────────────────────
+async def _ensure_tables(db=None):
+    """Create tables if not exist — uses get_db() for Supabase compatibility."""
+    tables = [
+        """CREATE TABLE IF NOT EXISTS crisis_signals (
+            id SERIAL PRIMARY KEY,
+            signal_type TEXT NOT NULL,
+            region TEXT NOT NULL,
+            country_code TEXT DEFAULT 'XX',
+            severity REAL DEFAULT 5.0,
+            description TEXT NOT NULL,
+            indicators TEXT DEFAULT '{}',
+            confidence REAL DEFAULT 0.5,
+            status TEXT DEFAULT 'active',
+            ai_assessment TEXT DEFAULT '',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS supply_chain_risks (
+            id SERIAL PRIMARY KEY,
+            risk_type TEXT NOT NULL,
+            location TEXT NOT NULL,
+            country_code TEXT DEFAULT 'XX',
+            latitude REAL DEFAULT 0.0,
+            longitude REAL DEFAULT 0.0,
+            severity REAL DEFAULT 5.0,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            affected_sectors TEXT DEFAULT '[]',
+            affected_routes TEXT DEFAULT '[]',
+            estimated_duration TEXT DEFAULT 'Unknown',
+            status TEXT DEFAULT 'active',
+            source TEXT DEFAULT 'AI Analysis',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS ew_snapshots (
+            id SERIAL PRIMARY KEY,
+            snapshot_date TEXT NOT NULL UNIQUE,
+            global_ew_score REAL DEFAULT 5.0,
+            sentiment_trend REAL DEFAULT 0.0,
+            macro_stress REAL DEFAULT 5.0,
+            market_stress REAL DEFAULT 5.0,
+            event_velocity REAL DEFAULT 0.0,
+            ai_assessment TEXT DEFAULT '',
+            top_risks TEXT DEFAULT '[]',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
+    ]
+    async with get_db() as _db:
+        for sql in tables:
+            try:
+                await _db.execute(sql)
+            except Exception as e:
+                pass
+        await _db.commit()
 
 # ── Signal classification ─────────────────────────────
 CRISIS_PATTERNS = {
@@ -278,7 +296,7 @@ async def get_early_warning(user=Depends(require_user)):
         today = date.today().isoformat()
         async with db.execute(
             "SELECT * FROM ew_snapshots WHERE snapshot_date=? AND "
-            "datetime(created_at) > datetime('now','-30 minutes')", (today,)
+            "created_at > NOW() - INTERVAL '30 minutes'", (today,)
         ) as c:
             snap = await c.fetchone()
         if snap:
@@ -294,12 +312,12 @@ async def get_early_warning(user=Depends(require_user)):
 
         # Load data
         async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
+            "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '72 hours' "
             "ORDER BY severity DESC LIMIT 100"
         ) as c:
-            events = [dict(r) for r in await c.fetchall()]
+            events = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute("SELECT * FROM macro_indicators") as c:
-            indicators = [dict(r) for r in await c.fetchall()]
+            indicators = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     # Compute rule-based baseline
     scores = _compute_ew_score_rule_based(events, indicators)
@@ -425,7 +443,7 @@ async def get_early_warning(user=Depends(require_user)):
     async with get_db() as db:
         await _ensure_tables(db)
         await db.execute(
-            "INSERT OR REPLACE INTO ew_snapshots "
+            "INSERT INTO ew_snapshots "
             "(snapshot_date,global_ew_score,sentiment_trend,macro_stress,"
             "market_stress,event_velocity,ai_assessment,top_risks) VALUES (?,?,?,?,?,?,?,?)",
             (today, result["global_ew_score"], result["sentiment_trend"],
@@ -465,7 +483,7 @@ async def get_ew_timeline():
             "macro_stress, market_stress, event_velocity "
             "FROM ew_snapshots ORDER BY snapshot_date DESC LIMIT 14"
         ) as c:
-            rows = [dict(r) for r in await c.fetchall()]
+            rows = [_json_safe(dict(r)) for r in await c.fetchall()]
     return rows
 
 
@@ -476,10 +494,10 @@ async def get_active_signals():
         await _ensure_tables(db)
         # Auto-generate signals from recent events
         async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
+            "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '72 hours' "
             "ORDER BY severity DESC LIMIT 80"
         ) as c:
-            events = [dict(r) for r in await c.fetchall()]
+            events = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     # Build signals: max 2 per type, deduplicate by event ID, sort by severity
     signals = []
@@ -556,10 +574,10 @@ async def get_supply_chain():
     async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
+            "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '72 hours' "
             "ORDER BY severity DESC LIMIT 150"
         ) as c:
-            events = [dict(r) for r in await c.fetchall()]
+            events = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     # Score each supply chain node based on nearby/relevant events
     node_risks = []
@@ -685,9 +703,9 @@ async def get_sector_exposure():
     async with get_db() as db:
         await _ensure_tables(db)
         async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') LIMIT 100"
+            "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '72 hours' LIMIT 100"
         ) as c:
-            events = [dict(r) for r in await c.fetchall()]
+            events = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     # Quick node risk computation (simplified)
     node_risk_cache: Dict[str, float] = {}
@@ -826,15 +844,15 @@ async def macro_brief_endpoint(user=Depends(require_user)):
             async with db.execute(
                 "SELECT id,title,summary,ai_summary,severity,country_name,category,timestamp "
                 "FROM events "
-                "WHERE datetime(timestamp) > datetime('now','-72 hours') "
+                "WHERE timestamp > NOW() - INTERVAL '72 hours' "
                 "ORDER BY severity DESC LIMIT 15"
             ) as cur:
-                events = [dict(r) for r in await cur.fetchall()]
+                events = [_json_safe(dict(r)) for r in await cur.fetchall()]
             async with db.execute(
                 "SELECT name,value,previous,unit,country FROM macro_indicators "
                 "ORDER BY updated_at DESC LIMIT 12"
             ) as cur:
-                indicators = [dict(r) for r in await cur.fetchall()]
+                indicators = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
         if not events:
             return {"brief": "Nessun evento recente. In attesa di aggiornamento dati."}
@@ -919,12 +937,12 @@ async def watchlist_digest_endpoint(user=Depends(require_user)):
             "SELECT label, value FROM user_watchlist WHERE user_id=? LIMIT 10",
             (user["id"],)
         ) as cur:
-            items = [dict(r) for r in await cur.fetchall()]
+            items = [_json_safe(dict(r)) for r in await cur.fetchall()]
         async with db.execute(
-            "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
+            "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '72 hours' "
             "ORDER BY severity DESC LIMIT 10"
         ) as cur:
-            events = [dict(r) for r in await cur.fetchall()]
+            events = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
     if not await ai_available_async():
         return {"digest": "Configure a Gemini key in Admin → Settings to enable personalised digests."}
@@ -948,7 +966,7 @@ async def macro_narrative_endpoint(user=Depends(require_user)):
                 "SELECT name,value,previous,unit,country,updated_at "
                 "FROM macro_indicators ORDER BY updated_at DESC LIMIT 20"
             ) as cur:
-                indicators = [dict(r) for r in await cur.fetchall()]
+                indicators = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
         # Pick top 6 most relevant indicators
         PRIORITY = ["CPI","Inflation","Fed","Interest Rate","GDP","PMI","VIX","DXY","Unemployment","Oil","NFP","PCE"]
@@ -1033,38 +1051,16 @@ async def get_dashboard_cache(user=Depends(require_user)):
     lang = user.get("lang", "it")
 
     cache = await get_global_cache()
-
-    # If cache missing, generate immediately (rule-based, no AI needed)
     if not cache:
-        try:
-            from global_cache import generate_global_cache
-            cache = await generate_global_cache(force=False)
-        except Exception:
-            pass
+        return {"error": "Cache not yet generated", "retry_after": 30}
 
-    # Still nothing (DB empty, no events yet) — return minimal live data
-    if not cache:
-        from scheduler import get_finance_cache
-        fin = get_finance_cache() or []
-        return {
-            "top_events": [],
-            "macro_narrative": [],
-            "kg_connections": [],
-            "market_snapshot": fin[:5],
-            "ew_assessment": "",
-            "global_brief": "",
-            "ai_enhanced": False,
-            "_fallback": True,
-        }
-
-    # If user has personal key and cache is rule-based, enhance in background
+    # If user has personal key and cache is rule-based, generate enhanced version
     if (ug or ua) and not cache.get("ai_enhanced"):
         try:
             from global_cache import generate_global_cache
-            import asyncio
-            asyncio.ensure_future(generate_global_cache(force=True))
+            cache = await generate_global_cache(force=True)
         except Exception:
-            pass  # Non-blocking — return existing cache immediately
+            pass  # Use existing cache
 
     return cache
 
