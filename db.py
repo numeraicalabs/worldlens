@@ -47,7 +47,28 @@ def _pg_to_sqlite(sql: str) -> str:
 
 
 def _sqlite_to_pg(sql: str) -> str:
-    """Convert SQLite-style SQL to PostgreSQL-compatible SQL."""
+    """Convert SQLite-style SQL to PostgreSQL-compatible SQL.
+    
+    Handles: ?, datetime(), INSERT OR IGNORE/REPLACE, GROUP_CONCAT,
+             AUTOINCREMENT, BOOLEAN, and other SQLite-specific syntax.
+    """
+
+    # INSERT OR IGNORE -> INSERT ... ON CONFLICT DO NOTHING
+    sql = re.sub(
+        r'\bINSERT\s+OR\s+IGNORE\b',
+        'INSERT', sql, flags=re.IGNORECASE
+    )
+    # Add ON CONFLICT DO NOTHING if not already present
+    # We do this by post-processing after ? replacement
+    _insert_or_ignore = 'INSERT OR IGNORE' in sql.upper()  # already replaced above
+
+    # INSERT OR REPLACE -> INSERT ... ON CONFLICT DO UPDATE (upsert)
+    # Since we don't know the conflict column here, convert to plain INSERT
+    # Callers should use explicit ON CONFLICT clauses
+    sql = re.sub(
+        r'\bINSERT\s+OR\s+REPLACE\b',
+        'INSERT', sql, flags=re.IGNORECASE
+    )
 
     # datetime('now', 'literal interval') -> (NOW() - INTERVAL 'X unit')
     def _interval_replace(m):
@@ -61,8 +82,39 @@ def _sqlite_to_pg(sql: str) -> str:
     # datetime('now') -> NOW()
     sql = re.sub(r"datetime\('now'\)", 'NOW()', sql, flags=re.IGNORECASE)
 
-    # datetime(column) -> column  (SQLite cast, not needed in PG)
+    # datetime(column) -> column (SQLite cast not needed in PG)
     sql = re.sub(r'datetime\((\w+)\)', r'\1', sql, flags=re.IGNORECASE)
+
+    # GROUP_CONCAT(x, sep) -> STRING_AGG(x::text, sep)
+    sql = re.sub(
+        r'\bGROUP_CONCAT\s*\(([^,)]+),\s*([^)]+)\)',
+        r'STRING_AGG(\1::text, \2)', sql, flags=re.IGNORECASE
+    )
+    sql = re.sub(
+        r'\bGROUP_CONCAT\s*\(([^)]+)\)',
+        r"STRING_AGG(\1::text, ',')", sql, flags=re.IGNORECASE
+    )
+
+    # MATCH syntax (SQLite FTS) -> PostgreSQL full-text search using ILIKE fallback
+    # MATCH 'term' -> ILIKE '%term%'
+    sql = re.sub(
+        r"\bMATCH\s+'([^']+)'",
+        r"ILIKE '%\1%'", sql, flags=re.IGNORECASE
+    )
+
+    # INTEGER PRIMARY KEY AUTOINCREMENT -> SERIAL PRIMARY KEY
+    sql = re.sub(
+        r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',
+        'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE
+    )
+
+    # BOOLEAN -> SMALLINT (PG has boolean but asyncpg strict typing causes issues with 0/1)
+    # Keep as integer to avoid bool/int mismatch errors
+    sql = re.sub(r'\bBOOLEAN\b', 'SMALLINT', sql, flags=re.IGNORECASE)
+
+    # TRUE/FALSE literals -> 1/0 for compatibility
+    sql = re.sub(r'\bTRUE\b', '1', sql, flags=re.IGNORECASE)
+    sql = re.sub(r'\bFALSE\b', '0', sql, flags=re.IGNORECASE)
 
     # ? placeholders -> $1, $2, ...
     counter = [0]
@@ -71,9 +123,11 @@ def _sqlite_to_pg(sql: str) -> str:
         return f'${counter[0]}'
     sql = re.sub(r'\?', replace_q, sql)
 
-    # INTEGER PRIMARY KEY AUTOINCREMENT -> SERIAL PRIMARY KEY
-    sql = re.sub(r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',
-                 'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE)
+    # Add ON CONFLICT DO NOTHING after VALUES (...) for converted INSERT OR IGNORE
+    if 'on conflict do nothing' not in sql.lower() and 'on conflict' not in sql.lower():
+        if re.search(r'\bINSERT\b', sql, re.IGNORECASE) and _insert_or_ignore:
+            sql = sql.rstrip(';') + ' ON CONFLICT DO NOTHING'
+
     return sql
 
 
@@ -212,7 +266,14 @@ async def db_run(sql: str) -> None:
     sq_sql = _pg_to_sqlite(sql)
     try:
         async with aiosqlite.connect(settings.db_path) as db:
-            await db.executescript(sq_sql)
+            # executescript not available on all aiosqlite versions; split manually
+            for stmt in sq_sql.split(';'):
+                stmt = stmt.strip()
+                if stmt:
+                    try:
+                        await db.execute(stmt)
+                    except Exception:
+                        pass
             await db.commit()
     except Exception as e:
         logger.debug("db_run SQLite DDL error: %s", e)

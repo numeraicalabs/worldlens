@@ -17,6 +17,12 @@ DB      = settings.db_path
 async def init_db():
     # Ensure all tables exist on Postgres if configured
     await ensure_full_schema()
+    # Apply runtime column migrations (fixes "column does not exist" errors)
+    try:
+        from pg_compat import ensure_session_date
+        await ensure_session_date()
+    except Exception as e:
+        pass  # Non-fatal: tables may not exist yet
     async with aiosqlite.connect(DB) as db:
         await db.executescript("""
         CREATE TABLE IF NOT EXISTS users (
@@ -227,10 +233,8 @@ async def _seed_macro(db):
     await db.commit()
 
 
-async def get_db():
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
-        yield db
+# get_db() is now in db.py (routes to Supabase or SQLite)
+# Import it from there: from db import get_db
 
 
 async def migrate_sentiment_columns():
