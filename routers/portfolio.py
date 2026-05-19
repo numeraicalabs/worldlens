@@ -4,10 +4,10 @@ import json
 import aiosqlite
 import random
 from datetime import datetime
-from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
+from db import get_db
 from ai_layer import _call_claude, ai_available_async
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
@@ -39,49 +39,53 @@ LEVELS = [
 ]
 
 
-async def _ensure_gamification_tables(db):
-    await db.executescript("""
-    CREATE TABLE IF NOT EXISTS user_xp (
-        user_id INTEGER PRIMARY KEY,
-        xp INTEGER DEFAULT 0,
-        portfolios_generated INTEGER DEFAULT 0,
-        ai_queries INTEGER DEFAULT 0,
-        events_viewed INTEGER DEFAULT 0,
-        macro_visits INTEGER DEFAULT 0,
-        events_scored INTEGER DEFAULT 0,
-        login_streak INTEGER DEFAULT 0,
-        last_activity TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-    CREATE TABLE IF NOT EXISTS user_badges (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        badge_id TEXT NOT NULL,
-        earned_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        UNIQUE(user_id, badge_id)
-    );
-    CREATE TABLE IF NOT EXISTS portfolios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        risk_profile TEXT NOT NULL,
-        horizon TEXT NOT NULL,
-        amount REAL NOT NULL,
-        focus TEXT DEFAULT '',
-        result TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-    """)
-    await db.commit()
+async def _ensure_gamification_tables(db=None):
+    """Create gamification tables if not exist."""
+    tables = [
+        """CREATE TABLE IF NOT EXISTS user_xp (
+            user_id INTEGER PRIMARY KEY,
+            xp INTEGER DEFAULT 0,
+            portfolios_generated INTEGER DEFAULT 0,
+            ai_queries INTEGER DEFAULT 0,
+            events_viewed INTEGER DEFAULT 0,
+            macro_visits INTEGER DEFAULT 0,
+            events_scored INTEGER DEFAULT 0,
+            login_streak INTEGER DEFAULT 0,
+            last_activity TIMESTAMPTZ DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS user_badges (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            badge_id TEXT NOT NULL,
+            earned_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(user_id, badge_id)
+        )""",
+        """CREATE TABLE IF NOT EXISTS portfolios (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            risk_profile TEXT NOT NULL,
+            horizon TEXT NOT NULL,
+            amount REAL NOT NULL,
+            focus TEXT DEFAULT '',
+            result TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
+    ]
+    async with get_db() as _db:
+        for sql in tables:
+            try:
+                await _db.execute(sql)
+            except Exception:
+                pass
+        await _db.commit()
 
 
 async def _get_or_create_xp(db, user_id: int) -> dict:
     async with db.execute("SELECT * FROM user_xp WHERE user_id=?", (user_id,)) as c:
         row = await c.fetchone()
     if not row:
-        await db.execute("INSERT OR IGNORE INTO user_xp (user_id) VALUES (?)", (user_id,))
+        await db.execute("INSERT INTO user_xp (user_id) VALUES (?)", (user_id,))
         await db.commit()
         async with db.execute("SELECT * FROM user_xp WHERE user_id=?", (user_id,)) as c:
             row = await c.fetchone()
@@ -105,7 +109,7 @@ def _calc_level(xp: int) -> dict:
 
 async def _award_xp(db, user_id: int, amount: int, action: str):
     await db.execute(
-        "UPDATE user_xp SET xp=xp+?, last_activity=datetime('now') WHERE user_id=?",
+        "UPDATE user_xp SET xp=xp+?, last_activity=NOW() WHERE user_id=?",
         (amount, user_id)
     )
     await db.commit()
@@ -142,7 +146,7 @@ async def _check_badges(db, user_id: int, xp_row: dict) -> list:
     for badge_id, condition in checks.items():
         if condition and badge_id not in earned:
             await db.execute(
-                "INSERT OR IGNORE INTO user_badges (user_id, badge_id) VALUES (?,?)",
+                "INSERT INTO user_badges (user_id, badge_id) VALUES (?,?)",
                 (user_id, badge_id)
             )
             new_badges.append(badge_id)
@@ -213,7 +217,7 @@ async def get_portfolios(user=Depends(require_user)):
             (user["id"],)
         ) as c:
             rows = await c.fetchall()
-    return [dict(r) for r in rows]
+    return [_json_safe(dict(r)) for r in rows]
 
 
 @router.post("/generate")

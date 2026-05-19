@@ -8,9 +8,18 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Body, HTTPException, Query
 from auth import require_admin
 from config import settings
+from db import get_db
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
+
+def _json_safe(obj):
+    import datetime as _dt
+    if isinstance(obj, dict): return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)): return obj.isoformat()
+    return obj
+
 
 DB = settings.db_path
 
@@ -31,20 +40,18 @@ async def _log_activity(db, user_id: int, action: str, section: str = "", detail
 
 @router.get("/overview")
 async def overview(admin=Depends(require_admin)):
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
-
+    async with get_db() as db:
         # User counts
         async with db.execute("SELECT COUNT(*) FROM users") as c:
             total_users = (await c.fetchone())[0]
         async with db.execute("SELECT COUNT(*) FROM users WHERE is_active=1") as c:
             active_users = (await c.fetchone())[0]
         async with db.execute(
-            "SELECT COUNT(*) FROM users WHERE datetime(last_login)>datetime('now','-24 hours')"
+            "SELECT COUNT(*) FROM users WHERE last_login > NOW() - INTERVAL '24 hours'"
         ) as c:
             dau = (await c.fetchone())[0]
         async with db.execute(
-            "SELECT COUNT(*) FROM users WHERE datetime(created_at)>datetime('now','-7 days')"
+            "SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '7 days'"
         ) as c:
             new_this_week = (await c.fetchone())[0]
 
@@ -52,49 +59,49 @@ async def overview(admin=Depends(require_admin)):
         async with db.execute("SELECT COUNT(*) FROM events") as c:
             total_events = (await c.fetchone())[0]
         async with db.execute(
-            "SELECT COUNT(*) FROM events WHERE datetime(timestamp)>datetime('now','-24 hours')"
+            "SELECT COUNT(*) FROM events WHERE timestamp > NOW() - INTERVAL '24 hours'"
         ) as c:
             events_24h = (await c.fetchone())[0]
         async with db.execute(
-            "SELECT COUNT(*) FROM events WHERE impact='High' AND datetime(timestamp)>datetime('now','-24 hours')"
+            "SELECT COUNT(*) FROM events WHERE impact='High' AND timestamp > NOW() - INTERVAL '24 hours'"
         ) as c:
             high_events = (await c.fetchone())[0]
 
         # Top regions
         async with db.execute(
-            "SELECT country_name, COUNT(*) as n FROM watchlist WHERE type='country' "
+            "SELECT MAX(country_name) as country_name, COUNT(*) as n FROM watchlist WHERE type='country' "
             "GROUP BY value ORDER BY n DESC LIMIT 5"
         ) as c:
-            top_regions = [dict(r) for r in await c.fetchall()]
+            top_regions = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # Top assets
         async with db.execute(
             "SELECT value, label, COUNT(*) as n FROM watchlist WHERE type='asset' "
             "GROUP BY value ORDER BY n DESC LIMIT 5"
         ) as c:
-            top_assets = [dict(r) for r in await c.fetchall()]
+            top_assets = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # Activity last 7 days (registrations per day)
         async with db.execute(
-            "SELECT date(created_at) as day, COUNT(*) as n FROM users "
-            "WHERE datetime(created_at)>datetime('now','-7 days') "
+            "SELECT created_at::date as day, COUNT(*) as n FROM users "
+            "WHERE created_at > NOW() - INTERVAL '7 days' "
             "GROUP BY day ORDER BY day"
         ) as c:
-            reg_trend = [dict(r) for r in await c.fetchall()]
+            reg_trend = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # Most active sections
         async with db.execute(
             "SELECT section, COUNT(*) as n FROM activity_log "
-            "WHERE datetime(created_at)>datetime('now','-24 hours') "
+            "WHERE created_at > NOW() - INTERVAL '24 hours' "
             "GROUP BY section ORDER BY n DESC LIMIT 6"
         ) as c:
-            section_usage = [dict(r) for r in await c.fetchall()]
+            section_usage = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # AI provider breakdown
         async with db.execute(
             "SELECT ai_provider, COUNT(*) as n FROM users GROUP BY ai_provider"
         ) as c:
-            ai_providers = [dict(r) for r in await c.fetchall()]
+            ai_providers = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     return {
         "users": {
@@ -138,8 +145,7 @@ async def list_users(
     if active is not None:
         where.append("is_active = ?"); params.append(active)
 
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT id, email, username, avatar_color, role, is_admin, is_active, "
             "ai_provider, onboarding_done, experience_level, created_at, last_login "
@@ -147,19 +153,19 @@ async def list_users(
             " ORDER BY created_at DESC LIMIT ? OFFSET ?",
             params + [limit, offset]
         ) as c:
-            users = [dict(r) for r in await c.fetchall()]
+            users = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute("SELECT COUNT(*) FROM users WHERE " + " AND ".join(where), params) as c:
             total = (await c.fetchone())[0]
 
     # Enrich with watchlist count + alert count
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         for u in users:
             async with db.execute("SELECT COUNT(*) FROM watchlist WHERE user_id=?", (u["id"],)) as c:
                 u["watchlist_count"] = (await c.fetchone())[0]
             async with db.execute("SELECT COUNT(*) FROM alerts WHERE user_id=?", (u["id"],)) as c:
                 u["alert_count"] = (await c.fetchone())[0]
             async with db.execute(
-                "SELECT COUNT(*) FROM activity_log WHERE user_id=? AND datetime(created_at)>datetime('now','-7 days')",
+                "SELECT COUNT(*) FROM activity_log WHERE user_id=? AND created_at > NOW() - INTERVAL '7 days'",
                 (u["id"],)
             ) as c:
                 u["activity_7d"] = (await c.fetchone())[0]
@@ -169,8 +175,7 @@ async def list_users(
 
 @router.get("/users/{user_id}")
 async def get_user_detail(user_id: int, admin=Depends(require_admin)):
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute("SELECT * FROM users WHERE id=?", (user_id,)) as c:
             row = await c.fetchone()
         if not row:
@@ -187,14 +192,14 @@ async def get_user_detail(user_id: int, admin=Depends(require_admin)):
         u.pop("user_gemini_key", None)
 
         async with db.execute("SELECT * FROM watchlist WHERE user_id=? ORDER BY type, label", (user_id,)) as c:
-            u["watchlist"] = [dict(r) for r in await c.fetchall()]
+            u["watchlist"] = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute("SELECT * FROM alerts WHERE user_id=? ORDER BY created_at DESC", (user_id,)) as c:
-            u["alerts"] = [dict(r) for r in await c.fetchall()]
+            u["alerts"] = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute(
             "SELECT action, section, detail, created_at FROM activity_log WHERE user_id=? "
             "ORDER BY created_at DESC LIMIT 30", (user_id,)
         ) as c:
-            u["recent_activity"] = [dict(r) for r in await c.fetchall()]
+            u["recent_activity"] = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute("SELECT * FROM user_xp WHERE user_id=?", (user_id,)) as c:
             row2 = await c.fetchone()
             u["xp"] = dict(row2) if row2 else {}
@@ -209,7 +214,7 @@ async def update_user(user_id: int, payload: dict = Body(...), admin=Depends(req
     if not updates:
         raise HTTPException(400, "No valid fields to update")
     sets = ", ".join(f"{k}=?" for k in updates)
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await db.execute(f"UPDATE users SET {sets} WHERE id=?", list(updates.values()) + [user_id])
         await _log_activity(db, admin["id"], "admin_user_update", "admin",
                             f"Updated user {user_id}: {list(updates.keys())}")
@@ -221,7 +226,7 @@ async def update_user(user_id: int, payload: dict = Body(...), admin=Depends(req
 async def delete_user(user_id: int, admin=Depends(require_admin)):
     if user_id == admin["id"]:
         raise HTTPException(400, "Cannot delete your own admin account")
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await db.execute("DELETE FROM users WHERE id=?", (user_id,))
         await db.execute("DELETE FROM watchlist WHERE user_id=?", (user_id,))
         await db.execute("DELETE FROM alerts WHERE user_id=?", (user_id,))
@@ -232,7 +237,7 @@ async def delete_user(user_id: int, admin=Depends(require_admin)):
 
 @router.post("/users/{user_id}/deactivate")
 async def deactivate_user(user_id: int, admin=Depends(require_admin)):
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await db.execute("UPDATE users SET is_active=0 WHERE id=?", (user_id,))
         await _log_activity(db, admin["id"], "admin_deactivate", "admin", f"Deactivated user {user_id}")
         await db.commit()
@@ -241,7 +246,7 @@ async def deactivate_user(user_id: int, admin=Depends(require_admin)):
 
 @router.post("/users/{user_id}/activate")
 async def activate_user(user_id: int, admin=Depends(require_admin)):
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await db.execute("UPDATE users SET is_active=1 WHERE id=?", (user_id,))
         await db.commit()
     return {"status": "activated"}
@@ -251,45 +256,41 @@ async def activate_user(user_id: int, admin=Depends(require_admin)):
 
 @router.get("/activity")
 async def get_activity(hours: int = Query(24), limit: int = Query(100), admin=Depends(require_admin)):
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT a.*, u.username, u.email FROM activity_log a "
             "LEFT JOIN users u ON a.user_id=u.id "
-            "WHERE datetime(a.created_at)>datetime('now',?) "
+            f"WHERE a.created_at > NOW() - INTERVAL '{int(hours)} hours' "
             "ORDER BY a.created_at DESC LIMIT ?",
-            (f"-{hours} hours", limit)
+            (limit,)
         ) as c:
-            logs = [dict(r) for r in await c.fetchall()]
+            logs = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute(
-            "SELECT section, COUNT(*) as n FROM activity_log "
-            "WHERE datetime(created_at)>datetime('now',?) GROUP BY section ORDER BY n DESC",
-            (f"-{hours} hours",)
+            f"SELECT section, COUNT(*) as n FROM activity_log "
+            f"WHERE created_at > NOW() - INTERVAL '{int(hours)} hours' GROUP BY section ORDER BY n DESC"
         ) as c:
-            by_section = [dict(r) for r in await c.fetchall()]
+            by_section = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute(
-            "SELECT action, COUNT(*) as n FROM activity_log "
-            "WHERE datetime(created_at)>datetime('now',?) GROUP BY action ORDER BY n DESC LIMIT 10",
-            (f"-{hours} hours",)
+            f"SELECT action, COUNT(*) as n FROM activity_log "
+            f"WHERE created_at > NOW() - INTERVAL '{int(hours)} hours' GROUP BY action ORDER BY n DESC LIMIT 10"
         ) as c:
-            by_action = [dict(r) for r in await c.fetchall()]
+            by_action = [_json_safe(dict(r)) for r in await c.fetchall()]
     return {"logs": logs, "by_section": by_section, "by_action": by_action}
 
 
 @router.get("/activity/trending")
 async def trending_topics(admin=Depends(require_admin)):
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT value, COUNT(*) as n FROM watchlist WHERE type='country' "
             "GROUP BY value ORDER BY n DESC LIMIT 10"
         ) as c:
-            top_countries = [dict(r) for r in await c.fetchall()]
+            top_countries = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute(
             "SELECT value, label, COUNT(*) as n FROM watchlist WHERE type='asset' "
             "GROUP BY value ORDER BY n DESC LIMIT 10"
         ) as c:
-            top_assets = [dict(r) for r in await c.fetchall()]
+            top_assets = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute(
             "SELECT interests FROM users WHERE interests != '[]' AND interests != ''"
         ) as c:
@@ -333,8 +334,7 @@ async def admin_events(
     if flagged is not None:
         where.append("admin_flagged=?"); params.append(flagged)
 
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         # Ensure column exists
         async with db.execute("PRAGMA table_info(events)") as c:
             ev_cols = {r[1] for r in await c.fetchall()}
@@ -351,7 +351,7 @@ async def admin_events(
             " ORDER BY timestamp DESC LIMIT ? OFFSET ?",
             params + [limit, offset]
         ) as c:
-            events = [dict(r) for r in await c.fetchall()]
+            events = [_json_safe(dict(r)) for r in await c.fetchall()]
         async with db.execute("SELECT COUNT(*) FROM events WHERE " + " AND ".join(where), params) as c:
             total = (await c.fetchone())[0]
 
@@ -366,7 +366,7 @@ async def update_event(event_id: str, payload: dict = Body(...), admin=Depends(r
     if not updates:
         raise HTTPException(400, "No valid fields")
     sets = ", ".join(f"{k}=?" for k in updates)
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await db.execute(f"UPDATE events SET {sets} WHERE id=?", list(updates.values()) + [event_id])
         await _log_activity(db, admin["id"], "admin_event_edit", "events",
                             f"Edited event {event_id[:16]}")
@@ -376,7 +376,7 @@ async def update_event(event_id: str, payload: dict = Body(...), admin=Depends(r
 
 @router.delete("/events/{event_id}")
 async def delete_event(event_id: str, admin=Depends(require_admin)):
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await db.execute("DELETE FROM events WHERE id=?", (event_id,))
         await _log_activity(db, admin["id"], "admin_event_delete", "events",
                             f"Deleted event {event_id[:16]}")
@@ -387,7 +387,7 @@ async def delete_event(event_id: str, admin=Depends(require_admin)):
 @router.post("/events/{event_id}/flag")
 async def flag_event(event_id: str, payload: dict = Body(...), admin=Depends(require_admin)):
     note = payload.get("note", "")
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE events SET admin_flagged=1, admin_note=? WHERE id=?", (note, event_id)
         )
@@ -398,13 +398,12 @@ async def flag_event(event_id: str, payload: dict = Body(...), admin=Depends(req
 @router.get("/events/duplicates")
 async def find_duplicates(hours: int = Query(48), admin=Depends(require_admin)):
     """Find potentially duplicate events (same category + country within 6h)."""
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT category, country_code, country_name, "
-            "COUNT(*) as count, GROUP_CONCAT(id, '|') as ids, "
-            "GROUP_CONCAT(title, '|||') as titles "
-            "FROM events WHERE datetime(timestamp)>datetime('now',?) "
+            "COUNT(*) as count, STRING_AGG(id::text, '|') as ids, "
+            "STRING_AGG(title::text, '|||') as titles "
+            "FROM events WHERE datetime(timestamp)>NOW() "
             "GROUP BY category, country_code "
             "HAVING count > 1 ORDER BY count DESC LIMIT 30",
             (f"-{hours} hours",)
@@ -423,8 +422,7 @@ async def find_duplicates(hours: int = Query(48), admin=Depends(require_admin)):
 @router.get("/ai/outputs")
 async def ai_outputs(limit: int = Query(50), admin=Depends(require_admin)):
     """Get recent AI-generated outputs for quality monitoring."""
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute(
             "SELECT id, title, category, country_name, severity, impact, "
             "ai_summary, ai_market_note, ai_impact_score, "
@@ -434,7 +432,7 @@ async def ai_outputs(limit: int = Query(50), admin=Depends(require_admin)):
             "ORDER BY timestamp DESC LIMIT ?",
             (limit,)
         ) as c:
-            outputs = [dict(r) for r in await c.fetchall()]
+            outputs = [_json_safe(dict(r)) for r in await c.fetchall()]
 
     # Stats
     total = len(outputs)
@@ -463,7 +461,7 @@ async def override_ai_output(event_id: str, payload: dict = Body(...), admin=Dep
     if not updates:
         raise HTTPException(400, "No valid fields")
     sets = ", ".join(f"{k}=?" for k in updates)
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await db.execute(f"UPDATE events SET {sets} WHERE id=?", list(updates.values()) + [event_id])
         await _log_activity(db, admin["id"], "admin_ai_override", "ai",
                             f"Overrode AI fields for {event_id[:16]}: {list(updates.keys())}")
@@ -483,16 +481,15 @@ async def _get_app_setting(db, key: str, default: str = "") -> str:
 async def _set_app_setting(db, key: str, value: str):
     """Upsert a value into app_settings table."""
     await db.execute(
-        "INSERT INTO app_settings (key, value, updated_at) VALUES (?,?,datetime('now')) "
-        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now')",
+        "INSERT INTO app_settings (key, value, updated_at) VALUES (?,?,NOW()) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=NOW()",
         (key, value)
     )
 
 
 @router.get("/settings/ai")
 async def get_ai_settings(admin=Depends(require_admin)):
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         # Provider stored in DB overrides config at runtime
         db_provider   = await _get_app_setting(db, "global_ai_provider", settings.global_ai_provider)
         db_gemini_key = await _get_app_setting(db, "gemini_api_key",     settings.gemini_api_key)
@@ -533,7 +530,7 @@ async def set_active_provider(payload: dict = Body(...), admin=Depends(require_a
 
     settings.global_ai_provider = provider
 
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await _set_app_setting(db, "global_ai_provider", provider)
         await _log_activity(db, admin["id"], "admin_provider_switch", "settings",
                             f"Switched global AI provider to {provider}")
@@ -564,7 +561,7 @@ async def update_ai_key(payload: dict = Body(...), admin=Depends(require_admin))
         env_key = "ANTHROPIC_API_KEY"
 
     # Persist to DB
-    async with aiosqlite.connect(DB) as db:
+    async with get_db() as db:
         await _set_app_setting(db, db_key, api_key)
         await _log_activity(db, admin["id"], "admin_ai_key_update", "settings",
                             f"Updated {provider} API key")
@@ -598,8 +595,7 @@ async def update_ai_key(payload: dict = Body(...), admin=Depends(require_admin))
 async def make_admin(payload: dict = Body(...), admin=Depends(require_admin)):
     """Promote a user to admin."""
     email = payload.get("email", "").lower()
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
+    async with get_db() as db:
         async with db.execute("SELECT id FROM users WHERE email=?", (email,)) as c:
             row = await c.fetchone()
         if not row:
@@ -615,9 +611,9 @@ async def make_admin(payload: dict = Body(...), admin=Depends(require_admin)):
 async def log_user_action(user_id: int, action: str, section: str = "", detail: str = ""):
     """Can be imported by other routers to log activity."""
     try:
-        async with aiosqlite.connect(DB) as db:
+        async with get_db() as db:
             await db.execute(
-                "INSERT OR IGNORE INTO activity_log (user_id, action, section, detail) VALUES (?,?,?,?)",
+                "INSERT INTO activity_log (user_id, action, section, detail) VALUES (?,?,?,?)",
                 (user_id, action, section, detail)
             )
             await db.commit()
@@ -633,20 +629,17 @@ async def behaviour_summary(
     admin=Depends(require_admin)
 ):
     """Aggregate behaviour analytics for the admin dashboard."""
-    async with aiosqlite.connect(DB) as db:
-        db.row_factory = aiosqlite.Row
-
+    async with get_db() as db:
         # Total actions
         async with db.execute(
-            "SELECT COUNT(*) FROM activity_log WHERE created_at > datetime('now',?)",
-            (f"-{days} days",)
+            f"SELECT COUNT(*) FROM activity_log WHERE created_at > NOW() - INTERVAL '{int(days)} days'"
         ) as c:
             total_actions = (await c.fetchone())[0]
 
         # Active users (distinct users who did something)
         async with db.execute(
             "SELECT COUNT(DISTINCT user_id) FROM activity_log "
-            "WHERE created_at > datetime('now','-7 days')"
+            "WHERE created_at > (NOW() - INTERVAL '7 days')"
         ) as c:
             active_users = (await c.fetchone())[0]
 
@@ -654,23 +647,23 @@ async def behaviour_summary(
         async with db.execute("""
             SELECT action, COUNT(*) as cnt
             FROM   activity_log
-            WHERE  created_at > datetime('now', ?)
+            WHERE  created_at > NOW() - INTERVAL '{int(days)} days'
             GROUP  BY action
             ORDER  BY cnt DESC
             LIMIT  10
-        """, (f"-{days} days",)) as c:
-            top_actions = [dict(r) for r in await c.fetchall()]
+        """) as c:
+            top_actions = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # Section popularity
         async with db.execute("""
             SELECT section, COUNT(*) as cnt
             FROM   activity_log
-            WHERE  created_at > datetime('now', ?)
+            WHERE  created_at > NOW() - INTERVAL '{int(days)} days'
               AND  section != ''
             GROUP  BY section
             ORDER  BY cnt DESC
-        """, (f"-{days} days",)) as c:
-            sections = [dict(r) for r in await c.fetchall()]
+        """) as c:
+            sections = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # Category affinity (platform-wide)
         async with db.execute("""
@@ -678,11 +671,11 @@ async def behaviour_summary(
             FROM   activity_log al
             JOIN   events e ON e.id = al.detail
             WHERE  al.action IN ('event_opened','event_saved')
-              AND  al.created_at > datetime('now', ?)
+              AND  al.created_at > NOW() - INTERVAL '{int(days)} days'
             GROUP  BY e.category
             ORDER  BY cnt DESC
-        """, (f"-{days} days",)) as c:
-            cat_affinity = [dict(r) for r in await c.fetchall()]
+        """) as c:
+            cat_affinity = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # AI feedback stats
         async with db.execute("""
@@ -691,8 +684,8 @@ async def behaviour_summary(
                 SUM(CASE WHEN rating=1  THEN 1 ELSE 0 END) as positive,
                 SUM(CASE WHEN rating=-1 THEN 1 ELSE 0 END) as negative
             FROM ai_feedback
-            WHERE created_at > datetime('now', ?)
-        """, (f"-{days} days",)) as c:
+            WHERE created_at > NOW() - INTERVAL '{int(days)} days'
+        """) as c:
             row  = await c.fetchone()
             total_fb, pos_fb, neg_fb = (row[0] or 0, row[1] or 0, row[2] or 0)
 
@@ -700,17 +693,16 @@ async def behaviour_summary(
         async with db.execute("""
             SELECT question, answer, rating, created_at
             FROM   ai_feedback
-            WHERE  created_at > datetime('now', ?)
+            WHERE  created_at > NOW() - INTERVAL '{int(days)} days'
             ORDER  BY created_at DESC
             LIMIT  10
-        """, (f"-{days} days",)) as c:
-            feedback_samples = [dict(r) for r in await c.fetchall()]
+        """) as c:
+            feedback_samples = [_json_safe(dict(r)) for r in await c.fetchall()]
 
         # Saved events count
         async with db.execute(
             "SELECT COUNT(*) FROM saved_events "
-            "WHERE created_at > datetime('now', ?)",
-            (f"-{days} days",)
+            f"WHERE created_at > NOW() - INTERVAL '{int(days)} days'"
         ) as c:
             total_saved = (await c.fetchone())[0]
 
