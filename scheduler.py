@@ -58,6 +58,19 @@ def get_finance_cache():
 
 # ── Event persistence ─────────────────────────────────────
 
+def _parse_ts(ts):
+    """Convert ISO timestamp string to datetime object for asyncpg."""
+    if not ts:
+        return None
+    try:
+        from datetime import datetime
+        # Handle both 'Z' suffix and offset-naive strings
+        ts = str(ts).replace('Z', '+00:00')
+        return datetime.fromisoformat(ts)
+    except Exception:
+        return None
+
+
 async def _persist_events(events, db) -> int:
     """Insert new events. Returns count of newly inserted rows.
     
@@ -104,7 +117,7 @@ async def _persist_events(events, db) -> int:
                        ON CONFLICT(id) DO NOTHING""",
                     (
                         str(ev["id"]),
-                        (str(ev.get("timestamp")) if ev.get("timestamp") else None),
+                        (_parse_ts(ev.get("timestamp"))),
                         str(ev.get("title") or ""),
                         str(ev.get("summary") or ""),
                         str(ev.get("category") or "GEOPOLITICS"),
@@ -284,7 +297,7 @@ async def _poll_gdelt():
                             source_count, source_list, heat_index, ai_tags, keywords)
                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                            ON CONFLICT(id) DO NOTHING""",
-                        (ev["id"], ev.get("timestamp"), ev.get("title",""),
+                        (ev["id"], _parse_ts(ev.get("timestamp")), ev.get("title",""),
                          ev.get("summary",""), ev.get("category","GEOPOLITICS"),
                          ev.get("source","GDELT"),
                          ev.get("latitude",0.0), ev.get("longitude",0.0),
