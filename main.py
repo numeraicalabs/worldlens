@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db
 from auth import hash_password
-import aiosqlite
+from db import get_db
 import scheduler
 from routers.auth import router as auth_router
 from routers.events import router as events_router
@@ -24,34 +24,71 @@ from routers.admin import router as admin_router
 from routers.insiders import router as insiders_router
 from routers.dependency import router as dependency_router
 from routers.track import router as track_router
-from routers.ml    import router as ml_router
+from routers.ml import router as ml_router
 from routers.globe import router as globe_router
 from routers.agents import router as agents_router
-from routers.tradgentic.router import router as tradgentic_router
-from routers.etf_tracker import router as etf_tracker_router
+from routers.finance_hub import router as finance_hub_router   # ← moved up
+from routers.brain import router as brain_router
+from routers.brain_agent import router as brain_agent_router
+from routers.knowledge_graph import router as kg_router
+from routers.jarvis import router as jarvis_router
 from datetime import datetime
 from config import settings
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 logger = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
 
 
 async def _seed_admin():
     """Create default admin account if no admin exists."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        async with db.execute("SELECT id FROM users WHERE is_admin=1 LIMIT 1") as cur:
-            if await cur.fetchone():
-                return
-        await db.execute(
-            "INSERT OR IGNORE INTO users "
-            "(email, username, password_hash, avatar_color, is_admin, role) "
-            "VALUES (?,?,?,?,1,'admin')",
-            (settings.admin_email, "Admin",
-             hash_password(settings.admin_password), "#EF4444")
+    try:
+        async with get_db() as db:
+            async with db.execute("SELECT id FROM users WHERE is_admin=1 LIMIT 1") as cur:
+                if await cur.fetchone():
+                    return
+            await db.execute(
+                "INSERT INTO users "
+                "(email, username, password_hash, avatar_color, is_admin, role) "
+                "VALUES (?,?,?,?,1,'admin') ON CONFLICT DO NOTHING",
+                (settings.admin_email, "Admin",
+                 hash_password(settings.admin_password), "#EF4444")
+            )
+            await db.commit()
+            logger.info("Default admin created: %s", settings.admin_email)
+    except Exception as e:
+        logger.warning("_seed_admin: %s", e)
+
+
+async def _load_ai_settings():
+    """Load AI provider settings persisted in DB."""
+    try:
+        async with get_db() as db:
+            async with db.execute(
+                "SELECT key, value FROM app_settings "
+                "WHERE key IN ('global_ai_provider','gemini_api_key','anthropic_api_key')"
+            ) as cur:
+                rows = await cur.fetchall()
+        for row in rows:
+            key, value = row[0], row[1]
+            if value:
+                if key == "global_ai_provider":
+                    settings.global_ai_provider = value
+                elif key == "gemini_api_key":
+                    settings.gemini_api_key = value
+                elif key == "anthropic_api_key":
+                    settings.anthropic_api_key = value
+        logger.info(
+            "AI settings loaded: provider=%s gemini=%s claude=%s",
+            settings.global_ai_provider,
+            "ok" if settings.gemini_api_key else "not set",
+            "ok" if settings.anthropic_api_key else "not set",
         )
-        await db.commit()
-        logger.info("Default admin created: %s", settings.admin_email)
+    except Exception as e:
+        logger.warning("_load_ai_settings: %s", e)
 
 
 class WSManager:
@@ -59,8 +96,12 @@ class WSManager:
         self.connections = []
 
     async def connect(self, ws: WebSocket):
-        await ws.accept()
-        self.connections.append(ws)
+        try:
+            if ws.client_state.value == 0:  # CONNECTING
+                await ws.accept()
+            self.connections.append(ws)
+        except Exception as e:
+            logger.debug("WS connect error: %s", e)
 
     def disconnect(self, ws: WebSocket):
         if ws in self.connections:
@@ -91,79 +132,73 @@ async def ws_broadcast_callback(data: dict):
     await ws_manager.broadcast(data)
 
 
-
-async def _load_ai_settings():
-    """Load AI provider settings persisted in DB (overrides config.py defaults)."""
-    try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            async with db.execute("SELECT key, value FROM app_settings WHERE key IN ('global_ai_provider','gemini_api_key','anthropic_api_key')") as cur:
-                rows = await cur.fetchall()
-        for key, value in rows:
-            if value:
-                if key == "global_ai_provider":
-                    settings.global_ai_provider = value
-                elif key == "gemini_api_key":
-                    settings.gemini_api_key = value
-                elif key == "anthropic_api_key":
-                    settings.anthropic_api_key = value
-        logger.info("AI settings loaded from DB: provider=%s, gemini=%s, claude=%s",
-                    settings.global_ai_provider,
-                    "configured" if settings.gemini_api_key    else "not set",
-                    "configured" if settings.anthropic_api_key else "not set (disabled)")
-    except Exception as e:
-        logger.warning("Could not load AI settings from DB: %s", e)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ── Ensure full schema on Postgres (all 20+ tables) ─────────────────
+    # ── 1. Postgres schema ────────────────────────────────────────────────────
     try:
         from db import ensure_full_schema
         await ensure_full_schema()
         logger.info("Full Postgres schema ensured")
-    except Exception as _dbe:
-        logger.warning("ensure_full_schema: %s", _dbe)
+    except Exception as e:
+        logger.warning("ensure_full_schema: %s", e)
 
+    # ── 2. SQLite init + seed ─────────────────────────────────────────────────
     await init_db()
     await _seed_admin()
     await _load_ai_settings()
 
-    # ── Supabase + Knowledge Graph schema ──────────────────────────────────────
+    # ── 3. Column migrations (fixes "column X does not exist") ───────────────
+    try:
+        from pg_compat import ensure_session_date
+        await ensure_session_date()
+        logger.info("Column migrations applied")
+    except Exception as e:
+        logger.warning("pg_compat migrations: %s", e)
+
+    # ── 4. Supabase + Knowledge Graph ─────────────────────────────────────────
     try:
         from supabase_client import get_pool, ensure_kg_schema
-        await get_pool()          # attempt connection (logs warning if fails)
-        await ensure_kg_schema()  # create tables in PG or SQLite fallback
+        await get_pool()
+        await ensure_kg_schema()
         logger.info("Knowledge Graph schema ready")
     except Exception as e:
         logger.warning("KG schema init skipped: %s", e)
 
-    # ── Startup: seed KG only if not already done (survives deploys) ─────────
+    # ── 5. Background startup tasks ───────────────────────────────────────────
     async def _startup_brain_seed():
-        import asyncio as _aio, aiosqlite as _asl
-        await _aio.sleep(6)
-        SEED_VERSION = "v2.0"  # bump to force re-seed
+        await asyncio.sleep(6)
+        SEED_VERSION = "v2.0"
         try:
             from supabase_client import get_pool
-            from config import settings as _s
             pool = await get_pool()
             already_done = False
-            try:
-                if pool:
+            if pool:
+                try:
                     async with pool.acquire() as conn:
-                        row = await conn.fetchrow("SELECT value FROM kg_meta WHERE key='seed_version'")
+                        row = await conn.fetchrow(
+                            "SELECT value FROM kg_meta WHERE key='seed_version'"
+                        )
                         if row and row["value"] == SEED_VERSION:
                             n = await conn.fetchval("SELECT COUNT(*) FROM kg_nodes")
                             already_done = (n or 0) > 200
-                else:
-                    async with _asl.connect(_s.db_path) as db:
-                        db.row_factory = _asl.Row
-                        async with db.execute("SELECT value FROM kg_meta WHERE key='seed_version'") as c:
+                except Exception as e:
+                    logger.debug("Seed check: %s", e)
+            else:
+                # Fallback: check via get_db()
+                try:
+                    async with get_db() as db:
+                        async with db.execute(
+                            "SELECT value FROM kg_meta WHERE key='seed_version'"
+                        ) as c:
                             row = await c.fetchone()
-                        if row and row["value"] == SEED_VERSION:
-                            async with db.execute("SELECT COUNT(*) as n FROM kg_nodes") as c:
+                        if row and row[0] == SEED_VERSION:
+                            async with db.execute(
+                                "SELECT COUNT(*) FROM kg_nodes"
+                            ) as c:
                                 r2 = await c.fetchone()
-                                already_done = (dict(r2)["n"] if r2 else 0) > 200
-            except Exception as _ce:
-                logger.debug("Seed check: %s", _ce)
+                                already_done = (r2[0] if r2 else 0) > 200
+                except Exception as e:
+                    logger.debug("Seed check fallback: %s", e)
 
             if already_done:
                 logger.info("KG seed already at %s — skip", SEED_VERSION)
@@ -174,53 +209,56 @@ async def lifespan(app: FastAPI):
             n, e = await run_mega_seed_v2()
             logger.info("Startup KG mega-seed v2: +%d nodes +%d edges", n, e)
 
-            # Mark version
             try:
                 if pool:
                     async with pool.acquire() as conn:
-                        await conn.execute("INSERT INTO kg_meta(key,value) VALUES('seed_version',$1) ON CONFLICT(key) DO UPDATE SET value=$1", SEED_VERSION)
+                        await conn.execute(
+                            "INSERT INTO kg_meta(key,value) VALUES('seed_version',$1) "
+                            "ON CONFLICT(key) DO UPDATE SET value=$1",
+                            SEED_VERSION,
+                        )
                 else:
-                    async with _asl.connect(_s.db_path) as db:
-                        await db.execute("INSERT OR REPLACE INTO kg_meta(key,value) VALUES(?,?)", ("seed_version", SEED_VERSION))
+                    async with get_db() as db:
+                        await db.execute(
+                            "INSERT INTO kg_meta(key,value) VALUES(?,?) "
+                            "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+                            ("seed_version", SEED_VERSION),
+                        )
                         await db.commit()
-            except Exception as _me:
-                logger.debug("kg_meta write: %s", _me)
-        except Exception as _se:
-            logger.warning("Startup seed: %s", _se)
+            except Exception as e:
+                logger.debug("kg_meta write: %s", e)
+        except Exception as e:
+            logger.warning("Startup seed: %s", e)
             try:
                 from brain_autopop import auto_populate_from_macro
                 await auto_populate_from_macro([])
-            except Exception: pass
+            except Exception:
+                pass
 
-    # ── Startup brain enrichment ──────────────────────────────────────────────
     async def _startup_brain_entries():
-        import asyncio as _aio
-        await _aio.sleep(12)
+        await asyncio.sleep(12)
         try:
             from brain_entries_engine import run_brain_enrichment_cycle, generate_daily_digest
-            logger.info("Startup: running brain entries enrichment…")
+            logger.info("Startup: brain entries enrichment…")
             await run_brain_enrichment_cycle()
-            # Generate today's digest if not already present
             await generate_daily_digest()
-        except Exception as _e:
-            logger.warning("Startup brain entries: %s", _e)
+        except Exception as e:
+            logger.warning("Startup brain entries: %s", e)
 
-    import asyncio as _asyncio
-    _asyncio.create_task(_startup_brain_entries())
-
-    # ── Startup: generate global dashboard cache ──────────────────────────────
     async def _startup_global_cache():
-        import asyncio as _aio
-        await _aio.sleep(8)  # after seed, generate cache quickly
+        await asyncio.sleep(8)
         try:
             from global_cache import get_global_cache
             logger.info("Startup: generating global dashboard cache…")
             await get_global_cache()
-        except Exception as _ce:
-            logger.warning("Startup global cache: %s", _ce)
+        except Exception as e:
+            logger.warning("Startup global cache: %s", e)
 
-    _asyncio.create_task(_startup_global_cache())
-    # Init tradgentic tables
+    asyncio.create_task(_startup_brain_seed())
+    asyncio.create_task(_startup_brain_entries())
+    asyncio.create_task(_startup_global_cache())
+
+    # ── 6. Optional modules ───────────────────────────────────────────────────
     try:
         from routers.tradgentic.portfolio import ensure_tables as tg_init
         await tg_init()
@@ -231,8 +269,7 @@ async def lifespan(app: FastAPI):
         logger.info("Tradgentic tables ready")
     except Exception as e:
         logger.warning("Tradgentic init skipped: %s", e)
-    # ── Start ML model pre-loading in background threads ──────────────
-    # Models are optional — app starts instantly even if ML unavailable.
+
     if settings.enable_finbert:
         try:
             from analysis.finbert_engine import init_models as init_finbert
@@ -240,6 +277,7 @@ async def lifespan(app: FastAPI):
             logger.info("FinBERT pre-load initiated")
         except Exception as e:
             logger.info("FinBERT pre-load skipped: %s", e)
+
     if settings.enable_spacy:
         try:
             from analysis.ner_engine import init_ner_models
@@ -247,22 +285,37 @@ async def lifespan(app: FastAPI):
             logger.info("spaCy NER pre-load initiated")
         except Exception as e:
             logger.info("spaCy pre-load skipped: %s", e)
+
     scheduler.register_ws_callback(ws_broadcast_callback)
     scheduler.start()
-    logger.info("World Lens started")
+    logger.info("World Lens started ✓")
     yield
     scheduler.stop()
 
 
-app = FastAPI(title="World Lens API", version="1.0.0", lifespan=lifespan, docs_url="/api/docs")
+# ── App setup ─────────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="World Lens API",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/api/docs",
+)
 
-# Parse ALLOWED_ORIGINS env var (comma-separated list or "*")
+# ── Error logging middleware (full traceback on 500) ──────────────────────────
+try:
+    from error_middleware import register_middleware, diag_router
+    register_middleware(app)
+    app.include_router(diag_router)
+    logger.info("Error middleware registered")
+except Exception as _em:
+    logger.warning("error_middleware not found: %s", _em)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
 _origins_raw = settings.allowed_origins.strip()
 _cors_origins = (
     ["*"] if _origins_raw == "*"
     else [o.strip() for o in _origins_raw.split(",") if o.strip()]
 )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -271,6 +324,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router)
 app.include_router(events_router)
 app.include_router(finance_router)
@@ -281,37 +335,40 @@ app.include_router(intelligence_router)
 app.include_router(markets_router)
 app.include_router(admin_router)
 app.include_router(insiders_router)
-from routers.finance_hub import router as finance_hub_router
 app.include_router(finance_hub_router)
-from routers.health import router as health_router
-app.include_router(health_router)
-from routers.opportunity import router as opportunity_router
-app.include_router(opportunity_router)
 app.include_router(dependency_router)
 app.include_router(track_router)
 app.include_router(ml_router)
 app.include_router(globe_router)
 app.include_router(agents_router)
-app.include_router(tradgentic_router)
-app.include_router(etf_tracker_router)
-
-from routers.brain import router as brain_router
 app.include_router(brain_router)
-
-from routers.brain_agent import router as brain_agent_router
 app.include_router(brain_agent_router)
-
-from routers.knowledge_graph import router as kg_router
 app.include_router(kg_router)
-
-from routers.financial_reports import router as fin_reports_router
-app.include_router(fin_reports_router)
-
-from routers.jarvis import router as jarvis_router
 app.include_router(jarvis_router)
+
+# Optional routers (skip if module missing)
+try:
+    from routers.tradgentic.router import router as tradgentic_router
+    app.include_router(tradgentic_router)
+except Exception as e:
+    logger.warning("tradgentic router skipped: %s", e)
+
+try:
+    from routers.etf_tracker import router as etf_tracker_router
+    app.include_router(etf_tracker_router)
+except Exception as e:
+    logger.warning("etf_tracker router skipped: %s", e)
+
+try:
+    from routers.financial_reports import router as fin_reports_router
+    app.include_router(fin_reports_router)
+except Exception as e:
+    logger.warning("financial_reports router skipped: %s", e)
+
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
@@ -321,8 +378,8 @@ async def health():
 async def websocket_endpoint(ws: WebSocket):
     await ws_manager.connect(ws)
     try:
-        from routers.events import stats_summary
         try:
+            from routers.events import stats_summary
             stats = await stats_summary()
             await ws_manager.send(ws, {"type": "welcome", "stats": stats})
         except Exception:
@@ -331,9 +388,15 @@ async def websocket_endpoint(ws: WebSocket):
             try:
                 msg = await asyncio.wait_for(ws.receive_text(), timeout=30)
                 if msg == "ping":
-                    await ws_manager.send(ws, {"type": "pong", "time": datetime.utcnow().isoformat()})
+                    await ws_manager.send(ws, {
+                        "type": "pong",
+                        "time": datetime.utcnow().isoformat(),
+                    })
             except asyncio.TimeoutError:
-                await ws_manager.send(ws, {"type": "heartbeat", "time": datetime.utcnow().isoformat()})
+                await ws_manager.send(ws, {
+                    "type": "heartbeat",
+                    "time": datetime.utcnow().isoformat(),
+                })
     except WebSocketDisconnect:
         ws_manager.disconnect(ws)
     except Exception as e:
