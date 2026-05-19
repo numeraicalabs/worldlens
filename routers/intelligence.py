@@ -315,8 +315,11 @@ async def get_early_warning(user=Depends(require_user)):
             "ORDER BY severity DESC LIMIT 100"
         ) as c:
             events = [_json_safe(dict(r)) for r in await c.fetchall()]
-        async with db.execute("SELECT * FROM macro_indicators") as c:
-            indicators = [_json_safe(dict(r)) for r in await c.fetchall()]
+        try:
+            async with db.execute("SELECT * FROM macro_indicators") as c:
+                indicators = [_json_safe(dict(r)) for r in await c.fetchall()]
+        except Exception:
+            indicators = []
 
     # Compute rule-based baseline
     scores = _compute_ew_score_rule_based(events, indicators)
@@ -444,7 +447,11 @@ async def get_early_warning(user=Depends(require_user)):
         await db.execute(
             "INSERT INTO ew_snapshots "
             "(snapshot_date,global_ew_score,sentiment_trend,macro_stress,"
-            "market_stress,event_velocity,ai_assessment,top_risks) VALUES (?,?,?,?,?,?,?,?)",
+            "market_stress,event_velocity,ai_assessment,top_risks) VALUES (?,?,?,?,?,?,?,?) "
+            "ON CONFLICT (snapshot_date) DO UPDATE SET "
+            "global_ew_score=EXCLUDED.global_ew_score, "
+            "ai_assessment=EXCLUDED.ai_assessment, "
+            "top_risks=EXCLUDED.top_risks",
             (today, result["global_ew_score"], result["sentiment_trend"],
              result["macro_stress"], result["market_stress"],
              result["event_velocity"], result["ai_assessment"],

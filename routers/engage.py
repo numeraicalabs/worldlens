@@ -234,7 +234,8 @@ async def get_today_missions(user=Depends(require_user)):
             chosen = rng.sample(MISSION_POOL, min(3, len(MISSION_POOL)))
             for m in chosen:
                 await db.execute(
-                    "INSERT INTO daily_missions (user_id,date,mission_id,title,description,xp_reward) VALUES (?,?,?,?,?,?)",
+                    "INSERT INTO daily_missions (user_id,date,mission_id,title,description,xp_reward) VALUES (?,?,?,?,?,?) "
+                    "ON CONFLICT (user_id,date,mission_id) DO NOTHING",
                     (user["id"], today, m["id"], m["title"], m["description"], m["xp"])
                 )
             await db.commit()
