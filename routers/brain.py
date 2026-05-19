@@ -112,38 +112,19 @@ async def brain_ingest(
     source: str = "interaction",
     weight: float = 1.0,
     context: dict = None,
-    db: Optional[aiosqlite.Connection] = None,
+    db=None,  # ignored - kept for signature compatibility
 ) -> bool:
-# ── Postgres write (persistent across deploys) ──────────────────────────
-    from supabase_client import get_pool as _gp
-    _pool = await _gp()
-    if _pool:
-        try:
-            import json as _j
-            ctx_s = json.dumps(context) if isinstance(context, dict) else (context or '{}')
-            async with _pool.acquire() as _conn:
-                _row = await _conn.fetchrow(
-                    "INSERT INTO brain_entries (user_id, content, source, topic, weight, context) "
-                    "VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
-                    user_id, content, source, topic, weight, ctx_s
-                )
-                if _row:
-                    logger.debug("brain_ingest→PG id=%s", _row['id'])
-                    return _row['id']
-        except Exception as _pe:
-            logger.debug("brain_ingest PG: %s", _pe)
-    # ── SQLite fallback ───────────────────────────────────────────────────
     """Add a piece of knowledge to the user's brain. Deduplicates automatically."""
     if not content or len(content.strip()) < 15:
         return False
 
-    content = content.strip()[:1000]  # cap length
+    content = content.strip()[:1000]
     topic = await _classify_topic(content)
     ctx_json = json.dumps(context or {})
 
     try:
-        # Dedup: skip if same content ingested in last 24h
         async with get_db() as _db:
+            # Dedup: skip if same content ingested in last 24h
             async with _db.execute(
                 "SELECT id FROM brain_entries WHERE user_id=? AND "
                 "substr(content,1,120)=? AND "
@@ -151,15 +132,13 @@ async def brain_ingest(
                 (user_id, content[:120])
             ) as cur:
                 if await cur.fetchone():
-                    return False  # already ingested recently
+                    return False
 
             await _db.execute(
                 "INSERT INTO brain_entries (user_id, content, source, topic, weight, context) "
                 "VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING",
                 (user_id, content, source, topic, weight, ctx_json)
             )
-
-            # Update session stats
             today = date.today().isoformat()
             await _db.execute(
                 "INSERT INTO brain_sessions (user_id, session_date, entries_added) "
@@ -172,7 +151,6 @@ async def brain_ingest(
     except Exception as e:
         logger.warning("brain_ingest error user=%s: %s", user_id, e)
         return False
-    # cleanup handled by get_db() context manager
 
 
 async def brain_search(

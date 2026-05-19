@@ -18,14 +18,22 @@ from datetime import datetime, date
 from typing import Optional, List, Dict, Tuple
 
 import aiosqlite
-from db import get_db
 from fastapi import APIRouter, Depends, Body, HTTPException
 from auth import require_user
 from config import settings
+from db import get_db
 from ai_layer import _call_claude, _get_user_ai_keys, ai_available_async
 from routers.brain import brain_ingest, brain_search, brain_context_for_prompt, ensure_brain_tables
 
 logger = logging.getLogger(__name__)
+
+def _json_safe(obj):
+    import datetime as _dt
+    if isinstance(obj, dict): return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)): return obj.isoformat()
+    return obj
+
 router = APIRouter(prefix="/api/brain-agent", tags=["brain-agent"])
 
 # ── DB schema ─────────────────────────────────────────────────────────────────
@@ -35,8 +43,8 @@ CREATE TABLE IF NOT EXISTS brain_agent_sessions (
     id          TEXT PRIMARY KEY,
     user_id     INTEGER NOT NULL,
     title       TEXT DEFAULT 'New conversation',
-    created_at  TEXT DEFAULT (datetime('now')),
-    updated_at  TEXT DEFAULT (datetime('now')),
+    created_at  TEXT DEFAULT (NOW()),
+    updated_at  TEXT DEFAULT (NOW()),
     message_count INTEGER DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -51,12 +59,12 @@ CREATE TABLE IF NOT EXISTS brain_agent_messages (
     sources_json TEXT DEFAULT '[]',
     rating      INTEGER DEFAULT NULL,
     dwell_ms    INTEGER DEFAULT NULL,
-    created_at  TEXT DEFAULT (datetime('now')),
+    created_at  TEXT DEFAULT (NOW()),
     FOREIGN KEY (session_id) REFERENCES brain_agent_sessions(id)
 );
 
 CREATE TABLE IF NOT EXISTS brain_agent_template_stats (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    id          SERIAL PRIMARY KEY,
     user_id     INTEGER NOT NULL,
     template    TEXT NOT NULL,
     uses        INTEGER DEFAULT 0,
@@ -288,7 +296,7 @@ async def get_or_create_session(db: aiosqlite.Connection, user_id: int, session_
 
     new_id = str(uuid.uuid4())
     await db.execute(
-        "INSERT INTO brain_agent_sessions (id, user_id, title) VALUES (?,?,?)",
+        "INSERT INTO brain_agent_sessions (id, user_id, title) VALUES (?,?,?)" "ON CONFLICT (user_id, session_date) DO UPDATE SET message_count=brain_agent_sessions.message_count+1, last_active=NOW()",
         (new_id, user_id, "New conversation")
     )
     return new_id
@@ -320,7 +328,7 @@ async def save_message(
         (msg_id, session_id, user_id, role, content, template, json.dumps(sources or []))
     )
     await db.execute(
-        "UPDATE brain_agent_sessions SET message_count=message_count+1, updated_at=datetime('now'), "
+        "UPDATE brain_agent_sessions SET message_count=message_count+1, updated_at=NOW(), "
         "title=CASE WHEN message_count=0 THEN ? ELSE title END WHERE id=?",
         (content[:60], session_id)
     )
@@ -672,7 +680,7 @@ async def list_sessions(user=Depends(require_user)):
             "SELECT * FROM brain_agent_sessions WHERE user_id=? ORDER BY updated_at DESC LIMIT 20",
             (user["id"],)
         ) as cur:
-            sessions = [dict(r) for r in await cur.fetchall()]
+            sessions = [_json_safe(dict(r)) for r in await cur.fetchall()]
     return sessions
 
 
@@ -684,7 +692,7 @@ async def get_session_messages(session_id: str, user=Depends(require_user)):
             "SELECT * FROM brain_agent_messages WHERE session_id=? AND user_id=? ORDER BY created_at ASC",
             (session_id, user["id"])
         ) as cur:
-            msgs = [dict(r) for r in await cur.fetchall()]
+            msgs = [_json_safe(dict(r)) for r in await cur.fetchall()]
     return msgs
 
 

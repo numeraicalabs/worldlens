@@ -5,17 +5,26 @@ Block A: enriched prompts, delta brief, threshold alerts, full profile persisten
 from __future__ import annotations
 import json, time, logging
 from typing import Optional, Dict, List
-from db import get_db
 from fastapi import APIRouter, Depends, Body
 import aiosqlite
 
 logger = logging.getLogger(__name__)
+
+def _json_safe(obj):
+    import datetime as _dt
+    if isinstance(obj, dict): return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)): return obj.isoformat()
+    return obj
+
 
 try:
     from config import settings
 except ImportError:
     class _S: db_path = "worldlens.db"
     settings = _S()
+
+from db import get_db
 
 try:
     from routers.auth import require_user
@@ -162,12 +171,19 @@ async def _save_brief_history(user_id: int, bot_id: str, brief: Dict, event_coun
                 "VALUES (?, ?, ?, ?, ?)",
                 (user_id, bot_id, json.dumps(brief), brief.get("signal", "neutral"), event_count)
             )
-            await db.execute(
-                "DELETE FROM agent_brief_history WHERE id NOT IN ("
+            # 2-step DELETE: PG does not allow LIMIT in subquery of DELETE
+            async with db.execute(
                 "SELECT id FROM agent_brief_history WHERE user_id=? AND bot_id=? "
-                "ORDER BY created_at DESC LIMIT 10)",
+                "ORDER BY created_at DESC LIMIT 10",
                 (user_id, bot_id)
-            )
+            ) as _cur:
+                _keep = [r[0] for r in await _cur.fetchall()]
+            if _keep:
+                _ph = ",".join(["?" for _ in _keep])
+                await db.execute(
+                    f"DELETE FROM agent_brief_history WHERE user_id=? AND bot_id=? AND id NOT IN ({_ph})",
+                    [user_id, bot_id] + _keep
+                )
             await db.commit()
     except Exception as e:
         logger.warning("_save_brief_history: %s", e)
@@ -202,7 +218,7 @@ async def _load_user_watchlist(user_id: int) -> List[Dict]:
                 (user_id,)
             ) as cur:
                 rows = await cur.fetchall()
-        return [dict(r) for r in rows]
+        return [_json_safe(dict(r)) for r in rows]
     except Exception:
         return []
 
@@ -234,12 +250,12 @@ async def _get_bot_events(bot_id: str, config: Dict, limit: int = 15) -> List[Di
                 f"severity, impact, timestamp, source, sentiment_tone "
                 f"FROM events "
                 f"WHERE category IN ({placeholders}){impact_sql}{region_sql} "
-                f"AND datetime(timestamp) > datetime('now','-72 hours') "
+                f"AND timestamp > NOW() - INTERVAL '72 hours' "
                 f"ORDER BY severity DESC, timestamp DESC LIMIT ?",
                 cats + region_params + [limit]
             ) as cur:
                 rows = await cur.fetchall()
-        return [dict(r) for r in rows]
+        return [_json_safe(dict(r)) for r in rows]
     except Exception as e:
         logger.warning("_get_bot_events %s: %s", bot_id, e)
         return []
@@ -514,8 +530,8 @@ async def save_bot_config(bot_id: str, payload: dict = Body(...), user=Depends(r
     try:
         async with get_db() as db:
             await db.execute(
-                "INSERT OR REPLACE INTO agent_configs "
-                "(user_id, bot_id, config_json, updated_at) VALUES (?, ?, ?, datetime('now'))",
+                "INSERT INTO agent_configs "
+                "(user_id, bot_id, config_json, updated_at) VALUES (?, ?, ?, NOW())",
                 (user["id"], bot_id, json.dumps(clean))
             )
             await db.commit()
@@ -699,7 +715,7 @@ async def bot_debate(user=Depends(require_user)):
     try:
         async with get_db() as db:
             async with db.execute(
-                "SELECT * FROM events WHERE datetime(timestamp) > datetime('now','-72 hours') "
+                "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '72 hours' "
                 "ORDER BY severity DESC LIMIT 1"
             ) as cur:
                 top_row = await cur.fetchone()
@@ -803,9 +819,9 @@ async def _update_streak(user_id: int):
 
             longest = max(r["longest_streak"], new_streak)
             await db.execute(
-                "INSERT OR REPLACE INTO agent_streaks "
+                "INSERT INTO agent_streaks "
                 "(user_id, current_streak, longest_streak, last_activity_date, total_reads, streak_frozen, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+                "VALUES (?, ?, ?, ?, ?, ?, NOW())",
                 (user_id, new_streak, longest, today, r["total_reads"] + 1, frozen)
             )
             await db.commit()
@@ -944,7 +960,7 @@ async def get_prediction(bot_id: str, user=Depends(require_user)):
         if prediction:
             async with get_db() as db:
                 await db.execute(
-                    "INSERT OR REPLACE INTO agent_predictions "
+                    "INSERT INTO agent_predictions "
                     "(user_id, bot_id, week_key, prediction_json) VALUES (?, ?, ?, ?)",
                     (user["id"], bot_id, week, json.dumps(prediction))
                 )
@@ -986,7 +1002,7 @@ async def get_all_predictions(user=Depends(require_user)):
                 if pred:
                     async with get_db() as db:
                         await db.execute(
-                            "INSERT OR REPLACE INTO agent_predictions "
+                            "INSERT INTO agent_predictions "
                             "(user_id, bot_id, week_key, prediction_json) VALUES (?, ?, ?, ?)",
                             (user["id"], bot_id, week, json.dumps(pred))
                         )
@@ -1075,7 +1091,7 @@ async def verify_prediction(bot_id: str, week_key: str, user=Depends(require_use
 
         async with get_db() as db:
             await db.execute(
-                "UPDATE agent_predictions SET verify_json=?, verify_ts=datetime('now'), "
+                "UPDATE agent_predictions SET verify_json=?, verify_ts=NOW(), "
                 "accuracy_score=? WHERE user_id=? AND bot_id=? AND week_key=?",
                 (json.dumps(verify), verify.get("score", 0.5),
                  user["id"], bot_id, week_key)
@@ -1182,7 +1198,7 @@ async def get_daily_digest(bot_id: str, user=Depends(require_user)):
         if not sent:
             async with get_db() as db:
                 await db.execute(
-                    "INSERT OR IGNORE INTO agent_digest_log (user_id, bot_id, digest_date) "
+                    "INSERT INTO agent_digest_log (user_id, bot_id, digest_date) "
                     "VALUES (?, ?, ?)",
                     (user["id"], bot_id, today)
                 )
