@@ -117,11 +117,6 @@ function rq(url, opts) {
       if (r.status === 401) {
         G.token = null;
         localStorage.removeItem('wl_tok');
-        // If app already running, force reload to show login
-        if (G.user) {
-          G.user = null;
-          setTimeout(function() { location.reload(); }, 300);
-        }
         resolve({ _status: 401, detail: 'Unauthorized' });
         return;
       }
@@ -210,9 +205,11 @@ window.addEventListener('DOMContentLoaded', function() {
         var ler = document.getElementById('ler');
         if (ler) ler.textContent = 'Server in avvio — riprova tra 10 secondi';
       } else {
+        // Token invalid/expired — clear and show login
         G.token = null;
         localStorage.removeItem('wl_tok');
         rmLoader();
+        if (typeof showAuth === 'function') showAuth('login');
       }
     }).catch(function() {
       clearTimeout(safetyTimer);
@@ -382,10 +379,10 @@ function enterApp() {
   document.body.classList.remove('landing-mode');
   document.body.style.overflow = 'hidden';
   rmLoader();
-  el('landing').classList.add('hidden');
-  el('shell').classList.add('on');
+  var _landing = el('landing'); if (_landing) _landing.classList.add('hidden');
+  var _shell = el('shell'); if (_shell) _shell.classList.add('on');
   var u = G.user;
-  var ini = u.username.slice(0,2).toUpperCase();
+  var ini = (u.username||'U').slice(0,2).toUpperCase();
   ['uav','pav'].forEach(function(id) {
     var e2 = document.getElementById(id);
     if (e2) { e2.textContent = ini; e2.style.background = u.avatar_color||'#3B82F6'; }
