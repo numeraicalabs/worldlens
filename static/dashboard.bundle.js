@@ -197,6 +197,9 @@ function sv(name, btn) {
   if (name==='tradgentic') {
     if (typeof initTradgentic === 'function') initTradgentic();
   }
+  if (name==='admin') {
+    if (typeof enterAdmin === 'function') enterAdmin();
+  }
   if (name==='earlywarning') {
     var attempt = 0;
     var tryLoad = function() {
@@ -6349,7 +6352,7 @@ function admNav(section, btn) {
 
 function loadAdminOverview() {
   rq('/api/admin/overview').then(function(r) {
-    if (!r) return;
+    if (!r || r._status >= 400) return;
     var el = function(id) { return document.getElementById(id); };
     if (el('adm-users-count'))  el('adm-users-count').textContent  = r.total_users  || 0;
     if (el('adm-events-count')) el('adm-events-count').textContent = r.total_events || 0;
@@ -6361,7 +6364,7 @@ function loadAdminOverview() {
 function loadAdminUsers() {
   rq('/api/admin/users').then(function(r) {
     var list = document.getElementById('adm-users-list');
-    if (!list || !r || !r.users) return;
+    if (!list || !r || r._status >= 400 || !r.users) return;
     list.innerHTML = r.users.map(function(u) {
       var dt = u.created_at ? String(u.created_at).slice(0,10) : '—';
       return '<tr>'
@@ -6386,7 +6389,7 @@ function admToggleAdmin(uid, isAdmin) {
 
 function loadAdminEvents() {
   rq('/api/admin/events-stats').then(function(r) {
-    if (!r) return;
+    if (!r || r._status >= 400) return;
     var el = function(id) { return document.getElementById(id); };
     if (el('adm-ev-total'))    el('adm-ev-total').textContent    = r.total    || 0;
     if (el('adm-ev-today'))    el('adm-ev-today').textContent    = r.today    || 0;
@@ -6446,7 +6449,7 @@ function loadAdminActivity() {
 
 function loadAdminAI() {
   rq('/api/admin/ai-status').then(function(r) {
-    if (!r) return;
+    if (!r || r._status >= 400) return;
     var el = function(id){ return document.getElementById(id); };
     if (el('adm-ai-provider'))  el('adm-ai-provider').textContent  = r.provider  || '—';
     if (el('adm-ai-available')) el('adm-ai-available').textContent = r.available ? '✅ Online' : '❌ Offline';

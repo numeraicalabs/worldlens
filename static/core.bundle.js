@@ -117,6 +117,11 @@ function rq(url, opts) {
       if (r.status === 401) {
         G.token = null;
         localStorage.removeItem('wl_tok');
+        // If app already running, force reload to show login
+        if (G.user) {
+          G.user = null;
+          setTimeout(function() { location.reload(); }, 300);
+        }
         resolve({ _status: 401, detail: 'Unauthorized' });
         return;
       }
@@ -1997,6 +2002,8 @@ function renderProfile() {
     }).join('') : '<div style="font-size:11px;color:var(--t3);padding:8px 0">Nothing in watchlist</div>';
   }
   renderAlerts();
+  // Re-inject admin button in case it was missed at boot
+  if (typeof adminBtnInject === 'function') adminBtnInject();
   // Load affinity profile (Sprint 2)
   if (typeof renderAffinityProfile === 'function') renderAffinityProfile();
 }
@@ -2100,7 +2107,7 @@ function loadMacroBrief() { getMacroBrief(); }
 
 // ── Onboarding ─────────────────────────────────────────────────
 
-var OB = { step:0, data:{} };
+OB.step = 0; OB.data = {};
 var OB_STEPS = [
   {
     title: 'Benvenuto in WorldLens',
@@ -2409,7 +2416,7 @@ function loadPortfolios()     { if (typeof initPortfolioTab==='function') initPo
 
 function loadGamification() {
   rq('/api/user/profile').then(function(r) {
-    if (!r||r.detail) return;
+    if (!r || r._status >= 400 || r.detail) return;
     var xp=r.xp||r.experience_points||0;
     var lvl=LEVELS.filter(function(l){ return xp>=l.min_xp; }).pop()||LEVELS[0];
     var nextLvl=LEVELS.find(function(l){ return l.min_xp>xp; });
@@ -2431,7 +2438,7 @@ function xpPop(amount, msg) {
 }
 function loadMissions() {
   rq('/api/engage/missions/today').then(function(r) {
-    var el2=document.getElementById('gam-missions'); if(!el2||!r||!r.missions) return;
+    var el2=document.getElementById('gam-missions'); if(!el2||!r||r._status>=400||!r.missions) return;
     el2.innerHTML=r.missions.map(function(m){
       return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)">'
         +'<div style="width:20px;height:20px;border-radius:50%;border:2px solid '+(m.completed?'var(--gr)':'var(--bd)')+';background:'+(m.completed?'var(--gr)':'none')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(m.completed?'<span style="color:#fff;font-size:10px">v</span>':'')+'</div>'
@@ -2659,7 +2666,7 @@ window.loadEarlyWarning = function(force) {
   if (hero) { hero.style.opacity = '0.5'; }
 
   rq('/api/intelligence/early-warning').then(function(r) {
-    if (!r) { _ewShowError('Could not reach Early Warning API'); return; }
+    if (!r || r._status >= 400) { _ewShowError('Could not reach Early Warning API (HTTP ' + (r&&r._status||0) + ')'); return; }
     _ewData = r;
 
     var score = parseFloat(r.global_ew_score || r.score || 5);
