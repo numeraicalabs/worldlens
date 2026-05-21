@@ -290,8 +290,6 @@ async def get_early_warning(user=Depends(require_user)):
     # Load user's personal AI key (takes priority over admin key)
     _ug, _ua = await _get_user_ai_keys(user["id"])
     async with get_db() as db:
-        await _ensure_tables(db)
-
         # Check snapshot cache (valid for 30 min)
         today = date.today().isoformat()
         async with db.execute(
@@ -443,7 +441,6 @@ async def get_early_warning(user=Depends(require_user)):
 
     # Cache snapshot
     async with get_db() as db:
-        await _ensure_tables(db)
         await db.execute(
             "INSERT INTO ew_snapshots "
             "(snapshot_date,global_ew_score,sentiment_trend,macro_stress,"
@@ -483,7 +480,6 @@ async def get_early_warning(user=Depends(require_user)):
 async def get_ew_timeline():
     """Historical EW scores over last 7 days."""
     async with get_db() as db:
-        await _ensure_tables(db)
         async with db.execute(
             "SELECT snapshot_date, global_ew_score, sentiment_trend, "
             "macro_stress, market_stress, event_velocity "
@@ -497,7 +493,6 @@ async def get_ew_timeline():
 async def get_active_signals():
     """Return currently active crisis signals."""
     async with get_db() as db:
-        await _ensure_tables(db)
         # Auto-generate signals from recent events
         async with db.execute(
             "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '72 hours' "
@@ -564,7 +559,6 @@ async def get_active_signals():
 async def refresh_early_warning(user=Depends(require_user)):
     """Force-invalidate the 30-min EW cache. Next GET will regenerate assessment."""
     async with get_db() as db:
-        await _ensure_tables(db)
         await db.execute("DELETE FROM ew_snapshots WHERE snapshot_date=?", (date.today().isoformat(),))
         await db.commit()
     return {"status": "ok", "message": "EW cache cleared"}
@@ -578,7 +572,6 @@ async def get_supply_chain():
     Correlates events with known chokepoints and critical nodes.
     """
     async with get_db() as db:
-        await _ensure_tables(db)
         async with db.execute(
             "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '72 hours' "
             "ORDER BY severity DESC LIMIT 150"
@@ -707,7 +700,6 @@ async def get_sector_exposure():
     }
 
     async with get_db() as db:
-        await _ensure_tables(db)
         async with db.execute(
             "SELECT * FROM events WHERE timestamp > NOW() - INTERVAL '72 hours' LIMIT 100"
         ) as c:

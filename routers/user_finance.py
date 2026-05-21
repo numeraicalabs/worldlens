@@ -25,10 +25,20 @@ async def get_finance():
 async def get_profile(user=Depends(require_user)):
     async with get_db() as db:
         async with db.execute(
-            "SELECT id,email,username,avatar_color,bio,timezone,notifications_enabled,"
-            "onboarding_done,tutorial_done,interests,regions,market_prefs,experience_level,"
-            "severity_threshold,affinity_vector,"
-            "created_at,last_login FROM users WHERE id=?", (user["id"],)
+            "SELECT id, email, username, avatar_color, is_admin, "
+            "COALESCE(bio,'') as bio, "
+            "COALESCE(timezone,'Europe/Rome') as timezone, "
+            "COALESCE(notifications_enabled,1) as notifications_enabled, "
+            "COALESCE(onboarding_done,0) as onboarding_done, "
+            "COALESCE(tutorial_done,0) as tutorial_done, "
+            "COALESCE(interests,'[]') as interests, "
+            "COALESCE(regions,'[]') as regions, "
+            "COALESCE(market_prefs,'[]') as market_prefs, "
+            "COALESCE(experience_level,'beginner') as experience_level, "
+            "COALESCE(severity_threshold,5) as severity_threshold, "
+            "COALESCE(affinity_vector,'[]') as affinity_vector, "
+            "created_at "
+            "FROM users WHERE id=?", (user["id"],)
         ) as c:
             row = await c.fetchone()
         if not row:
