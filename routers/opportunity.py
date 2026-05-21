@@ -41,6 +41,14 @@ from config import settings
 from ai_layer import _call_claude, _parse_json, _ai_available, _FACTOR_MAP
 
 logger = logging.getLogger(__name__)
+
+def _json_safe(obj):
+    import datetime as _dt
+    if isinstance(obj, dict): return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)): return obj.isoformat()
+    return obj
+
 router = APIRouter(prefix="/api/opportunity", tags=["opportunity"])
 
 
@@ -69,7 +77,7 @@ CREATE TABLE IF NOT EXISTS trade_ideas (
     risks       TEXT DEFAULT '[]',   -- JSON array
     catalysts   TEXT DEFAULT '[]',   -- JSON array
     status      TEXT DEFAULT 'active',  -- active|expired|hit_target|hit_stop
-    created_at  TEXT DEFAULT (datetime('now')),
+    created_at  TEXT DEFAULT (NOW()),
     expires_at  TEXT,
     -- Performance tracking (Fase 4)
     price_at_generation REAL,           -- market price when idea was created
@@ -93,13 +101,13 @@ CREATE TABLE IF NOT EXISTS anomaly_alerts (
     change_pct   REAL,
     related_event_id TEXT DEFAULT '',
     acknowledged INTEGER DEFAULT 0,
-    created_at   TEXT DEFAULT (datetime('now'))
+    created_at   TEXT DEFAULT (NOW())
 );
 
 CREATE TABLE IF NOT EXISTS opp_scores (
     event_id    TEXT PRIMARY KEY,
     score       INTEGER NOT NULL,
-    scored_at   TEXT DEFAULT (datetime('now')),
+    scored_at   TEXT DEFAULT (NOW()),
     ideas_count INTEGER DEFAULT 0
 );
 
@@ -111,9 +119,63 @@ CREATE INDEX IF NOT EXISTS idx_aa_created ON anomaly_alerts(created_at DESC);
 """
 
 
-async def _ensure_tables(db):
-    await db.executescript(_DB_INIT)
-    await db.commit()
+async def _ensure_tables(db=None):
+    """Create opportunity tables using get_db() — PostgreSQL compatible."""
+    from db import get_db as _gdb
+    tables_pg = [
+        """CREATE TABLE IF NOT EXISTS trade_ideas (
+            id          SERIAL PRIMARY KEY,
+            event_id    TEXT NOT NULL DEFAULT '',
+            ticker      TEXT NOT NULL,
+            asset_name  TEXT NOT NULL,
+            direction   TEXT NOT NULL,
+            entry_low   REAL, entry_high REAL,
+            target_pct  REAL, stop_pct REAL,
+            timeframe   TEXT NOT NULL DEFAULT '3-10 days',
+            confidence  REAL NOT NULL DEFAULT 0.6,
+            opp_score   INTEGER NOT NULL DEFAULT 50,
+            rationale   TEXT NOT NULL DEFAULT '',
+            risks       TEXT DEFAULT '[]',
+            catalysts   TEXT DEFAULT '[]',
+            status      TEXT DEFAULT 'active',
+            created_at  TIMESTAMPTZ DEFAULT NOW(),
+            expires_at  TEXT,
+            price_at_generation REAL, price_current REAL,
+            pnl_pct REAL, max_favorable_pct REAL,
+            tracked_at TEXT, outcome_note TEXT DEFAULT ''
+        )""",
+        """CREATE TABLE IF NOT EXISTS anomaly_alerts (
+            id           SERIAL PRIMARY KEY,
+            ticker       TEXT NOT NULL,
+            asset_name   TEXT NOT NULL,
+            alert_type   TEXT NOT NULL,
+            severity     TEXT NOT NULL,
+            title        TEXT NOT NULL,
+            detail       TEXT NOT NULL,
+            current_val  REAL, reference_val REAL, change_pct REAL,
+            related_event_id TEXT DEFAULT '',
+            acknowledged SMALLINT DEFAULT 0,
+            created_at   TIMESTAMPTZ DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS opp_scores (
+            event_id    TEXT PRIMARY KEY,
+            score       INTEGER NOT NULL,
+            scored_at   TIMESTAMPTZ DEFAULT NOW(),
+            ideas_count INTEGER DEFAULT 0
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_ti_event   ON trade_ideas(event_id)",
+        "CREATE INDEX IF NOT EXISTS idx_ti_status  ON trade_ideas(status)",
+        "CREATE INDEX IF NOT EXISTS idx_ti_created ON trade_ideas(created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_aa_type    ON anomaly_alerts(alert_type)",
+        "CREATE INDEX IF NOT EXISTS idx_aa_created ON anomaly_alerts(created_at DESC)",
+    ]
+    async with _gdb() as _db:
+        for sql in tables_pg:
+            try:
+                await _db.execute(sql)
+            except Exception:
+                pass
+        await _db.commit()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -333,7 +395,6 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
         return None
 
     async with get_db() as db:
-        await _ensure_tables(db)
 
         # Skip already processed unless forced
         if not force:
@@ -379,18 +440,17 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
     expires_at = (datetime.utcnow() + timedelta(days=10)).isoformat()
 
     async with get_db() as db:
-        await _ensure_tables(db)
 
         # Save opportunity score
         await db.execute(
-            "INSERT OR REPLACE INTO opp_scores (event_id, score, ideas_count) VALUES (?,?,?)",
+            "INSERT INTO opp_scores (event_id, score, ideas_count) VALUES (?,?,?) ON CONFLICT(event_id) DO UPDATE SET score=EXCLUDED.score, ideas_count=EXCLUDED.ideas_count",
             (event_id, opp_score, len(ideas))
         )
 
         # Save trade ideas
         for idea in ideas:
             await db.execute(
-                """INSERT OR IGNORE INTO trade_ideas
+                """INSERT INTO trade_ideas
                    (event_id, event_title, event_category, event_severity,
                     ticker, asset_name, direction, entry_low, entry_high,
                     target_pct, stop_pct, timeframe, confidence, opp_score,
@@ -450,12 +510,12 @@ async def run_opportunity_pipeline(lookback_hours: int = 4) -> int:
                           ai_summary, summary, impact, country_name, country_code
                    FROM events
                    WHERE (ai_impact_score >= 6 OR severity >= 6)
-                     AND datetime(created_at) > datetime('now', ?)
+                     AND created_at::timestamptz > NOW() - ('{lookback_hours} hours'::interval)
                    ORDER BY COALESCE(ai_impact_score, severity) DESC
                    LIMIT 30""",
-                (f"-{lookback_hours} hours",)
+                ()
             ) as cur:
-                events = [dict(r) for r in await cur.fetchall()]
+                events = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
         if not events:
             return 0
@@ -603,14 +663,13 @@ async def run_anomaly_scan() -> int:
         # ── Dedup and persist ─────────────────────────────────────────────────
         saved = 0
         async with get_db() as db:
-            await _ensure_tables(db)
-
+    
             for alert in new_alerts:
                 # Don't re-fire same type for same ticker within 30 min
                 async with db.execute(
                     """SELECT id FROM anomaly_alerts
                        WHERE ticker=? AND alert_type=?
-                         AND datetime(created_at) > datetime('now','-30 minutes')
+                         AND created_at > NOW() - INTERVAL '30 minutes'
                        LIMIT 1""",
                     (alert["ticker"], alert["alert_type"])
                 ) as cur:
@@ -622,7 +681,7 @@ async def run_anomaly_scan() -> int:
                 async with db.execute(
                     """SELECT event_id FROM trade_ideas
                        WHERE ticker=? AND status='active'
-                         AND datetime(created_at) > datetime('now','-7 days')
+                         AND created_at > NOW() - INTERVAL '7 days'
                        LIMIT 1""",
                     (alert["ticker"],)
                 ) as cur2:
@@ -690,7 +749,6 @@ async def get_trade_ideas(
 ):
     """Return latest trade ideas, optionally filtered."""
     async with get_db() as db:
-        await _ensure_tables(db)
 
         filters = ["status=?", "opp_score>=?"]
         params: List = [status, min_score]
@@ -711,7 +769,7 @@ async def get_trade_ideas(
                LIMIT ?""",
             params
         ) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
+            rows = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
     # Parse JSON fields
     for r in rows:
@@ -728,7 +786,6 @@ async def get_trade_ideas(
 async def get_top_ideas(user=Depends(require_user)):
     """Top 5 high-confidence ideas for dashboard widget."""
     async with get_db() as db:
-        await _ensure_tables(db)
         async with db.execute(
             """SELECT ticker, asset_name, direction, target_pct, confidence,
                       opp_score, rationale, timeframe, event_category
@@ -737,7 +794,7 @@ async def get_top_ideas(user=Depends(require_user)):
                ORDER BY confidence DESC, opp_score DESC
                LIMIT 5"""
         ) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
+            rows = [_json_safe(dict(r)) for r in await cur.fetchall()]
     return {"ideas": rows}
 
 
@@ -745,7 +802,6 @@ async def get_top_ideas(user=Depends(require_user)):
 async def get_event_score(event_id: str, user=Depends(require_user)):
     """Get opportunity score and ideas for a specific event."""
     async with get_db() as db:
-        await _ensure_tables(db)
 
         async with db.execute(
             "SELECT * FROM opp_scores WHERE event_id=?", (event_id,)
@@ -756,7 +812,7 @@ async def get_event_score(event_id: str, user=Depends(require_user)):
             "SELECT * FROM trade_ideas WHERE event_id=? AND status='active'",
             (event_id,)
         ) as cur:
-            ideas = [dict(r) for r in await cur.fetchall()]
+            ideas = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
     for idea in ideas:
         for field in ("risks", "catalysts"):
@@ -798,7 +854,6 @@ async def get_anomaly_alerts(
 ):
     """Return recent anomaly alerts."""
     async with get_db() as db:
-        await _ensure_tables(db)
 
         conditions = []
         params = []
@@ -816,7 +871,7 @@ async def get_anomaly_alerts(
             f"SELECT * FROM anomaly_alerts {where} ORDER BY created_at DESC LIMIT ?",
             params
         ) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
+            rows = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
     return {"alerts": rows, "total": len(rows)}
 
@@ -839,7 +894,6 @@ async def get_opportunity_dashboard(user=Depends(require_user)):
     Single endpoint for the frontend widget.
     """
     async with get_db() as db:
-        await _ensure_tables(db)
 
         # Top ideas
         async with db.execute(
@@ -851,16 +905,16 @@ async def get_opportunity_dashboard(user=Depends(require_user)):
                ORDER BY confidence DESC, opp_score DESC
                LIMIT 6"""
         ) as cur:
-            top_ideas = [dict(r) for r in await cur.fetchall()]
+            top_ideas = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
         # Anomaly summary
         async with db.execute(
             """SELECT alert_type, severity, COUNT(*) as cnt
                FROM anomaly_alerts
-               WHERE datetime(created_at) > datetime('now','-24 hours')
+               WHERE datetime(created_at) > (NOW() - INTERVAL '24 hours')
                GROUP BY alert_type, severity"""
         ) as cur:
-            anomaly_summary = [dict(r) for r in await cur.fetchall()]
+            anomaly_summary = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
         # Stats
         async with db.execute(
@@ -958,7 +1012,7 @@ async def run_performance_tracker() -> int:
                    FROM trade_ideas
                    WHERE status='active'"""
             ) as cur:
-                ideas = [dict(r) for r in await cur.fetchall()]
+                ideas = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
             now = datetime.utcnow()
             updated = 0
@@ -1050,7 +1104,6 @@ async def get_performance_summary(user=Depends(require_user)):
     Shows hit rate, average P&L, best/worst trades.
     """
     async with get_db() as db:
-        await _ensure_tables(db)
         await _migrate_performance_columns()
 
         # Closed ideas
@@ -1064,7 +1117,7 @@ async def get_performance_summary(user=Depends(require_user)):
                ORDER BY tracked_at DESC
                LIMIT 50"""
         ) as cur:
-            closed = [dict(r) for r in await cur.fetchall()]
+            closed = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
         # Active with live P&L
         async with db.execute(
@@ -1077,7 +1130,7 @@ async def get_performance_summary(user=Depends(require_user)):
                ORDER BY pnl_pct DESC NULLS LAST
                LIMIT 20"""
         ) as cur:
-            active = [dict(r) for r in await cur.fetchall()]
+            active = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
     # Compute stats
     hits   = [x for x in closed if x["status"] == "hit_target"]
@@ -1204,7 +1257,7 @@ async def idea_add_to_portfolio(
                user_id INTEGER NOT NULL,
                shares REAL NOT NULL,
                entry_price REAL NOT NULL,
-               linked_at TEXT DEFAULT (datetime('now'))
+               linked_at TEXT DEFAULT (NOW())
             )"""
         )
         await db.execute(
@@ -1250,7 +1303,6 @@ async def get_portfolio_analysis(
       summary:            one-line AI-free natural language summary
     """
     async with get_db() as db:
-        await _ensure_tables(db)
 
         # 1. Verify portfolio ownership and get holdings
         async with db.execute(
@@ -1267,7 +1319,7 @@ async def get_portfolio_analysis(
                FROM etf_holdings WHERE portfolio_id=?""",
             (portfolio_id,)
         ) as cur:
-            holdings = [dict(r) for r in await cur.fetchall()]
+            holdings = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
         if not holdings:
             return {
@@ -1290,7 +1342,7 @@ async def get_portfolio_analysis(
                 ORDER BY opp_score DESC""",
             tickers
         ) as cur:
-            all_ideas = [dict(r) for r in await cur.fetchall()]
+            all_ideas = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
     # 3. Also check for anomaly alerts on these tickers
     async with get_db() as db:
@@ -1299,12 +1351,12 @@ async def get_portfolio_analysis(
             f"""SELECT ticker, alert_type, severity, title, detail, created_at
                 FROM anomaly_alerts
                 WHERE UPPER(ticker) IN ({p2})
-                  AND datetime(created_at) > datetime('now','-48 hours')
+                  AND created_at > NOW() - INTERVAL '48 hours'
                   AND acknowledged=0
                 ORDER BY created_at DESC""",
             tickers
         ) as cur:
-            anomalies = [dict(r) for r in await cur.fetchall()]
+            anomalies = [_json_safe(dict(r)) for r in await cur.fetchall()]
 
     # 4. Build per-ticker signal map
     ideas_by_ticker: Dict[str, list] = {}
