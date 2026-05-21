@@ -316,7 +316,7 @@ async def _ai_event_summaries(events: List[Dict], ug: str = "", ua: str = "",
         cat = ev.get("category") or "general"
         country = ev.get("country_name") or "Global"
         sev = float(ev.get("severity") or 5)
-        existing_summary = ev.get("ai_summary") or ev.get("summary") or ""
+        existing_summary = ev.get("summary") or ""
 
         if existing_summary and len(existing_summary) > 100:
             ev["rich_summary"] = existing_summary
@@ -432,9 +432,6 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
     today = date.today().isoformat()
 
     async with get_db() as db:
-        pass  # schema handled by get_db() / Supabase migration
-        await db.commit()
-
         if not force:
             async with db.execute(
                 "SELECT * FROM global_cache WHERE cache_date=?", (today,)
@@ -451,8 +448,8 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
 
         # Fetch source data
         async with db.execute(
-            """SELECT id, title, summary, ai_summary, category, country_name,
-                      severity, source_url, timestamp
+            """SELECT id, title, summary, category, country_name,
+                      severity, url, timestamp
                FROM events
                WHERE timestamp > NOW() - INTERVAL '72 hours'
                ORDER BY severity DESC LIMIT 20"""
@@ -478,11 +475,24 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
     logger.info("Generating global cache (ai=%s, events=%d, indicators=%d)",
                 has_ai, len(events), len(indicators))
 
-    # EW scores
+    # EW scores — compute inline (compute_ew_scores not exported)
     try:
-        from routers.intelligence import compute_ew_scores
-        scores = await compute_ew_scores()
-    except Exception:
+        async with get_db() as _ewdb:
+            async with _ewdb.execute(
+                "SELECT AVG(severity) as avg_sev, COUNT(*) as cnt "
+                "FROM events WHERE timestamp > NOW() - INTERVAL '72 hours'"
+            ) as _ewc:
+                _ewr = await _ewc.fetchone()
+            avg_sev = float(_ewr[0] or 5) if _ewr else 5.0
+            cnt = int(_ewr[1] or 0) if _ewr else 0
+        scores = {
+            "global_ew_score": round(min(10, avg_sev), 1),
+            "macro_stress":    round(min(10, avg_sev * 0.9), 1),
+            "market_stress":   round(min(10, avg_sev * 0.8), 1),
+            "event_velocity":  round(min(10, cnt / 50), 1),
+        }
+    except Exception as _e:
+        logger.debug("EW scores inline: %s", _e)
         scores = {"global_ew_score": 5, "macro_stress": 5,
                   "market_stress": 5, "event_velocity": 1}
 
@@ -500,7 +510,7 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
         brief = _rule_global_brief(events, indicators, lang)
         enriched_events = events[:10]
         for ev in enriched_events:
-            ev["rich_summary"] = ev.get("ai_summary") or ev.get("summary") or ev.get("title","")
+            ev["rich_summary"] = ev.get("summary") or ev.get("title","")
         macro_cards = [dict(m, **{
             "interpretation": _rule_macro_interp(
                 m.get("name",""), m.get("value"), m.get("unit",""), m.get("previous"), lang),
