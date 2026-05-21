@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 
 from auth import require_user
 from config import settings
+from db import get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/finance", tags=["finance"])
@@ -76,35 +77,44 @@ class PortfolioUpdate(BaseModel):
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
-async def _db(sql: str, params=(), fetchall=False, fetchone=False, lastrowid=False):
-    try:
-        from db import db_fetchall, db_fetchone, db_execute, db_fetchval
-        if fetchall:
-            return await db_fetchall(sql, tuple(params))
-        if fetchone:
-            return await db_fetchone(sql, tuple(params))
-        if lastrowid:
-            return await db_execute(sql, tuple(params), returning=True)
-        return await db_execute(sql, tuple(params))
-    except Exception:
-        pass  # fallback below
+def _json_safe(obj):
+    """Convert datetime objects to ISO strings."""
+    import datetime as _dt
+    if isinstance(obj, dict): return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)): return obj.isoformat()
+    return obj
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
-        if fetchall:
-            async with db.execute(sql, params) as c:
-                return [dict(r) for r in await c.fetchall()]
-        if fetchone:
-            async with db.execute(sql, params) as c:
-                r = await c.fetchone()
-                return dict(r) if r else None
-        if lastrowid:
-            async with db.execute(sql, params) as c:
-                lid = c.lastrowid
+
+async def _db(sql: str, params=(), fetchall=False, fetchone=False, lastrowid=False):
+    """Universal DB helper — routes to Supabase via get_db()."""
+    try:
+        async with get_db() as db:
+            if fetchall:
+                async with db.execute(sql, tuple(params)) as c:
+                    return [_json_safe(dict(r)) for r in await c.fetchall()]
+            if fetchone:
+                async with db.execute(sql, tuple(params)) as c:
+                    r = await c.fetchone()
+                    return _json_safe(dict(r)) if r else None
+            if lastrowid:
+                # Use RETURNING id for PostgreSQL compatibility
+                ret_sql = sql
+                if 'RETURNING' not in sql.upper():
+                    ret_sql = sql + ' RETURNING id'
+                async with db.execute(ret_sql, tuple(params)) as c:
+                    row = await c.fetchone()
+                    lid = row[0] if row else None
+                await db.commit()
+                return lid
+            await db.execute(sql, tuple(params))
             await db.commit()
-            return lid
-        await db.execute(sql, params)
-        await db.commit()
+    except Exception as e:
+        logger.debug("_db error: %s | sql: %s", e, sql[:80])
+        if fetchall: return []
+        if fetchone: return None
+        if lastrowid: return None
+        return None
 
 
 # ── FX rates ─────────────────────────────────────────────────────────────────
@@ -397,20 +407,17 @@ async def compute_geo_risk_score(portfolio_id: int) -> Dict:
 
                         # Look for active events in those geos
                         if geo_labels:
-                            async with aiosqlite.connect(settings.db_path) as db:
-                                db.row_factory = aiosqlite.Row
-                                for geo in geo_labels[:3]:
-                                    async with db.execute(
-                                        "SELECT title, severity FROM events "
-                                        "WHERE country_name LIKE ? "
-                                        "AND datetime(timestamp) > datetime('now','-72 hours') "
-                                        "ORDER BY severity DESC LIMIT 2",
-                                        (f"%{geo}%",)
-                                    ) as c:
-                                        evs = [dict(r) for r in await c.fetchall()]
-                                        if evs:
-                                            node_risk = max(node_risk, float(evs[0].get("severity", 5)))
-                                            top_events.extend(evs)
+                            for geo in geo_labels[:3]:
+                                evs = await _db(
+                                    "SELECT title, severity FROM events "
+                                    "WHERE country_name LIKE ? "
+                                    "AND timestamp > NOW() - INTERVAL '72 hours' "
+                                    "ORDER BY severity DESC LIMIT 2",
+                                    (f"%{geo}%",), fetchall=True
+                                ) or []
+                                if evs:
+                                    node_risk = max(node_risk, float(evs[0].get("severity", 5)))
+                                    top_events.extend(evs)
         except Exception as e:
             logger.debug("geo_risk %s: %s", ticker, e)
 
@@ -456,7 +463,7 @@ async def save_daily_snapshot(portfolio_id: int) -> bool:
 
     try:
         await _db(
-            """INSERT OR REPLACE INTO portfolio_snapshots
+            """INSERT INTO portfolio_snapshots
                (portfolio_id, snap_date, total_value, total_cost, total_return_pct,
                 day_return_pct, sharpe_ratio, volatility_pct, max_drawdown_pct,
                 geo_risk_score, currency)
@@ -519,32 +526,25 @@ async def list_portfolios(user=Depends(require_user)):
 async def create_portfolio(data: PortfolioCreate, user=Depends(require_user)):
     """Create portfolio + meta in a single transaction via direct aiosqlite."""
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            # Ensure meta table exists
-            await db.executescript("""
-                CREATE TABLE IF NOT EXISTS etf_portfolios_meta (
-                    portfolio_id    INTEGER PRIMARY KEY,
-                    base_currency   TEXT NOT NULL DEFAULT 'EUR',
-                    benchmark_ticker TEXT DEFAULT 'VWCE',
-                    description     TEXT DEFAULT '',
-                    color           TEXT DEFAULT '#7C3AED',
-                    icon            TEXT DEFAULT '💼',
-                    is_public       INTEGER DEFAULT 0,
-                    updated_at      TEXT DEFAULT (datetime('now')),
-                    FOREIGN KEY (portfolio_id) REFERENCES etf_portfolios(id)
-                );
-            """)
+        async with get_db() as db:
+            # Insert portfolio
             async with db.execute(
-                "INSERT INTO etf_portfolios (user_id, name, strategy) VALUES (?,?,?)",
+                "INSERT INTO etf_portfolios (user_id, name, strategy) VALUES (?,?,?) RETURNING id",
                 (user["id"], data.name, data.strategy or "custom")
             ) as cur:
-                pid = cur.lastrowid
+                row = await cur.fetchone()
+                pid = row[0] if row else None
             if not pid:
                 raise HTTPException(500, "Portfolio insert failed")
+            # Insert meta
             await db.execute(
-                """INSERT OR REPLACE INTO etf_portfolios_meta
+                """INSERT INTO etf_portfolios_meta
                    (portfolio_id, base_currency, benchmark_ticker, description, color, icon)
-                   VALUES (?,?,?,?,?,?)""",
+                   VALUES (?,?,?,?,?,?)
+                   ON CONFLICT(portfolio_id) DO UPDATE SET
+                   base_currency=EXCLUDED.base_currency,
+                   benchmark_ticker=EXCLUDED.benchmark_ticker,
+                   icon=EXCLUDED.icon""",
                 (pid, data.base_currency or "EUR", data.benchmark_ticker or "VWCE",
                  data.description or "", data.color or "#7C3AED", data.icon or "💼")
             )
@@ -634,38 +634,24 @@ async def add_holding(pid: int, data: HoldingCreate, user=Depends(require_user))
                        (data.ticker.upper(),), fetchone=True)
         name = (fc.get("name") if fc else None) or data.ticker.upper()
 
-    # Ensure optional columns exist (safe migration for existing DBs)
-    async with aiosqlite.connect(settings.db_path) as _mdb:
-        for _col, _def in [
-            ("currency",     "TEXT DEFAULT 'USD'"),
-            ("asset_class",  "TEXT DEFAULT 'equity'"),
-            ("purchase_date","TEXT DEFAULT NULL"),
-        ]:
-            try:
-                await _mdb.execute(f"ALTER TABLE etf_holdings ADD COLUMN {_col} {_def}")
-                await _mdb.commit()
-            except Exception:
-                pass  # column already exists — OK
-
-    # Insert using direct aiosqlite to get reliable lastrowid
     try:
-        async with aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with get_db() as db:
             async with db.execute(
                 """INSERT INTO etf_holdings
                    (portfolio_id, isin, ticker, name, shares, avg_price,
                     currency, asset_class, purchase_date)
-                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                   VALUES (?,?,?,?,?,?,?,?,?) RETURNING id""",
                 (pid, "", data.ticker.upper(), name, float(data.shares),
                  float(data.avg_price), data.currency or "USD",
                  data.asset_class or "equity",
                  data.purchase_date or None)
             ) as cur:
-                hid = cur.lastrowid
+                row = await cur.fetchone()
+                hid = row[0] if row else None
             await db.commit()
 
         if not hid:
-            raise HTTPException(500, "Insert failed: no lastrowid returned")
+            raise HTTPException(500, "Insert failed")
 
         return {"id": hid, "ticker": data.ticker.upper(), "shares": data.shares,
                 "avg_price": data.avg_price, "name": name}
@@ -724,7 +710,7 @@ async def get_portfolio_history(pid: int, days: int = 90, user=Depends(require_u
         """SELECT snap_date, total_value, total_return_pct, day_return_pct,
                   sharpe_ratio, volatility_pct, geo_risk_score
            FROM portfolio_snapshots WHERE portfolio_id=?
-           AND snap_date >= date('now', ?)
+           AND snap_date >= (CURRENT_DATE - ($1 || ' days')::interval)::date
            ORDER BY snap_date ASC""",
         (pid, f"-{days} days"), fetchall=True
     )
