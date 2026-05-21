@@ -227,3 +227,55 @@ CREATE TABLE IF NOT EXISTS etf_portfolios_meta (
 );
 
 CREATE INDEX IF NOT EXISTS idx_snapshots_portfolio ON portfolio_snapshots(portfolio_id, snap_date DESC);
+
+-- Opportunity Engine tables
+CREATE TABLE IF NOT EXISTS trade_ideas (
+    id          SERIAL PRIMARY KEY,
+    event_id    TEXT NOT NULL DEFAULT '',
+    event_title TEXT DEFAULT '',
+    event_category TEXT DEFAULT '',
+    event_severity REAL DEFAULT 5,
+    ticker      TEXT NOT NULL,
+    asset_name  TEXT NOT NULL,
+    direction   TEXT NOT NULL,
+    entry_low   REAL, entry_high REAL,
+    target_pct  REAL, stop_pct REAL,
+    timeframe   TEXT NOT NULL DEFAULT '3-10 days',
+    confidence  REAL NOT NULL DEFAULT 0.6,
+    opp_score   INTEGER NOT NULL DEFAULT 50,
+    rationale   TEXT NOT NULL DEFAULT '',
+    risks       TEXT DEFAULT '[]',
+    catalysts   TEXT DEFAULT '[]',
+    status      TEXT DEFAULT 'active',
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    expires_at  TEXT,
+    price_at_generation REAL, price_current REAL,
+    pnl_pct REAL, max_favorable_pct REAL,
+    tracked_at TEXT, outcome_note TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS anomaly_alerts (
+    id           SERIAL PRIMARY KEY,
+    ticker       TEXT NOT NULL,
+    asset_name   TEXT NOT NULL,
+    alert_type   TEXT NOT NULL,
+    severity     TEXT NOT NULL,
+    title        TEXT NOT NULL,
+    detail       TEXT NOT NULL,
+    current_val  REAL, reference_val REAL, change_pct REAL,
+    related_event_id TEXT DEFAULT '',
+    acknowledged SMALLINT DEFAULT 0,
+    created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS opp_scores (
+    event_id    TEXT PRIMARY KEY,
+    score       INTEGER NOT NULL,
+    scored_at   TIMESTAMPTZ DEFAULT NOW(),
+    ideas_count INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_ti_event   ON trade_ideas(event_id);
+CREATE INDEX IF NOT EXISTS idx_ti_status  ON trade_ideas(status);
+CREATE INDEX IF NOT EXISTS idx_ti_created ON trade_ideas(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_aa_created ON anomaly_alerts(created_at DESC);
