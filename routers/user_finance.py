@@ -371,3 +371,120 @@ async def test_user_ai_key(user=Depends(require_user)):
             return {"status": "error", "provider": "claude", "message": "Chiave Anthropic non valida"}
         except Exception as e:
             return {"status": "error", "provider": "claude", "message": str(e)}
+
+
+# ── Portfolio CRUD endpoints (/api/finance/portfolios) ────────────────────────
+# These endpoints serve the Finance Hub portfolio tab
+
+@finance_router.get("/portfolios")
+async def list_portfolios(user=Depends(require_user)):
+    """List all portfolios for the current user."""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT id, name, strategy, created_at FROM etf_portfolios WHERE user_id=? ORDER BY created_at DESC",
+            (user["id"],)
+        ) as cur:
+            portfolios = [_json_safe(dict(r)) for r in await cur.fetchall()]
+    return {"portfolios": portfolios}
+
+
+@finance_router.post("/portfolios")
+async def create_portfolio(body: dict = Body(...), user=Depends(require_user)):
+    """Create a new portfolio."""
+    name = (body.get("name") or "Portafoglio Principale").strip()[:80]
+    strategy = (body.get("strategy") or "custom").strip()[:40]
+    async with get_db() as db:
+        async with db.execute(
+            "INSERT INTO etf_portfolios (user_id, name, strategy) VALUES (?,?,?) RETURNING id",
+            (user["id"], name, strategy)
+        ) as cur:
+            row = await cur.fetchone()
+        await db.commit()
+    pid = row[0] if row else None
+    return {"ok": True, "id": pid, "name": name}
+
+
+@finance_router.get("/portfolios/{pid}")
+async def get_portfolio(pid: int, user=Depends(require_user)):
+    """Get portfolio detail with holdings and P&L."""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT id, name, strategy, created_at FROM etf_portfolios WHERE id=? AND user_id=?",
+            (pid, user["id"])
+        ) as cur:
+            port = await cur.fetchone()
+        if not port:
+            raise HTTPException(404, "Portfolio not found")
+        async with db.execute(
+            "SELECT id, ticker, isin, name, shares, avg_price, current_price FROM etf_holdings WHERE portfolio_id=?",
+            (pid,)
+        ) as cur:
+            holdings = [_json_safe(dict(r)) for r in await cur.fetchall()]
+    p = _json_safe(dict(port))
+    # Calculate P&L
+    total_value = 0.0
+    total_cost = 0.0
+    for h in holdings:
+        cp = float(h.get("current_price") or h.get("avg_price") or 0)
+        shares = float(h.get("shares") or 0)
+        avg = float(h.get("avg_price") or 0)
+        h["current_value"] = round(cp * shares, 2)
+        h["pnl"] = round((cp - avg) * shares, 2)
+        h["pnl_pct"] = round((cp - avg) / avg * 100, 2) if avg else 0
+        total_value += h["current_value"]
+        total_cost += avg * shares
+    p["holdings"] = holdings
+    p["total_value"] = round(total_value, 2)
+    p["total_cost"] = round(total_cost, 2)
+    p["total_pnl"] = round(total_value - total_cost, 2)
+    p["total_pnl_pct"] = round((total_value - total_cost) / total_cost * 100, 2) if total_cost else 0
+    return p
+
+
+@finance_router.delete("/portfolios/{pid}")
+async def delete_portfolio(pid: int, user=Depends(require_user)):
+    """Delete a portfolio and its holdings."""
+    async with get_db() as db:
+        await db.execute("DELETE FROM etf_holdings WHERE portfolio_id=?", (pid,))
+        await db.execute(
+            "DELETE FROM etf_portfolios WHERE id=? AND user_id=?", (pid, user["id"])
+        )
+        await db.commit()
+    return {"deleted": True}
+
+
+@finance_router.get("/portfolios/{pid}/history")
+async def portfolio_history(pid: int, days: int = 30, user=Depends(require_user)):
+    """Get portfolio value history."""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT snapshot_date, total_value FROM etf_portfolios_meta "
+            "WHERE portfolio_id=? ORDER BY snapshot_date DESC LIMIT ?",
+            (pid, days)
+        ) as cur:
+            rows = [_json_safe(dict(r)) for r in await cur.fetchall()]
+    return {"history": rows, "portfolio_id": pid}
+
+
+@finance_router.post("/portfolios/{pid}/holdings")
+async def add_holding(pid: int, body: dict = Body(...), user=Depends(require_user)):
+    """Add or update a holding in a portfolio."""
+    async with get_db() as db:
+        # Verify ownership
+        async with db.execute(
+            "SELECT id FROM etf_portfolios WHERE id=? AND user_id=?", (pid, user["id"])
+        ) as cur:
+            if not await cur.fetchone():
+                raise HTTPException(403, "Not your portfolio")
+        ticker = (body.get("ticker") or "").upper().strip()[:20]
+        isin = (body.get("isin") or "").strip()[:20]
+        name = (body.get("name") or ticker).strip()[:80]
+        shares = float(body.get("shares") or 0)
+        avg_price = float(body.get("avg_price") or 0)
+        await db.execute(
+            "INSERT INTO etf_holdings (portfolio_id, ticker, isin, name, shares, avg_price) "
+            "VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+            (pid, ticker, isin, name, shares, avg_price)
+        )
+        await db.commit()
+    return {"ok": True, "ticker": ticker}

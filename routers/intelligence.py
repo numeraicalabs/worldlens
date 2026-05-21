@@ -1056,7 +1056,16 @@ async def get_dashboard_cache(user=Depends(require_user)):
     ug, ua = await _get_user_ai_keys(user["id"])
     lang = user.get("lang", "it")
 
-    cache = await get_global_cache()
+    try:
+        cache = await get_global_cache()
+    except Exception as _cge:
+        logger.warning("dashboard-cache get_global_cache error: %s", _cge)
+        import traceback
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=503,
+            content={"error": "cache_generation_failed", "detail": str(_cge)}
+        )
     if not cache:
         return {"error": "Cache not yet generated", "retry_after": 30}
 
