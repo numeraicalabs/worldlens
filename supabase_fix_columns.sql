@@ -195,3 +195,35 @@ CREATE TABLE IF NOT EXISTS etf_portfolios_meta (
 
 CREATE INDEX IF NOT EXISTS idx_etf_portfolios_user ON etf_portfolios(user_id);
 CREATE INDEX IF NOT EXISTS idx_etf_holdings_portfolio ON etf_holdings(portfolio_id);
+
+-- portfolio_snapshots table (used by finance_hub for historical metrics)
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+    id               SERIAL PRIMARY KEY,
+    portfolio_id     INTEGER NOT NULL REFERENCES etf_portfolios(id) ON DELETE CASCADE,
+    snap_date        TEXT NOT NULL,
+    total_value      REAL DEFAULT 0,
+    total_cost       REAL DEFAULT 0,
+    total_return_pct REAL DEFAULT 0,
+    day_return_pct   REAL DEFAULT 0,
+    sharpe_ratio     REAL,
+    volatility_pct   REAL,
+    max_drawdown_pct REAL,
+    geo_risk_score   REAL DEFAULT 0,
+    currency         TEXT DEFAULT 'EUR',
+    created_at       TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(portfolio_id, snap_date)
+);
+
+-- etf_portfolios_meta: aggiorna con tutte le colonne necessarie
+CREATE TABLE IF NOT EXISTS etf_portfolios_meta (
+    portfolio_id     INTEGER PRIMARY KEY REFERENCES etf_portfolios(id) ON DELETE CASCADE,
+    base_currency    TEXT NOT NULL DEFAULT 'EUR',
+    benchmark_ticker TEXT DEFAULT 'VWCE',
+    description      TEXT DEFAULT '',
+    color            TEXT DEFAULT '#7C3AED',
+    icon             TEXT DEFAULT '💼',
+    is_public        SMALLINT DEFAULT 0,
+    updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_portfolio ON portfolio_snapshots(portfolio_id, snap_date DESC);
