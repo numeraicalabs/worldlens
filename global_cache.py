@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS global_cache (
     kg_connections  TEXT NOT NULL DEFAULT '[]',
     market_snapshot TEXT NOT NULL DEFAULT '[]',
     created_at   TEXT NOT NULL DEFAULT (NOW()),
-    ai_enhanced  INTEGER NOT NULL DEFAULT 0
+    ai_enhanced  BOOLEAN NOT NULL DEFAULT FALSE
 );
 """
 
@@ -569,7 +569,7 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
                     "ai_enhanced=EXCLUDED.ai_enhanced",
                     today, brief, json.dumps(macro_cards), ew_text,
                     json.dumps(deduped_events[:10]), json.dumps(kg_conn),
-                    json.dumps(market_snap), 1 if has_ai else 0
+                    json.dumps(market_snap), bool(has_ai)
                 )
                 logger.info("Global cache saved to PostgreSQL")
         except Exception as _e:
@@ -584,7 +584,7 @@ async def generate_global_cache(force: bool = False, lang: str = "it") -> Dict:
                VALUES (?,?,?,?,?,?,?,?)""" + " ON CONFLICT (cache_date) DO UPDATE SET global_brief=EXCLUDED.global_brief, macro_narrative=EXCLUDED.macro_narrative, ew_assessment=EXCLUDED.ew_assessment, top_events=EXCLUDED.top_events, ai_enhanced=EXCLUDED.ai_enhanced",
             (today, brief, json.dumps(macro_cards), ew_text,
              json.dumps(deduped_events[:10]), json.dumps(kg_conn),
-             json.dumps(market_snap), int(has_ai))
+             json.dumps(market_snap), bool(has_ai))
         )
         await db.commit()
 

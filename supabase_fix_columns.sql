@@ -279,3 +279,7 @@ CREATE INDEX IF NOT EXISTS idx_ti_event   ON trade_ideas(event_id);
 CREATE INDEX IF NOT EXISTS idx_ti_status  ON trade_ideas(status);
 CREATE INDEX IF NOT EXISTS idx_ti_created ON trade_ideas(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_aa_created ON anomaly_alerts(created_at DESC);
+
+-- Fix ai_enhanced in global_cache: ensure it's BOOLEAN (asyncpg strict typing)
+ALTER TABLE global_cache ALTER COLUMN ai_enhanced TYPE BOOLEAN USING ai_enhanced::boolean;
+ALTER TABLE global_cache ALTER COLUMN ai_enhanced SET DEFAULT FALSE;
