@@ -141,3 +141,57 @@ WHERE table_schema = 'public'
   AND table_name IN ('global_cache','macro_indicators','activity_log',
                      'saved_events','ai_feedback','app_settings')
 GROUP BY table_name ORDER BY table_name;
+
+-- etf_portfolios: add missing columns for Finance Hub
+ALTER TABLE etf_portfolios ADD COLUMN IF NOT EXISTS base_currency     TEXT DEFAULT 'EUR';
+ALTER TABLE etf_portfolios ADD COLUMN IF NOT EXISTS benchmark_ticker  TEXT DEFAULT 'VWCE';
+ALTER TABLE etf_portfolios ADD COLUMN IF NOT EXISTS icon              TEXT DEFAULT '💼';
+
+-- etf_holdings: add missing columns
+ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS currency      TEXT DEFAULT 'EUR';
+ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS asset_class   TEXT DEFAULT 'equity';
+ALTER TABLE etf_holdings ADD COLUMN IF NOT EXISTS purchase_date TEXT;
+
+-- etf_portfolios_meta: ensure total_cost column
+ALTER TABLE etf_portfolios_meta ADD COLUMN IF NOT EXISTS total_cost REAL DEFAULT 0;
+
+-- Fix AUTOINCREMENT -> SERIAL (se le tabelle sono state create con SQLite schema)
+-- (sicuro solo se le tabelle non esistono ancora in Supabase)
+CREATE TABLE IF NOT EXISTS etf_portfolios (
+    id               SERIAL PRIMARY KEY,
+    user_id          INTEGER NOT NULL,
+    name             TEXT NOT NULL DEFAULT 'Portafoglio Principale',
+    strategy         TEXT DEFAULT 'custom',
+    base_currency    TEXT DEFAULT 'EUR',
+    benchmark_ticker TEXT DEFAULT 'VWCE',
+    icon             TEXT DEFAULT '💼',
+    created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS etf_holdings (
+    id             SERIAL PRIMARY KEY,
+    portfolio_id   INTEGER NOT NULL REFERENCES etf_portfolios(id) ON DELETE CASCADE,
+    isin           TEXT DEFAULT '',
+    ticker         TEXT NOT NULL,
+    name           TEXT NOT NULL,
+    shares         REAL NOT NULL DEFAULT 0,
+    avg_price      REAL NOT NULL DEFAULT 0,
+    current_price  REAL,
+    currency       TEXT DEFAULT 'EUR',
+    asset_class    TEXT DEFAULT 'equity',
+    purchase_date  TEXT,
+    created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS etf_portfolios_meta (
+    id             SERIAL PRIMARY KEY,
+    portfolio_id   INTEGER NOT NULL REFERENCES etf_portfolios(id) ON DELETE CASCADE,
+    snapshot_date  TEXT NOT NULL,
+    total_value    REAL DEFAULT 0,
+    total_cost     REAL DEFAULT 0,
+    created_at     TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(portfolio_id, snapshot_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_etf_portfolios_user ON etf_portfolios(user_id);
+CREATE INDEX IF NOT EXISTS idx_etf_holdings_portfolio ON etf_holdings(portfolio_id);
