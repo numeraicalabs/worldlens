@@ -21,15 +21,6 @@ async def get_finance():
     return JSONResponse({"assets": get_finance_cache()})
 
 
-@finance_router.get("/{symbol}")
-async def get_asset(symbol: str):
-    for a in get_finance_cache():
-        if a["symbol"].upper() == symbol.upper():
-            return a
-    raise HTTPException(404, "Not found")
-
-
-# ── Profile ──────────────────────────────────────────
 @user_router.get("/profile")
 async def get_profile(user=Depends(require_user)):
     async with get_db() as db:
@@ -373,78 +364,100 @@ async def test_user_ai_key(user=Depends(require_user)):
             return {"status": "error", "provider": "claude", "message": str(e)}
 
 
-# ── Portfolio CRUD endpoints (/api/finance/portfolios) ────────────────────────
-# These endpoints serve the Finance Hub portfolio tab
-
 @finance_router.get("/portfolios")
 async def list_portfolios(user=Depends(require_user)):
-    """List all portfolios for the current user."""
     async with get_db() as db:
         async with db.execute(
-            "SELECT id, name, strategy, created_at FROM etf_portfolios WHERE user_id=? ORDER BY created_at DESC",
+            "SELECT id, name, base_currency, benchmark_ticker, icon, created_at "
+            "FROM etf_portfolios WHERE user_id=? ORDER BY created_at DESC",
             (user["id"],)
         ) as cur:
-            portfolios = [_json_safe(dict(r)) for r in await cur.fetchall()]
-    return {"portfolios": portfolios}
+            rows = [_json_safe(dict(r)) for r in await cur.fetchall()]
+    return {"portfolios": rows}
 
 
 @finance_router.post("/portfolios")
-async def create_portfolio(body: dict = Body(...), user=Depends(require_user)):
-    """Create a new portfolio."""
-    name = (body.get("name") or "Portafoglio Principale").strip()[:80]
-    strategy = (body.get("strategy") or "custom").strip()[:40]
+async def create_portfolio(body: _PortfolioCreate, user=Depends(require_user)):
     async with get_db() as db:
         async with db.execute(
-            "INSERT INTO etf_portfolios (user_id, name, strategy) VALUES (?,?,?) RETURNING id",
-            (user["id"], name, strategy)
+            "INSERT INTO etf_portfolios (user_id, name, base_currency, benchmark_ticker, icon) "
+            "VALUES (?,?,?,?,?) RETURNING id",
+            (user["id"], body.name.strip()[:80],
+             body.base_currency[:8], body.benchmark_ticker[:20], body.icon[:10])
         ) as cur:
             row = await cur.fetchone()
         await db.commit()
-    pid = row[0] if row else None
-    return {"ok": True, "id": pid, "name": name}
+    return {"ok": True, "id": row[0] if row else None, "name": body.name}
 
 
 @finance_router.get("/portfolios/{pid}")
 async def get_portfolio(pid: int, user=Depends(require_user)):
-    """Get portfolio detail with holdings and P&L."""
+    import json as _j
+
     async with get_db() as db:
         async with db.execute(
-            "SELECT id, name, strategy, created_at FROM etf_portfolios WHERE id=? AND user_id=?",
+            "SELECT id, name, base_currency, benchmark_ticker, icon, created_at "
+            "FROM etf_portfolios WHERE id=? AND user_id=?",
             (pid, user["id"])
         ) as cur:
             port = await cur.fetchone()
         if not port:
             raise HTTPException(404, "Portfolio not found")
+
         async with db.execute(
-            "SELECT id, ticker, isin, name, shares, avg_price, current_price FROM etf_holdings WHERE portfolio_id=?",
+            "SELECT id, ticker, isin, name, shares, avg_price, current_price, "
+            "       currency, asset_class, purchase_date "
+            "FROM etf_holdings WHERE portfolio_id=? ORDER BY id",
             (pid,)
         ) as cur:
             holdings = [_json_safe(dict(r)) for r in await cur.fetchall()]
+
     p = _json_safe(dict(port))
-    # Calculate P&L
+    cur_sym = p.get("base_currency", "EUR")
+
+    # Compute P&L per holding
     total_value = 0.0
     total_cost = 0.0
+    day_pnl = 0.0
+
     for h in holdings:
         cp = float(h.get("current_price") or h.get("avg_price") or 0)
         shares = float(h.get("shares") or 0)
         avg = float(h.get("avg_price") or 0)
-        h["current_value"] = round(cp * shares, 2)
-        h["pnl"] = round((cp - avg) * shares, 2)
-        h["pnl_pct"] = round((cp - avg) / avg * 100, 2) if avg else 0
-        total_value += h["current_value"]
-        total_cost += avg * shares
-    p["holdings"] = holdings
-    p["total_value"] = round(total_value, 2)
-    p["total_cost"] = round(total_cost, 2)
-    p["total_pnl"] = round(total_value - total_cost, 2)
-    p["total_pnl_pct"] = round((total_value - total_cost) / total_cost * 100, 2) if total_cost else 0
+        cost = avg * shares
+        val = cp * shares
+        h["current_value"] = round(val, 2)
+        h["pnl"]           = round(val - cost, 2)
+        h["pnl_pct"]       = round((cp - avg) / avg * 100, 2) if avg else 0.0
+        total_value += val
+        total_cost  += cost
+
+    total_pnl     = total_value - total_cost
+    total_ret_pct = round(total_pnl / total_cost * 100, 2) if total_cost else 0.0
+
+    p["holdings"]         = holdings
+    p["total_value"]      = round(total_value, 2)
+    p["total_cost"]       = round(total_cost, 2)
+    p["total_pnl"]        = round(total_pnl, 2)
+    p["total_return_pct"] = total_ret_pct
+    p["today_return_pct"] = 0.0   # updated by scheduler
+    p["ytd_return_pct"]   = None
+    p["sharpe_ratio"]     = None
+    p["volatility_pct"]   = None
+    p["max_drawdown_pct"] = None
+    p["geo_risk"]         = None
     return p
 
 
 @finance_router.delete("/portfolios/{pid}")
 async def delete_portfolio(pid: int, user=Depends(require_user)):
-    """Delete a portfolio and its holdings."""
     async with get_db() as db:
+        async with db.execute(
+            "SELECT id FROM etf_portfolios WHERE id=? AND user_id=?",
+            (pid, user["id"])
+        ) as cur:
+            if not await cur.fetchone():
+                raise HTTPException(404, "Portfolio not found")
         await db.execute("DELETE FROM etf_holdings WHERE portfolio_id=?", (pid,))
         await db.execute(
             "DELETE FROM etf_portfolios WHERE id=? AND user_id=?", (pid, user["id"])
@@ -454,12 +467,18 @@ async def delete_portfolio(pid: int, user=Depends(require_user)):
 
 
 @finance_router.get("/portfolios/{pid}/history")
-async def portfolio_history(pid: int, days: int = 30, user=Depends(require_user)):
-    """Get portfolio value history."""
+async def portfolio_history(pid: int, days: int = 90, user=Depends(require_user)):
     async with get_db() as db:
         async with db.execute(
-            "SELECT snapshot_date, total_value FROM etf_portfolios_meta "
-            "WHERE portfolio_id=? ORDER BY snapshot_date DESC LIMIT ?",
+            "SELECT id FROM etf_portfolios WHERE id=? AND user_id=?",
+            (pid, user["id"])
+        ) as cur:
+            if not await cur.fetchone():
+                raise HTTPException(404, "Portfolio not found")
+        async with db.execute(
+            "SELECT snapshot_date, total_value, total_cost "
+            "FROM etf_portfolios_meta WHERE portfolio_id=? "
+            "ORDER BY snapshot_date ASC LIMIT ?",
             (pid, days)
         ) as cur:
             rows = [_json_safe(dict(r)) for r in await cur.fetchall()]
@@ -467,24 +486,120 @@ async def portfolio_history(pid: int, days: int = 30, user=Depends(require_user)
 
 
 @finance_router.post("/portfolios/{pid}/holdings")
-async def add_holding(pid: int, body: dict = Body(...), user=Depends(require_user)):
-    """Add or update a holding in a portfolio."""
+async def add_holding(pid: int, body: _HoldingCreate, user=Depends(require_user)):
     async with get_db() as db:
-        # Verify ownership
         async with db.execute(
-            "SELECT id FROM etf_portfolios WHERE id=? AND user_id=?", (pid, user["id"])
+            "SELECT id FROM etf_portfolios WHERE id=? AND user_id=?",
+            (pid, user["id"])
         ) as cur:
             if not await cur.fetchone():
                 raise HTTPException(403, "Not your portfolio")
-        ticker = (body.get("ticker") or "").upper().strip()[:20]
-        isin = (body.get("isin") or "").strip()[:20]
-        name = (body.get("name") or ticker).strip()[:80]
-        shares = float(body.get("shares") or 0)
-        avg_price = float(body.get("avg_price") or 0)
+
+        ticker = body.ticker.upper().strip()[:20]
+
+        # Fetch live price
+        live_price = await _fetch_live_price(ticker)
+        if live_price == 0.0:
+            live_price = body.avg_price  # fallback to purchase price
+
+        async with db.execute(
+            "INSERT INTO etf_holdings "
+            "(portfolio_id, ticker, name, shares, avg_price, current_price, "
+            " currency, asset_class, purchase_date) "
+            "VALUES (?,?,?,?,?,?,?,?,?) RETURNING id",
+            (pid, ticker, ticker,
+             round(body.shares, 6), round(body.avg_price, 6),
+             round(live_price, 6),
+             body.currency[:8], body.asset_class[:20],
+             body.purchase_date)
+        ) as cur:
+            row = await cur.fetchone()
+        await db.commit()
+
+    return {"ok": True, "id": row[0] if row else None, "ticker": ticker}
+
+
+# ── Holdings direct endpoints — /api/finance/holdings/{hid} ──────────────────
+
+@finance_router.put("/holdings/{hid}")
+async def update_holding(hid: int, body: _HoldingUpdate, user=Depends(require_user)):
+    async with get_db() as db:
+        # Verify ownership via portfolio
+        async with db.execute(
+            "SELECT h.id FROM etf_holdings h "
+            "JOIN etf_portfolios p ON h.portfolio_id=p.id "
+            "WHERE h.id=? AND p.user_id=?",
+            (hid, user["id"])
+        ) as cur:
+            if not await cur.fetchone():
+                raise HTTPException(404, "Holding not found")
         await db.execute(
-            "INSERT INTO etf_holdings (portfolio_id, ticker, isin, name, shares, avg_price) "
-            "VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING",
-            (pid, ticker, isin, name, shares, avg_price)
+            "UPDATE etf_holdings SET shares=?, avg_price=? WHERE id=?",
+            (round(body.shares, 6), round(body.avg_price, 6), hid)
         )
         await db.commit()
-    return {"ok": True, "ticker": ticker}
+    return {"ok": True}
+
+
+@finance_router.delete("/holdings/{hid}")
+async def delete_holding(hid: int, user=Depends(require_user)):
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT h.id FROM etf_holdings h "
+            "JOIN etf_portfolios p ON h.portfolio_id=p.id "
+            "WHERE h.id=? AND p.user_id=?",
+            (hid, user["id"])
+        ) as cur:
+            if not await cur.fetchone():
+                raise HTTPException(404, "Holding not found")
+        await db.execute("DELETE FROM etf_holdings WHERE id=?", (hid,))
+        await db.commit()
+    return {"deleted": True}
+
+
+@finance_router.get("/{symbol}")
+async def get_asset(symbol: str):
+    for a in get_finance_cache():
+        if a["symbol"].upper() == symbol.upper():
+            return a
+    raise HTTPException(404, "Not found")
+
+
+# ── Profile ──────────────────────────────────────────
+
+# ── Portfolio CRUD — /api/finance/portfolios/* ────────────────────────────────
+# Full implementation matching dashboard.bundle.js expectations
+
+from pydantic import BaseModel as _BM
+from typing import Optional as _Opt
+
+class _PortfolioCreate(_BM):
+    name: str
+    base_currency: str = "EUR"
+    benchmark_ticker: str = "VWCE"
+    icon: str = "💼"
+
+class _HoldingCreate(_BM):
+    ticker: str
+    shares: float
+    avg_price: float
+    currency: str = "EUR"
+    asset_class: str = "equity"
+    purchase_date: _Opt[str] = None
+
+class _HoldingUpdate(_BM):
+    shares: float
+    avg_price: float
+
+
+async def _fetch_live_price(ticker: str) -> float:
+    """Fetch current price via yfinance, return 0 on failure."""
+    try:
+        import yfinance as yf
+        t = yf.Ticker(ticker)
+        hist = t.history(period="1d")
+        if not hist.empty:
+            return float(hist["Close"].iloc[-1])
+    except Exception:
+        pass
+    return 0.0
