@@ -2104,7 +2104,7 @@ function loadMacroBrief() { getMacroBrief(); }
 
 // ── Onboarding ─────────────────────────────────────────────────
 
-OB.step = 0; OB.data = {};
+var OB = { step:0, data:{} };
 var OB_STEPS = [
   {
     title: 'Benvenuto in WorldLens',
