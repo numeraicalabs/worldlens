@@ -127,7 +127,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 /* ─── CONTENT ─── */
 #content{flex:1;overflow:hidden;min-height:0;height:0;position:relative;display:flex;flex-direction:column}
 .view{display:none;width:100%;flex:1;min-height:0;flex-direction:column;overflow:hidden}
-.view.on{display:flex;flex:1;min-height:0;opacity:1;transition:opacity .2s ease}
+.view.on{display:flex!important;flex:1;min-height:0;opacity:1!important;visibility:visible!important}
 
 /* ─── SHARED ─── */
 .vtit{font-family:var(--fh);font-size:19px;font-weight:700;letter-spacing:-.02em;margin-bottom:3px}
@@ -5281,7 +5281,7 @@ body {
 
 /* ── 22. MISC ──────────────────────────────────────────────────────── */
 /* animation removed — caused opacity:0 on iOS */
-@keyframes viewFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* viewFadeIn removed */ }
 
 .wsd.on { background: var(--gr) !important; animation: livePulse 2s ease-in-out infinite !important; }
 #help-btn { background: var(--bg2) !important; border: 1px solid var(--bd) !important; border-radius: 50% !important; width: 36px !important; height: 36px !important; color: var(--t2) !important; }
