@@ -7,11 +7,10 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Optional
 
-import aiosqlite
 from fastapi import APIRouter, HTTPException, Depends, Body
 from pydantic import BaseModel
 
-from db import get_db, db_fetchone, db_execute
+from db import get_db
 from models import UserRegister, UserLogin, Token, UserOut
 from auth import hash_password, verify_password, create_token, get_current_user
 from config import settings
@@ -22,14 +21,11 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 AVATAR_COLORS = ["#3B82F6","#8B5CF6","#10B981","#F59E0B","#EF4444","#06B6D4","#EC4899"]
 
 
-# ── Pydantic inputs ────────────────────────────────────────────────
-
 class UserRegisterWithInvite(BaseModel):
     email:       str
     username:    str
     password:    str
     invite_code: Optional[str] = None
-
 
 class InviteCreate(BaseModel):
     label:           str = ""
@@ -38,25 +34,24 @@ class InviteCreate(BaseModel):
     expires_in_days: Optional[int] = None
 
 
-# ── Helpers ────────────────────────────────────────────────────────
-
 def _generate_code() -> str:
     chars = string.ascii_uppercase + string.digits
     return "WL-" + ''.join(secrets.choice(chars) for _ in range(5)) + \
            "-" + ''.join(secrets.choice(chars) for _ in range(5))
 
-
 def _safe_str(val) -> str:
-    """Convert any value (including datetime) to string safely."""
-    if val is None:
-        return ""
-    if isinstance(val, datetime):
-        return val.isoformat()
+    if val is None: return ""
+    if isinstance(val, datetime): return val.isoformat()
     return str(val)
 
+def _json_safe(obj):
+    import datetime as _dt
+    if isinstance(obj, dict): return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [_json_safe(i) for i in obj]
+    if isinstance(obj, (_dt.datetime, _dt.date)): return obj.isoformat()
+    return obj
 
 def _row_to_userout(row: dict) -> UserOut:
-    """Build UserOut from a DB row dict, handling datetime fields from PG."""
     return UserOut(
         id=int(row["id"]),
         email=str(row["email"]),
@@ -68,9 +63,7 @@ def _row_to_userout(row: dict) -> UserOut:
         role=row.get("role"),
     )
 
-
 async def _validate_invite(db, code: str) -> dict:
-    """Validate an invite code. Returns invite dict or raises HTTPException."""
     async with db.execute(
         "SELECT id, code, max_uses, use_count, expires_at FROM invites WHERE code = ?",
         (code.upper().strip(),)
@@ -78,7 +71,6 @@ async def _validate_invite(db, code: str) -> dict:
         row = await cur.fetchone()
     if not row:
         raise HTTPException(400, "Invalid invite code")
-    # row is already a dict from get_db()
     inv = dict(row)
     if int(inv.get("use_count", 0)) >= int(inv.get("max_uses", 1)):
         raise HTTPException(400, "Invite code already fully used")
@@ -98,7 +90,6 @@ async def register(data: UserRegisterWithInvite):
     username = data.username.strip()
     password = data.password
 
-    # Validation
     if not email or "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(400, "Invalid email address")
     if len(username) < 2 or len(username) > 32:
@@ -127,17 +118,18 @@ async def register(data: UserRegisterWithInvite):
             async with db.execute(
                 "SELECT id FROM users WHERE email = ?", (email,)
             ) as cur:
-                existing = await cur.fetchone()
-            if existing:
-                raise HTTPException(400, "Email already registered")
+                if await cur.fetchone():
+                    raise HTTPException(400, "Email already registered")
 
-            # Insert user
+            # ── INSERT con RETURNING id (PostgreSQL-compatible) ──
             color = random.choice(AVATAR_COLORS)
-            insert_cur = await db.execute(
-                "INSERT INTO users (email, username, password_hash, avatar_color) VALUES (?,?,?,?)",
+            async with db.execute(
+                "INSERT INTO users (email, username, password_hash, avatar_color) "
+                "VALUES (?,?,?,?) RETURNING id",
                 (email, username, hash_password(password), color)
-            )
-            new_id = insert_cur.lastrowid
+            ) as cur:
+                row = await cur.fetchone()
+            new_id = row[0] if row else None
             await db.commit()
 
             if not new_id:
@@ -146,12 +138,12 @@ async def register(data: UserRegisterWithInvite):
             # Update invite usage
             if invite_row:
                 await db.execute(
-                    "UPDATE invites SET use_count=use_count+1, used_by=?, used_at=datetime('now') WHERE id=?",
+                    "UPDATE invites SET use_count=use_count+1, used_by=?, used_at=NOW() WHERE id=?",
                     (new_id, invite_row["id"])
                 )
                 await db.commit()
 
-            # Fetch freshly inserted user
+            # Fetch inserted user
             async with db.execute(
                 "SELECT id, email, username, avatar_color, created_at, is_admin, is_active, role "
                 "FROM users WHERE id=?", (new_id,)
@@ -161,7 +153,7 @@ async def register(data: UserRegisterWithInvite):
             if not user_row:
                 raise HTTPException(500, "Registration failed — user not found after insert")
 
-            user = dict(user_row)
+            user = _json_safe(dict(user_row))
 
     except HTTPException:
         raise
@@ -171,7 +163,6 @@ async def register(data: UserRegisterWithInvite):
 
     token = create_token({"sub": str(user["id"])})
 
-    # Fire-and-forget welcome email
     try:
         import asyncio
         from notifications import send_welcome
@@ -198,7 +189,7 @@ async def login(data: UserLogin):
         if not row:
             raise HTTPException(401, "Invalid credentials")
 
-        user = dict(row)
+        user = _json_safe(dict(row))
 
         if not int(user.get("is_active") or 1):
             raise HTTPException(403, "Account deactivated. Contact support.")
@@ -210,7 +201,7 @@ async def login(data: UserLogin):
         try:
             async with get_db() as db:
                 await db.execute(
-                    "UPDATE users SET last_login=datetime('now') WHERE id=?",
+                    "UPDATE users SET last_login=NOW() WHERE id=?",
                     (user["id"],)
                 )
                 await db.commit()
@@ -254,7 +245,7 @@ async def registration_status():
     return {"registration_open": open_flag}
 
 
-# ── Invite management (admin only) ─────────────────────────────────
+# ── Invite management ──────────────────────────────────────────────
 
 @router.post("/invites")
 async def create_invite(data: InviteCreate, current_user=Depends(get_current_user)):
@@ -287,8 +278,8 @@ async def list_invites(current_user=Depends(get_current_user)):
             FROM invites i LEFT JOIN users u ON u.id = i.used_by
             ORDER BY i.created_at DESC
         """) as cur:
-            rows = await cur.fetchall()
-    return {"invites": [dict(r) for r in rows]}
+            rows = [_json_safe(dict(r)) for r in await cur.fetchall()]
+    return {"invites": rows}
 
 
 @router.delete("/invites/{invite_id}")
@@ -322,24 +313,18 @@ async def toggle_registration(body: dict = Body(...), current_user=Depends(get_c
     async with get_db() as db:
         await db.execute(
             "INSERT INTO app_settings (key, value) VALUES ('registration_open',?) "
-            "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=datetime('now')",
+            "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()",
             ("true" if open_flag else "false",)
         )
         await db.commit()
     return {"registration_open": open_flag}
 
 
-# ── Admin bootstrap (create admin if missing) ──────────────────────
+# ── Bootstrap admin ────────────────────────────────────────────────
 
 @router.post("/bootstrap-admin")
 async def bootstrap_admin(body: dict = Body(...)):
-    """
-    Creates the admin user in the current DB (Supabase or SQLite).
-    Protected by ADMIN_BOOTSTRAP_SECRET env var.
-    Call once after first deploy: POST /api/auth/bootstrap-admin
-    Body: {"secret": "...", "email": "...", "username": "...", "password": "..."}
-    """
-    secret = body.get("secret", "")
+    secret   = body.get("secret", "")
     expected = getattr(settings, "admin_bootstrap_secret", "") or ""
     if not expected or secret != expected:
         raise HTTPException(403, "Invalid bootstrap secret")
@@ -355,14 +340,12 @@ async def bootstrap_admin(body: dict = Body(...)):
 
     try:
         async with get_db() as db:
-            # Check if already exists
             async with db.execute(
                 "SELECT id FROM users WHERE email=?", (email,)
             ) as cur:
                 existing = await cur.fetchone()
 
             if existing:
-                # Update to admin if exists
                 uid = dict(existing)["id"]
                 await db.execute(
                     "UPDATE users SET is_admin=1, role='admin' WHERE id=?", (uid,)
@@ -370,14 +353,15 @@ async def bootstrap_admin(body: dict = Body(...)):
                 await db.commit()
                 return {"status": "updated", "id": uid, "email": email}
 
-            # Create new admin user
+            # ── INSERT con RETURNING id ──
             color = AVATAR_COLORS[0]
-            cur2 = await db.execute(
+            async with db.execute(
                 "INSERT INTO users (email, username, password_hash, avatar_color, is_admin, role) "
-                "VALUES (?,?,?,?,1,'admin')",
+                "VALUES (?,?,?,?,1,'admin') RETURNING id",
                 (email, username, hash_password(password), color)
-            )
-            new_id = cur2.lastrowid
+            ) as cur:
+                row = await cur.fetchone()
+            new_id = row[0] if row else None
             await db.commit()
 
     except HTTPException:
