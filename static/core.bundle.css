@@ -127,7 +127,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 /* ─── CONTENT ─── */
 #content{flex:1;overflow:hidden;min-height:0;height:0;position:relative;display:flex;flex-direction:column}
 .view{display:none;width:100%;flex:1;min-height:0;flex-direction:column;overflow:hidden}
-.view.on{display:flex!important;flex:1;min-height:0;opacity:1!important;visibility:visible!important}
+.view.on{display:flex!important;width:100%!important;flex:1;min-height:0;opacity:1!important;visibility:visible!important}
 
 /* ─── SHARED ─── */
 .vtit{font-family:var(--fh);font-size:19px;font-weight:700;letter-spacing:-.02em;margin-bottom:3px}
