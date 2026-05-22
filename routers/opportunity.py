@@ -510,10 +510,10 @@ async def run_opportunity_pipeline(lookback_hours: int = 4) -> int:
                           ai_summary, summary, impact, country_name, country_code
                    FROM events
                    WHERE (ai_impact_score >= 6 OR severity >= 6)
-                     AND created_at::timestamptz > NOW() - ('{lookback_hours} hours'::interval)
+                     AND created_at::timestamptz > NOW() - INTERVAL '1 hour' * ?
                    ORDER BY COALESCE(ai_impact_score, severity) DESC
                    LIMIT 30""",
-                ()
+                (int(lookback_hours),)
             ) as cur:
                 events = [_json_safe(dict(r)) for r in await cur.fetchall()]
 

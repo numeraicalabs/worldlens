@@ -143,7 +143,7 @@ async def brain_ingest(
             await _db.execute(
                 "INSERT INTO brain_sessions (user_id, session_date, entries_added) "
                 "VALUES (?,?,1) ON CONFLICT(user_id,session_date) DO UPDATE SET "
-                "entries_added=entries_added+1, interactions=interactions+1",
+                "entries_added=brain_sessions.entries_added+1, interactions=brain_sessions.interactions+1",
                 (user_id, today)
             )
             await _db.commit()

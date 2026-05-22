@@ -15,6 +15,15 @@ from routers.brain import brain_ingest
 
 logger = logging.getLogger(__name__)
 
+# ── AI Insight system prompt ───────────────────────────────────────────────────
+INSIGHT_SYSTEM = (
+    "You are a concise geopolitical intelligence analyst. "
+    "Generate a brief daily insight (2-3 sentences) based on current events. "
+    "Focus on market impact, geopolitical risks, and actionable intelligence. "
+    "Be direct and specific. Use Italian if the user prefers it."
+)
+
+
 def _json_safe(obj):
     """Convert datetime objects to ISO strings for JSON serialization."""
     import datetime as _dt
