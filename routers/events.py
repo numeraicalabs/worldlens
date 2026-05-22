@@ -1,5 +1,6 @@
 """World Lens — Events + AI + Macro router"""
 from __future__ import annotations
+import logging
 import json
 import aiosqlite
 from db import get_db
@@ -10,6 +11,7 @@ from ai_layer import ai_score_event, ai_regional_risk, ai_answer, ai_macro_brief
 from config import settings
 
 router = APIRouter(prefix="/api/events", tags=["events"])
+logger = logging.getLogger(__name__)
 
 
 def _json_safe(obj):
