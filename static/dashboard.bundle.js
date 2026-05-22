@@ -144,7 +144,8 @@ function sv(name, btn) {
   document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
   document.querySelectorAll('.ni[data-v]').forEach(function(b){ b.classList.remove('on'); });
   var el2 = document.getElementById('view-'+name);
-  if (el2) el2.classList.add('on');
+  if (el2) { el2.classList.add('on'); console.log('[sv] added .on to view-'+name+' | el found:',!!el2,'| classList:',el2.className); }
+  else { console.warn('[sv] ELEMENT NOT FOUND: view-'+name); }
   if (btn) btn.classList.add('on');
   G.currentView = name;
   /* Always close event panel + backdrop when switching views */
@@ -4722,8 +4723,12 @@ function _fhUnmountViews() {
     var viewEl  = document.getElementById('view-' + viewId);
     var origParent = _fhMountedViews[viewId];
     if (viewEl && origParent && !origParent.contains(viewEl)) {
+      var wasOn = viewEl.classList.contains('on');
       viewEl.style.cssText = '';  // restore class-driven styling
+      viewEl.classList.remove('on');  // ensure clean state
       origParent.appendChild(viewEl);
+      // Re-apply .on if it was active (DOM move can lose classes in some browsers)
+      if (wasOn) viewEl.classList.add('on');
     }
   });
   _fhMountedViews = {};
