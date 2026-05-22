@@ -144,8 +144,14 @@ function sv(name, btn) {
   document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
   document.querySelectorAll('.ni[data-v]').forEach(function(b){ b.classList.remove('on'); });
   var el2 = document.getElementById('view-'+name);
-  if (el2) { el2.classList.add('on'); console.log('[sv] added .on to view-'+name+' | el found:',!!el2,'| classList:',el2.className); }
-  else { console.warn('[sv] ELEMENT NOT FOUND: view-'+name); }
+  if (el2) {
+    el2.classList.add('on');
+    el2.style.opacity = '1';           // force — bypass any CSS that sets opacity:0
+    el2.style.visibility = 'visible';  // extra safety
+    console.log('[sv] added .on to view-'+name+' opacity forced to 1');
+  } else {
+    console.warn('[sv] ELEMENT NOT FOUND: view-'+name);
+  }
   if (btn) btn.classList.add('on');
   G.currentView = name;
   /* Always close event panel + backdrop when switching views */
