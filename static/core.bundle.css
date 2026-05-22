@@ -127,7 +127,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 /* ─── CONTENT ─── */
 #content{flex:1;overflow:hidden;min-height:0;height:0;position:relative;display:flex;flex-direction:column}
 .view{display:none;width:100%;flex:1;min-height:0;flex-direction:column;overflow:hidden}
-.view.on{display:flex;flex:1;min-height:0}
+.view.on{display:flex;flex:1;min-height:0;opacity:1}
 
 /* ─── SHARED ─── */
 .vtit{font-family:var(--fh);font-size:19px;font-weight:700;letter-spacing:-.02em;margin-bottom:3px}
@@ -5280,7 +5280,7 @@ body {
 #kg-close-btn { background: var(--bg2) !important; border: 1px solid var(--bd) !important; border-radius: 8px !important; color: var(--t2) !important; font-size: 11px !important; padding: 5px 12px !important; cursor: pointer !important; }
 
 /* ── 22. MISC ──────────────────────────────────────────────────────── */
-.view.on { animation: viewFadeIn .25s var(--ease-out) both !important; }
+.view.on { animation: viewFadeIn .25s var(--ease-out) !important; }
 @keyframes viewFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
 .wsd.on { background: var(--gr) !important; animation: livePulse 2s ease-in-out infinite !important; }
