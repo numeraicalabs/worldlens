@@ -991,11 +991,29 @@ def start():
         next_run_time=__import__('datetime').datetime.now(),
     )
 
+    # ── Macro Indicators Seed/Update (every hour) ──────────────────────────────
+    async def _run_macro_seed():
+        try:
+            from macro_seed import seed_macro_indicators
+            count = await seed_macro_indicators()
+            if count:
+                logger.info("Macro seed: %d indicators updated", count)
+        except Exception as e:
+            logger.warning("macro_seed: %s", e)
+
+    _scheduler.add_job(
+        _run_macro_seed, "interval",
+        hours=1,
+        id="macro_seed",
+        next_run_time=__import__('datetime').datetime.now(),
+        misfire_grace_time=300,
+    )
+
     # ── Opportunity Score Engine + Event-to-Trade Pipeline (every 10 min) ────
     async def _run_opportunity_pipeline():
         try:
             from routers.opportunity import run_opportunity_pipeline
-            count = await run_opportunity_pipeline(lookback_hours=4)
+            count = await run_opportunity_pipeline(lookback_hours=24)
             if count:
                 logger.info("Opportunity pipeline: %d new trade ideas", count)
         except Exception as e:

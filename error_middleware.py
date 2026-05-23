@@ -69,6 +69,9 @@ async def diagnose():
         "macro_indicators":   "SELECT COUNT(*) FROM macro_indicators",
         "agent_brief_history":"SELECT COUNT(*) FROM agent_brief_history",
         "global_cache":       "SELECT COUNT(*) FROM global_cache",
+        "trade_ideas":        "SELECT COUNT(*) FROM trade_ideas",
+        "anomaly_alerts":     "SELECT COUNT(*) FROM anomaly_alerts",
+        "opp_scores":         "SELECT COUNT(*) FROM opp_scores",
     }
     out["tables"] = {}
     try:
