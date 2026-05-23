@@ -497,7 +497,7 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
 # 2. EVENT-TO-TRADE PIPELINE (batch runner for scheduler)
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def run_opportunity_pipeline(lookback_hours: int = 4) -> int:
+async def run_opportunity_pipeline(lookback_hours: int = 24) -> int:
     """
     Called by scheduler every 10 minutes.
     Scans recent high-severity events → generates trade ideas.
@@ -506,10 +506,10 @@ async def run_opportunity_pipeline(lookback_hours: int = 4) -> int:
     try:
         async with get_db() as db:
             async with db.execute(
-                """SELECT id, title, category, severity, ai_impact_score,
+                """SELECT id, title, category, severity, COALESCE(ai_impact_score, severity) as ai_impact_score,
                           ai_summary, summary, impact, country_name, country_code
                    FROM events
-                   WHERE (ai_impact_score >= 6 OR severity >= 6)
+                   WHERE (COALESCE(ai_impact_score, 0) >= 5 OR severity >= 5)
                      AND created_at::timestamptz > NOW() - INTERVAL '1 hour' * ?
                    ORDER BY COALESCE(ai_impact_score, severity) DESC
                    LIMIT 30""",
@@ -1521,3 +1521,15 @@ async def get_portfolio_analysis(
         "tickers_covered": len([s for s in holding_signals if s["ideas_count"] > 0]),
         "total_holdings":  len(holdings),
     }
+
+
+@router.post("/refresh")
+async def trigger_pipeline(user=Depends(require_user)):
+    """Manually trigger the opportunity pipeline."""
+    try:
+        count = await run_opportunity_pipeline(lookback_hours=48)
+        anomalies = await run_anomaly_scan()
+        return {"ok": True, "new_ideas": count, "message": f"Generated {count} ideas"}
+    except Exception as e:
+        logger.warning("manual pipeline trigger: %s", e)
+        raise HTTPException(500, str(e))
