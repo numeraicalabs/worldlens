@@ -18,7 +18,7 @@ from routers.events import router as events_router
 from routers.user_finance import finance_router, user_router
 from routers.portfolio import router as portfolio_router
 from routers.engage import router as engage_router
-from routers.intelligence import router as intelligence_router
+from routers.intelligence import router as intelligence_router, macro_router
 from routers.markets import router as markets_router
 from routers.admin import router as admin_router
 from routers.insiders import router as insiders_router
@@ -332,6 +332,7 @@ app.include_router(user_router)
 app.include_router(portfolio_router)
 app.include_router(engage_router)
 app.include_router(intelligence_router)
+app.include_router(macro_router)
 app.include_router(markets_router)
 app.include_router(admin_router)
 app.include_router(insiders_router)
