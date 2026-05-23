@@ -1084,3 +1084,36 @@ async def refresh_dashboard_cache(
 
     background_tasks.add_task(_run)
     return {"ok": True, "message": "Cache refresh started"}
+
+
+@router.post("/macro-refresh")
+async def refresh_macro(user=Depends(require_user)):
+    """Manually trigger macro indicators update."""
+    try:
+        from macro_seed import seed_macro_indicators
+        count = await seed_macro_indicators()
+        return {"ok": True, "updated": count}
+    except Exception as exc:
+        import traceback
+        logger.error("macro_refresh: %s\n%s", exc, traceback.format_exc())
+        raise HTTPException(500, str(exc))
+
+
+# ── Standalone /api/macro router ────────────────────────────────────────────
+from fastapi import APIRouter as _MacroAPIRouter
+macro_router = _MacroAPIRouter(prefix="/api/macro", tags=["macro"])
+
+@macro_router.get("/indicators")
+async def macro_indicators_standalone(user=Depends(require_user)):
+    """Returns macro indicators for the macro dashboard view."""
+    try:
+        async with get_db() as db:
+            async with db.execute(
+                "SELECT name, value, previous, unit, category, country, trend, updated_at "
+                "FROM macro_indicators ORDER BY category, name"
+            ) as c:
+                rows = [_json_safe(dict(r)) for r in await c.fetchall()]
+        return {"indicators": rows, "count": len(rows)}
+    except Exception as e:
+        logger.warning("macro_indicators: %s", e)
+        return {"indicators": [], "count": 0}
