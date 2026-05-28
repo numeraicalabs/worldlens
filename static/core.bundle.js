@@ -3976,3 +3976,280 @@ function doLogout() {
   var loginModal = document.getElementById('auth-overlay');
   if(loginModal) loginModal.style.display='none';
 }
+
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE DASHBOARD v2 — Financial Intelligence Cards
+   Popola le 6 card del swipe deck con dati live
+   ═══════════════════════════════════════════════════════════ */
+
+function initMobileDashboard() {
+  // Solo mobile
+  if (window.innerWidth > 768) return;
+  _mscLoadPortfolio();
+  _mscLoadTradeIdeas();
+  _mscLoadMarkets();
+  _mscLoadCrisisRadar();
+  _mscLoadAIBrief();
+  _mscLoadMacroAnomalies();
+}
+
+// ── Card 1: Portfolio Pulse ────────────────────────────────
+function _mscLoadPortfolio() {
+  rq('/api/finance/portfolios').then(function(r) {
+    if (!r || !r.portfolios || !r.portfolios.length) return;
+    var port = r.portfolios[0];
+    rq('/api/finance/portfolios/' + port.id).then(function(d) {
+      if (!d) return;
+      var pnl = d.total_pnl || 0;
+      var pct = d.total_return_pct || 0;
+      var el_val = document.getElementById('msc-pnl-value');
+      var el_pct = document.getElementById('msc-pnl-pct');
+      var el_name = document.getElementById('msc-portfolio-name');
+      if (el_val) el_val.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' €';
+      if (el_val) el_val.style.color = pnl >= 0 ? '#10B981' : '#EF4444';
+      if (el_pct) {
+        el_pct.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+        el_pct.style.background = pnl >= 0 ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)';
+        el_pct.style.color = pnl >= 0 ? '#10B981' : '#EF4444';
+      }
+      if (el_name) el_name.textContent = port.name + ' · ' + (d.holdings || []).length + ' posizioni';
+      // Holdings mini-grid
+      var grid = document.getElementById('msc-holdings-grid');
+      if (grid && d.holdings && d.holdings.length) {
+        grid.innerHTML = d.holdings.slice(0, 4).map(function(h) {
+          var pnlH = h.pnl || 0;
+          var pnlPct = h.pnl_pct || 0;
+          var col = pnlH >= 0 ? '#10B981' : '#EF4444';
+          return '<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:8px 10px">'
+            + '<div style="font-size:10px;font-weight:700;color:var(--t1)">' + (h.ticker || '—') + '</div>'
+            + '<div style="font-size:9px;color:var(--t3);margin:1px 0">' + (h.shares || 0).toFixed(2) + ' shares</div>'
+            + '<div style="font-size:11px;font-weight:600;color:' + col + '">'
+            + (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(1) + '%</div>'
+            + '</div>';
+        }).join('');
+      }
+    });
+  });
+}
+
+// ── Card 2: Trade Ideas ────────────────────────────────────
+function _mscLoadTradeIdeas() {
+  rq('/api/opportunity/ideas?limit=3&min_score=30&status=active').then(function(r) {
+    var ideas = (r && r.ideas) || [];
+    var el = document.getElementById('msc-top-ideas');
+    var tot = document.getElementById('msc-ideas-total');
+    var lon = document.getElementById('msc-ideas-long');
+    var shr = document.getElementById('msc-ideas-short');
+    if (tot) tot.textContent = ideas.length;
+    var longs = ideas.filter(function(i){ return i.direction === 'LONG'; }).length;
+    var shorts = ideas.filter(function(i){ return i.direction === 'SHORT'; }).length;
+    if (lon) lon.textContent = longs;
+    if (shr) shr.textContent = shorts;
+    if (!el) return;
+    if (!ideas.length) {
+      el.innerHTML = '<div style="color:var(--t3);font-size:11px;text-align:center;padding:20px 0">'
+        + 'Pipeline in avvio…<br><span style="font-size:10px;opacity:.6">Premi ⚡ per forzare</span></div>';
+      return;
+    }
+    el.innerHTML = ideas.map(function(idea) {
+      var dir = idea.direction === 'LONG';
+      var col = dir ? '#10B981' : '#EF4444';
+      var bg  = dir ? 'rgba(16,185,129,.07)' : 'rgba(239,68,68,.07)';
+      var bdr = dir ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)';
+      var conf = Math.round((idea.confidence || 0.5) * 100);
+      return '<div style="background:' + bg + ';border:1px solid ' + bdr + ';border-radius:8px;padding:9px 11px;cursor:pointer" '
+        + 'onclick="mobileNav('opportunity',null)">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+        + '<span style="font-size:13px;font-weight:800;color:var(--t1)">' + (idea.ticker || '—') + '</span>'
+        + '<span style="font-size:9px;padding:2px 7px;border-radius:10px;background:' + col + '22;color:' + col + ';font-weight:700">'
+        + idea.direction + '</span></div>'
+        + '<div style="font-size:10px;color:var(--t2);margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden">'
+        + (idea.rationale || '—') + '</div>'
+        + '<div style="display:flex;gap:10px">'
+        + '<span style="font-size:9px;color:var(--t3)">Score: <b style="color:' + col + '">' + (idea.opp_score || 0) + '</b></span>'
+        + '<span style="font-size:9px;color:var(--t3)">Conf: <b style="color:var(--t2)">' + conf + '%</b></span>'
+        + (idea.timeframe ? '<span style="font-size:9px;color:var(--t3)">' + idea.timeframe + '</span>' : '')
+        + '</div></div>';
+    }).join('');
+  });
+  // Anomaly count
+  rq('/api/opportunity/anomalies?limit=1&unread_only=true').then(function(r) {
+    var badge = document.getElementById('msc-anomaly-badge');
+    if (badge && r && r.anomalies) badge.textContent = r.anomalies.length + (r.anomalies.length >= 30 ? '+' : '');
+  });
+}
+
+// ── Card 3: Market Snapshot ────────────────────────────────
+function _mscLoadMarkets() {
+  var TICKERS = [
+    {sym:'^GSPC', label:'S&P 500'},
+    {sym:'^VIX',  label:'VIX'},
+    {sym:'GC=F',  label:'Gold'},
+    {sym:'CL=F',  label:'WTI Oil'},
+    {sym:'BTC-USD',label:'Bitcoin'},
+    {sym:'EURUSD=X',label:'EUR/USD'},
+  ];
+  var grid = document.getElementById('msc-market-grid');
+  if (!grid) return;
+  // Usa finance_cache via API mercati
+  rq('/api/markets/summary').then(function(r) {
+    var assets = (r && (r.assets || r.data || r)) || [];
+    if (!Array.isArray(assets) || !assets.length) {
+      // Fallback: usa macro indicators
+      rq('/api/macro/indicators').then(function(d) {
+        var inds = (d && d.indicators) || [];
+        var filtered = inds.filter(function(i){
+          return ['S&P 500','Gold','Bitcoin','EUR/USD','WTI Crude Oil','VIX Fear Index'].includes(i.name);
+        }).slice(0, 6);
+        _renderMscMarkets(filtered.map(function(i){
+          return {name: i.name, price: i.value, change_pct: i.previous ?
+            (i.value - i.previous) / i.previous * 100 : 0};
+        }));
+      });
+      return;
+    }
+    _renderMscMarkets(assets.slice(0, 6));
+  });
+  var timeEl = document.getElementById('msc-mkt-time');
+  if (timeEl) timeEl.textContent = new Date().toTimeString().slice(0,5) + ' UTC';
+}
+
+function _renderMscMarkets(assets) {
+  var grid = document.getElementById('msc-market-grid');
+  if (!grid || !assets.length) return;
+  grid.innerHTML = assets.map(function(a) {
+    var chg = parseFloat(a.change_pct || 0);
+    var col = chg > 0 ? '#10B981' : chg < 0 ? '#EF4444' : 'var(--t3)';
+    var arrow = chg > 0 ? '▲' : chg < 0 ? '▼' : '—';
+    var price = parseFloat(a.price || a.value || 0);
+    var fmt = price > 1000 ? price.toLocaleString('it-IT', {maximumFractionDigits:0})
+              : price > 10 ? price.toFixed(2)
+              : price.toFixed(4);
+    return '<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:9px 10px">'
+      + '<div style="font-size:9px;color:var(--t3);margin-bottom:3px">' + (a.name || a.symbol || '—') + '</div>'
+      + '<div style="font-size:14px;font-weight:800;color:var(--t1);line-height:1">' + fmt + '</div>'
+      + '<div style="font-size:10px;color:' + col + ';margin-top:2px">'
+      + arrow + ' ' + (Math.abs(chg)).toFixed(2) + '%</div>'
+      + '</div>';
+  }).join('');
+  // Sentiment bar (VIX proxy)
+  var vix = assets.find(function(a){ return (a.name||'').includes('VIX') || (a.symbol||'').includes('VIX'); });
+  if (vix) {
+    var vixVal = parseFloat(vix.price || vix.value || 20);
+    var fearPct = Math.min(100, Math.max(0, (vixVal - 10) / 40 * 100));
+    var bar = document.getElementById('msc-sentiment-bar');
+    var lbl = document.getElementById('msc-sentiment-label');
+    if (bar) bar.style.width = (100 - fearPct) + '%';
+    if (lbl) lbl.textContent = vixVal < 15 ? 'GREED' : vixVal < 20 ? 'NEUTRAL' : vixVal < 30 ? 'FEAR' : 'EXTREME FEAR';
+  }
+}
+
+// ── Card 4: Crisis Radar ───────────────────────────────────
+function _mscLoadCrisisRadar() {
+  rq('/api/intelligence/early-warning').then(function(r) {
+    if (!r) return;
+    var score = parseFloat(r.global_ew_score || 5);
+    var label = r.ew_label || (score >= 7 ? 'HIGH RISK' : score >= 5 ? 'MODERATE' : 'LOW RISK');
+    var col = score >= 7 ? '#EF4444' : score >= 5 ? '#F59E0B' : '#10B981';
+    // Gauge ring
+    var ring = document.getElementById('msc-ew-ring');
+    if (ring) {
+      var pct = score / 10;
+      var circ = 163.4;
+      ring.style.strokeDashoffset = circ * (1 - pct * 0.75);
+      ring.style.stroke = col;
+    }
+    var val = document.getElementById('msc-ew-score-val');
+    var lbl = document.getElementById('msc-ew-label-card');
+    var ass = document.getElementById('msc-ew-assess-short');
+    if (val) val.textContent = score.toFixed(1);
+    if (lbl) { lbl.textContent = label; lbl.style.color = col; }
+    if (ass && r.ai_assessment) ass.textContent = r.ai_assessment.slice(0, 120) + (r.ai_assessment.length > 120 ? '…' : '');
+    // Sub-scores
+    var ms = document.getElementById('msc-macro-stress');
+    var mkt = document.getElementById('msc-market-stress');
+    var vel = document.getElementById('msc-ev-velocity');
+    if (ms) ms.textContent = (r.macro_stress || '—');
+    if (mkt) mkt.textContent = (r.market_stress || '—');
+    if (vel) vel.textContent = (r.event_velocity || '—');
+    // Crisis events
+    if (r.top_risks && r.top_risks.length) {
+      var el = document.getElementById('msc-crisis-events');
+      if (el) el.innerHTML = r.top_risks.slice(0, 2).map(function(ev) {
+        var sev = parseFloat(ev.severity || ev.score || 5);
+        var sevCol = sev >= 7 ? '#EF4444' : sev >= 5 ? '#F59E0B' : '#10B981';
+        return '<div style="padding:8px 10px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;border-left:3px solid ' + sevCol + '">'
+          + '<div style="font-size:11px;color:var(--t1);font-weight:600;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden">'
+          + (ev.title || ev.country || '—') + '</div>'
+          + '<div style="display:flex;gap:8px">'
+          + '<span style="font-size:9px;color:var(--t3)">' + (ev.category || '') + '</span>'
+          + '<span style="font-size:9px;color:' + sevCol + ';font-weight:700">SEV ' + sev.toFixed(1) + '</span>'
+          + '</div></div>';
+      }).join('');
+    }
+  });
+}
+
+// ── Card 5: AI Brief ───────────────────────────────────────
+function _mscLoadAIBrief() {
+  var el = document.getElementById('msc-ai-brief-text');
+  if (!el) return;
+  // Usa il global cache brief se disponibile
+  rq('/api/intelligence/dashboard-cache').then(function(r) {
+    if (r && r.global_brief && r.global_brief.length > 20) {
+      el.textContent = r.global_brief.slice(0, 280) + (r.global_brief.length > 280 ? '…' : '');
+    } else {
+      el.innerHTML = '<span style="opacity:.5">Brief non disponibile. Configura Gemini API in Admin → Settings.</span>';
+    }
+  });
+}
+
+// ── Card 6: Macro + Anomalies ──────────────────────────────
+function _mscLoadMacroAnomalies() {
+  // Macro grid
+  rq('/api/macro/indicators').then(function(r) {
+    var inds = (r && r.indicators) || [];
+    var priority = ['S&P 500','Gold','WTI Crude Oil','EUR/USD','VIX Fear Index','US 10Y Yield'];
+    var sorted = priority.map(function(name) {
+      return inds.find(function(i){ return i.name === name; });
+    }).filter(Boolean).slice(0, 6);
+    var grid = document.getElementById('msc-macro-grid');
+    if (grid && sorted.length) {
+      grid.innerHTML = sorted.map(function(ind) {
+        var delta = (ind.value || 0) - (ind.previous || ind.value || 0);
+        var col = delta > 0 ? '#10B981' : delta < 0 ? '#EF4444' : 'var(--t3)';
+        var pct = ind.previous ? (delta / ind.previous * 100).toFixed(1) : '0.0';
+        return '<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:8px 10px">'
+          + '<div style="font-size:9px;color:var(--t3);margin-bottom:2px">' + ind.name + '</div>'
+          + '<div style="font-size:15px;font-weight:800;color:var(--t1)">' + (ind.value||0).toFixed(2) + '</div>'
+          + '<div style="font-size:9px;color:' + col + '">' + (delta >= 0 ? '+' : '') + pct + '%</div>'
+          + '</div>';
+      }).join('');
+    }
+  });
+  // Anomalies
+  rq('/api/opportunity/anomalies?limit=3').then(function(r) {
+    var anoms = (r && r.anomalies) || [];
+    var el = document.getElementById('msc-anomalies-list');
+    if (!el) return;
+    if (!anoms.length) {
+      el.innerHTML = '<div style="color:var(--t3);font-size:11px;text-align:center;padding:10px">Nessuna anomalia recente</div>';
+      return;
+    }
+    el.innerHTML = anoms.map(function(a) {
+      var chg = parseFloat(a.change_pct || 0);
+      var col = a.alert_type === 'BREAKOUT_UP' || chg > 0 ? '#10B981' : '#EF4444';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--bg2);border:1px solid var(--bd);border-radius:7px">'
+        + '<div style="font-size:11px;font-weight:700;color:var(--t1);min-width:50px">' + (a.ticker||'—') + '</div>'
+        + '<div style="font-size:10px;color:var(--t2);flex:1">' + (a.title||a.alert_type||'—') + '</div>'
+        + '<div style="font-size:10px;font-weight:700;color:' + col + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(1) + '%</div>'
+        + '</div>';
+    }).join('');
+  });
+}
+
+// ── Auto-init al caricamento ───────────────────────────────
+// Chiamato da enterApp() e da sv('dash')
+window.initMobileDashboard = initMobileDashboard;
+

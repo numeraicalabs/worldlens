@@ -13,9 +13,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v68">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v68">
-<link rel="stylesheet" href="/static/finance.bundle.css?v68">
+<link rel="stylesheet" href="/static/core.bundle.css?v70">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v70">
+<link rel="stylesheet" href="/static/finance.bundle.css?v70">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -571,184 +571,249 @@
     <!-- SWIPE TRACK -->
     <div id="mob-swipe-track">
 
-      <!-- CARD 0: RISCHIO — Risk score + AI brief + greeting -->
-      <div class="mob-swipe-card" data-card="0" id="msc-0">
-        <div class="msc-overline">
-          <span id="msc-time-label">BENVENUTO</span>
-          <span id="msc-last-update" style="color:var(--fire-text-dim)"></span>
-        </div>
-        <div id="msc-greeting" class="msc-greeting">WorldLens</div>
+  <!-- ═══════ CARD 1: PORTFOLIO PULSE ═══════ -->
+  <div class="mob-swipe-card" data-card="0" id="msc-0">
+    <div class="msc-overline">
+      <span>🎯 PORTFOLIO PULSE</span>
+      <button class="msc-view-all" onclick="mobileNav('portfolio',null)">Full Hub →</button>
+    </div>
 
-        <!-- Risk score block -->
-        <div class="msc-risk-row">
-          <div>
-            <div class="msc-risk-label">RISCHIO GLOBALE</div>
-            <div class="msc-risk-num" id="msc-risk">—</div>
-            <div class="msc-risk-sub" id="msc-risk-l">Caricamento…</div>
-          </div>
-          <div class="msc-risk-divider"></div>
-          <div class="msc-brief-wrap">
-            <div class="msc-brief-label">AI CHIEF ANALYST</div>
-            <div class="msc-brief" id="msc-brief" style="font-size:14px;line-height:1.65">Caricamento briefing…</div>
-          </div>
-        </div>
-
-        <!-- Top 3 crisis events -->
-        <div class="msc-crisis-label">CRISI ATTIVE</div>
-        <div id="msc-top-events" class="msc-top-events"></div>
-
-        <div class="msc-swipe-hint">Scorri → per Mercati</div>
+    <!-- P&L Hero -->
+    <div style="margin:12px 0 16px">
+      <div style="font-size:11px;color:var(--t3);letter-spacing:.08em;margin-bottom:4px">TOTAL P&L OGGI</div>
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <span id="msc-pnl-value" style="font-size:36px;font-weight:800;color:var(--t1);letter-spacing:-.02em">—</span>
+        <span id="msc-pnl-pct" style="font-size:13px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(16,185,129,.15);color:#10B981">—</span>
       </div>
+      <div id="msc-portfolio-name" style="font-size:11px;color:var(--t3);margin-top:2px">Nessun portafoglio</div>
+    </div>
 
-      <!-- CARD 1: MERCATI — KPI grid -->
-      <div class="mob-swipe-card" data-card="1" id="msc-1">
-        <div class="msc-overline">MERCATI</div>
-        <div class="msc-title">Snapshot live</div>
+    <!-- Asset mini-grid -->
+    <div id="msc-holdings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px"></div>
 
-        <!-- 2x3 KPI grid — mirrors d-sp, d-btc etc. -->
-        <div class="msc-kpi-grid">
-          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
-            <div class="msc-kpi-lbl">S&amp;P 500</div>
-            <div class="msc-kpi-val" id="msc-sp">—</div>
-            <div class="msc-kpi-chg" id="msc-sp-c">—</div>
-          </div>
-          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
-            <div class="msc-kpi-lbl">BTC/USD</div>
-            <div class="msc-kpi-val" id="msc-btc">—</div>
-            <div class="msc-kpi-chg" id="msc-btc-c">—</div>
-          </div>
-          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
-            <div class="msc-kpi-lbl">VIX</div>
-            <div class="msc-kpi-val" id="msc-vix">—</div>
-            <div class="msc-kpi-chg" id="msc-vix-c">—</div>
-          </div>
-          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
-            <div class="msc-kpi-lbl">GOLD/OZ</div>
-            <div class="msc-kpi-val" id="msc-gold">—</div>
-            <div class="msc-kpi-chg" id="msc-gold-c">—</div>
-          </div>
-          <div class="msc-kpi" onclick="mobileNav('portfolio',null);fhTab('mercati',document.querySelector('[data-tab=mercati]'))">
-            <div class="msc-kpi-lbl">DXY</div>
-            <div class="msc-kpi-val" id="msc-dxy">—</div>
-            <div class="msc-kpi-chg" id="msc-dxy-c">—</div>
-          </div>
-          <div class="msc-kpi" onclick="mobileNav('feed',null)">
-            <div class="msc-kpi-lbl">EVENTI 24H</div>
-            <div class="msc-kpi-val" id="msc-ev">—</div>
-            <div class="msc-kpi-chg" id="msc-ev-hi" style="color:var(--fire-ember)">—</div>
-          </div>
-        </div>
+    <!-- Allocation bar -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:9px;color:var(--t3);letter-spacing:.12em;margin-bottom:6px">ALLOCAZIONE</div>
+      <div id="msc-alloc-bar" style="display:flex;height:5px;border-radius:3px;overflow:hidden;gap:1px"></div>
+      <div id="msc-alloc-legend" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px"></div>
+    </div>
 
-        <!-- Market movers — best and worst performers -->
-        <div class="msc-section-head" style="margin-top:16px">TOP MOVERS</div>
-        <div id="msc-movers" class="msc-movers"></div>
+    <!-- Quick actions -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button class="msc-view-all" onclick="mobileNav('portfolio',null)"
+        style="justify-content:center;padding:9px;font-size:10px;border:1px solid var(--bd);border-radius:8px">
+        📊 Portfolio
+      </button>
+      <button class="msc-view-all" onclick="mobileNav('opportunity',null)"
+        style="justify-content:center;padding:9px;font-size:10px;border:1px solid rgba(16,185,129,.3);border-radius:8px;color:#10B981">
+        ⚡ Trade Ideas
+      </button>
+    </div>
+  </div>
 
-        <!-- Category bars -->
-        <div class="msc-section-head" style="margin-top:16px">EVENTI PER CATEGORIA</div>
-        <div id="msc-catbars" class="msc-catbars"></div>
+  <!-- ═══════ CARD 2: TRADE IDEAS LIVE ═══════ -->
+  <div class="mob-swipe-card" data-card="1" id="msc-1">
+    <div class="msc-overline">
+      <span>⚡ TRADE IDEAS</span>
+      <button class="msc-view-all" onclick="mobileNav('opportunity',null)">Tutte →</button>
+    </div>
 
-        <div class="msc-swipe-hint">← Rischio · Crisi →</div>
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0 14px">
+      <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:10px 8px;text-align:center">
+        <div id="msc-ideas-total" style="font-size:22px;font-weight:800;color:var(--t1)">0</div>
+        <div style="font-size:9px;color:var(--t3);margin-top:2px">ATTIVE</div>
       </div>
-
-      <!-- CARD 2: CRISI — top events list -->
-      <div class="mob-swipe-card" data-card="2" id="msc-2">
-        <div class="msc-overline">
-          <span>⚡ CRISI SPOTLIGHT</span>
-          <button class="msc-view-all" onclick="mobileNav('feed',null)">Vedi tutto →</button>
-        </div>
-        <div class="msc-title">Cosa richiede attenzione</div>
-        <div id="msc-events" class="msc-events-list"></div>
-        <div class="msc-swipe-hint">← Mercati · EW →</div>
+      <div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 8px;text-align:center">
+        <div id="msc-ideas-long" style="font-size:22px;font-weight:800;color:#10B981">0</div>
+        <div style="font-size:9px;color:var(--t3);margin-top:2px">LONG</div>
       </div>
-
-      <!-- CARD 3: EARLY WARNING -->
-      <div class="mob-swipe-card" data-card="3" id="msc-3">
-        <div class="msc-overline">
-          <span>📡 EARLY WARNING</span>
-          <button class="msc-view-all" onclick="mobileNav('earlywarning',null)">Dettagli →</button>
-        </div>
-        <div class="msc-ew-score-row">
-          <div>
-            <div class="msc-ew-score" id="msc-ew-score" style="color:var(--fire-corona)">—</div>
-            <div class="msc-ew-label" id="msc-ew-label">LOADING</div>
-          </div>
-          <div class="msc-ew-assess" id="msc-ew-assess">Analisi in corso…</div>
-        </div>
-        <div class="msc-gauges">
-          <div class="msc-gauge-row">
-            <span class="msc-gauge-name">Macro Stress</span>
-            <div class="msc-gauge-bar"><div class="msc-gauge-fill" id="msc-gb-macro"></div></div>
-            <span class="msc-gauge-val" id="msc-gv-macro">—</span>
-          </div>
-          <div class="msc-gauge-row">
-            <span class="msc-gauge-name">Market Stress</span>
-            <div class="msc-gauge-bar"><div class="msc-gauge-fill" id="msc-gb-market"></div></div>
-            <span class="msc-gauge-val" id="msc-gv-market">—</span>
-          </div>
-          <div class="msc-gauge-row">
-            <span class="msc-gauge-name">Sentiment</span>
-            <div class="msc-gauge-bar"><div class="msc-gauge-fill" id="msc-gb-sent"></div></div>
-            <span class="msc-gauge-val" id="msc-gv-sent">—</span>
-          </div>
-          <div class="msc-gauge-row">
-            <span class="msc-gauge-name">Velocità</span>
-            <div class="msc-gauge-bar"><div class="msc-gauge-fill" id="msc-gb-vel"></div></div>
-            <span class="msc-gauge-val" id="msc-gv-vel">—</span>
-          </div>
-        </div>
-        <div class="msc-section-head" style="margin-top:16px">SEGNALI ATTIVI</div>
-        <div id="msc-signals" class="msc-signals"></div>
-
-        <div class="msc-section-head" style="margin-top:16px">ULTIME NEWS CRITICHE</div>
-        <div id="msc-ew-news" class="msc-ew-news"></div>
-
-        <div class="msc-swipe-hint">← Crisi · Agenti →</div>
+      <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px 8px;text-align:center">
+        <div id="msc-ideas-short" style="font-size:22px;font-weight:800;color:#EF4444">0</div>
+        <div style="font-size:9px;color:var(--t3);margin-top:2px">SHORT</div>
       </div>
+    </div>
 
-      <!-- CARD 4: AGENTI AI -->
-      <div class="mob-swipe-card" data-card="4" id="msc-4">
-        <div class="msc-overline">
-          <span>🤖 AI AGENT BOTS</span>
-          <button class="msc-view-all" onclick="refreshAgentBriefs && refreshAgentBriefs()">↻ Refresh</button>
-        </div>
-        <div class="msc-title">I tuoi 4 analyst bot</div>
-        <!-- agents-grid content is mirrored here by 34_swipe_dash.js -->
-        <div id="msc-agents" class="msc-agents"></div>
-        <div class="msc-swipe-hint">← EW</div>
+    <!-- Top 3 ideas -->
+    <div id="msc-top-ideas" style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
+      <div style="color:var(--t3);font-size:11px;text-align:center;padding:20px 0">
+        Generazione ideas in corso…<br>
+        <span style="font-size:10px;opacity:.6">Il pipeline gira ogni 10 min</span>
       </div>
+    </div>
 
-      <!-- CARD 5: MACRO NARRATIVE + JARVIS -->
-      <div class="mob-swipe-card" data-card="5" id="msc-5">
-        <div class="msc-overline">
-          <span>📊 MACRO INTELLIGENCE</span>
-          <button class="msc-view-all" onclick="loadMacroNarrative()">↻</button>
-        </div>
-        <div class="msc-title">Indicatori + AI</div>
-        <div id="msc-macro-narrative" class="msc-macro-row">
-          <div class="msc-macro-item"><div class="msc-macro-name">Caricamento…</div></div>
-        </div>
-        <div style="margin-top:12px">
-          <div class="msc-section-head" style="margin-bottom:6px">CHIEDI A JARVIS</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px">
-            <button class="msc-view-all" onclick="openJarvisForEvent('Market brief equity globale')">📈 Brief</button>
-            <button class="msc-view-all" onclick="openJarvisForEvent('Risk geopolitico')">⚠️ Risk</button>
-            <button class="msc-view-all" onclick="openJarvisForEvent('VWCE IBGL portafoglio')">💼 Portfolio</button>
-          </div>
-        </div>
-        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <button class="msc-view-all" onclick="mobileNav('macro',null)" 
-            style="justify-content:center;padding:8px;font-size:11px">
-            📊 Macro
-          </button>
-          <button class="msc-view-all" onclick="mobileNav('opportunity',null)"
-            style="justify-content:center;padding:8px;font-size:11px;background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:#10B981">
-            💡 Opportunity
-          </button>
-        </div>
-        <div class="msc-swipe-hint">← Agenti</div>
+    <!-- Anomalie badge -->
+    <div style="display:flex;gap:6px;align-items:center;padding:10px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;cursor:pointer"
+      onclick="mobileNav('opportunity',null)">
+      <div id="msc-anomaly-badge" style="background:rgba(245,158,11,.15);color:#F59E0B;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px">0</div>
+      <div style="font-size:11px;color:var(--t2);flex:1">anomalie di mercato rilevate</div>
+      <div style="font-size:11px;color:var(--t3)">→</div>
+    </div>
+  </div>
+
+  <!-- ═══════ CARD 3: MARKET SNAPSHOT ═══════ -->
+  <div class="mob-swipe-card" data-card="2" id="msc-2">
+    <div class="msc-overline">
+      <span>📊 MERCATI LIVE</span>
+      <span id="msc-mkt-time" style="font-size:8px;color:var(--t3)">—</span>
+    </div>
+
+    <!-- 6-asset grid -->
+    <div id="msc-market-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0 14px">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- Sentiment bar -->
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:9px;color:var(--t3);letter-spacing:.1em">SENTIMENT GLOBALE</span>
+        <span id="msc-sentiment-label" style="font-size:9px;color:var(--t2)">—</span>
       </div>
+      <div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden">
+        <div id="msc-sentiment-bar" style="height:100%;width:50%;background:linear-gradient(90deg,#EF4444,#F59E0B,#10B981);border-radius:3px;transition:width .8s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:3px">
+        <span style="font-size:8px;color:var(--t3)">FEAR</span>
+        <span style="font-size:8px;color:var(--t3)">GREED</span>
+      </div>
+    </div>
 
-    </div><!-- mob-swipe-track -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button class="msc-view-all" onclick="mobileNav('markets',null)"
+        style="justify-content:center;padding:9px;font-size:10px;border:1px solid var(--bd);border-radius:8px">
+        📈 Mercati completi
+      </button>
+      <button class="msc-view-all" onclick="mobileNav('macro',null)"
+        style="justify-content:center;padding:9px;font-size:10px;border:1px solid rgba(96,165,250,.3);border-radius:8px;color:#60A5FA">
+        📉 Macro →
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════ CARD 4: CRISIS RADAR ═══════ -->
+  <div class="mob-swipe-card" data-card="3" id="msc-3">
+    <div class="msc-overline">
+      <span>🔴 CRISIS RADAR</span>
+      <button class="msc-view-all" onclick="mobileNav('earlywarning',null)">EW Full →</button>
+    </div>
+
+    <!-- EW Score gauge -->
+    <div style="display:flex;align-items:center;gap:14px;margin:12px 0 16px;padding:12px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px">
+      <div style="position:relative;width:64px;height:64px;flex-shrink:0">
+        <svg viewBox="0 0 64 64" width="64" height="64">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--bg3)" stroke-width="6"/>
+          <circle id="msc-ew-ring" cx="32" cy="32" r="26" fill="none" stroke="#F59E0B" stroke-width="6"
+            stroke-dasharray="163.4" stroke-dashoffset="82" stroke-linecap="round"
+            transform="rotate(-90 32 32)" style="transition:stroke-dashoffset 1s,stroke 1s"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span id="msc-ew-score-val" style="font-size:18px;font-weight:800;color:var(--t1);line-height:1">5.0</span>
+          <span style="font-size:7px;color:var(--t3)">/10</span>
+        </div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div id="msc-ew-label-card" style="font-size:12px;font-weight:700;color:#F59E0B;margin-bottom:3px">MODERATE</div>
+        <div id="msc-ew-assess-short" style="font-size:10px;color:var(--t2);line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">Monitoraggio attivo degli indicatori geopolitici e di mercato.</div>
+      </div>
+    </div>
+
+    <!-- Top 2 crisis events -->
+    <div style="font-size:9px;color:var(--t3);letter-spacing:.1em;margin-bottom:7px">TOP EVENTI AD ALTO RISCHIO</div>
+    <div id="msc-crisis-events" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+      <div style="color:var(--t3);font-size:11px;text-align:center;padding:12px">Caricamento…</div>
+    </div>
+
+    <!-- Gauges row -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+      <div style="text-align:center;padding:8px;background:var(--bg2);border-radius:8px;border:1px solid var(--bd)">
+        <div id="msc-macro-stress" style="font-size:16px;font-weight:800;color:var(--t1)">—</div>
+        <div style="font-size:8px;color:var(--t3);margin-top:2px">MACRO</div>
+      </div>
+      <div style="text-align:center;padding:8px;background:var(--bg2);border-radius:8px;border:1px solid var(--bd)">
+        <div id="msc-market-stress" style="font-size:16px;font-weight:800;color:var(--t1)">—</div>
+        <div style="font-size:8px;color:var(--t3);margin-top:2px">MARKET</div>
+      </div>
+      <div style="text-align:center;padding:8px;background:var(--bg2);border-radius:8px;border:1px solid var(--bd)">
+        <div id="msc-ev-velocity" style="font-size:16px;font-weight:800;color:var(--t1)">—</div>
+        <div style="font-size:8px;color:var(--t3);margin-top:2px">VELOCITY</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ CARD 5: AI INTELLIGENCE BRIEF ═══════ -->
+  <div class="mob-swipe-card" data-card="4" id="msc-4">
+    <div class="msc-overline">
+      <span>🤖 AI INTELLIGENCE</span>
+      <button class="msc-view-all" onclick="brainAgent && brainAgent.open ? brainAgent.open() : mobileNav('ai',null)">Jarvis →</button>
+    </div>
+
+    <!-- Brief del giorno -->
+    <div style="margin:10px 0 14px;padding:14px;background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(139,92,246,.08));border:1px solid rgba(99,102,241,.2);border-radius:10px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-10px;right:-10px;font-size:60px;opacity:.05">🧠</div>
+      <div style="font-size:9px;color:#818CF8;letter-spacing:.12em;margin-bottom:8px">BRIEF DEL GIORNO</div>
+      <div id="msc-ai-brief-text" style="font-size:12px;color:var(--t2);line-height:1.6">
+        <span style="opacity:.5">Generazione in corso…</span>
+      </div>
+    </div>
+
+    <!-- 3 quick actions AI -->
+    <div style="font-size:9px;color:var(--t3);letter-spacing:.1em;margin-bottom:7px">CHIEDI A JARVIS</div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px">
+      <button onclick="aiSend && aiSend('Quali sono i top 3 trade ideas basati sugli eventi geopolitici di oggi?');mobileNav('ai',null)"
+        style="text-align:left;padding:9px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--t2);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:8px">
+        <span>⚡</span><span>Top trade ideas di oggi</span>
+      </button>
+      <button onclick="aiSend && aiSend('Analizza il rischio geopolitico attuale sui mercati europei e USA');mobileNav('ai',null)"
+        style="text-align:left;padding:9px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--t2);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:8px">
+        <span>🌍</span><span>Rischio geopolitico mercati</span>
+      </button>
+      <button onclick="aiSend && aiSend('Qual è il sentiment attuale su oro, oil e crypto?');mobileNav('ai',null)"
+        style="text-align:left;padding:9px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--t2);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:8px">
+        <span>📊</span><span>Sentiment Gold, Oil, Crypto</span>
+      </button>
+    </div>
+
+    <!-- Agent bots row -->
+    <div style="font-size:9px;color:var(--t3);letter-spacing:.1em;margin-bottom:7px">AGENT BOTS</div>
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">
+      <button onclick="mobileNav('ai',null)" style="flex-shrink:0;padding:7px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:20px;font-size:10px;color:var(--t2);white-space:nowrap">💹 FinanceBot</button>
+      <button onclick="mobileNav('ai',null)" style="flex-shrink:0;padding:7px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:20px;font-size:10px;color:var(--t2);white-space:nowrap">🌍 GeoBot</button>
+      <button onclick="mobileNav('ai',null)" style="flex-shrink:0;padding:7px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:20px;font-size:10px;color:var(--t2);white-space:nowrap">💻 TechBot</button>
+      <button onclick="mobileNav('ai',null)" style="flex-shrink:0;padding:7px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:20px;font-size:10px;color:var(--t2);white-space:nowrap">⚡ EnergyBot</button>
+    </div>
+  </div>
+
+  <!-- ═══════ CARD 6: MACRO + ANOMALIES ═══════ -->
+  <div class="mob-swipe-card" data-card="5" id="msc-5">
+    <div class="msc-overline">
+      <span>📉 MACRO + ANOMALIE</span>
+      <button class="msc-view-all" onclick="mobileNav('macro',null)">Full →</button>
+    </div>
+
+    <!-- Key macro indicators -->
+    <div style="font-size:9px;color:var(--t3);letter-spacing:.1em;margin:10px 0 7px">INDICATORI CHIAVE</div>
+    <div id="msc-macro-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- Anomaly alerts -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+      <span style="font-size:9px;color:var(--t3);letter-spacing:.1em">ANOMALIE RECENTI</span>
+      <button class="msc-view-all" onclick="mobileNav('opportunity',null)" style="font-size:9px">Vedi tutte →</button>
+    </div>
+    <div id="msc-anomalies-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px">
+      <div style="color:var(--t3);font-size:11px;text-align:center;padding:10px">Scansione in corso…</div>
+    </div>
+
+    <!-- Jarvis macro brief -->
+    <button onclick="getMacroBrief && getMacroBrief();mobileNav('macro',null)"
+      style="width:100%;padding:10px;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);border-radius:8px;color:#60A5FA;font-size:11px;font-weight:600;cursor:pointer">
+      🤖 Genera AI Macro Brief
+    </button>
+  </div>
+
+</div>
+<!-- mob-swipe-track -->
   </div><!-- mob-swipe-deck -->
 
   <!-- ═══════════════════ MOBILE-ONLY FEED CARDS (hidden on desktop) ═══════════════════ -->
@@ -4012,10 +4077,10 @@
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v68"></script>
-<script src="/static/finance.bundle.js?v68"></script>
-<script src="/static/map.bundle.js?v68"></script>
-<script src="/static/dashboard.bundle.js?v68"></script>
+<script src="/static/core.bundle.js?v70"></script>
+<script src="/static/finance.bundle.js?v70"></script>
+<script src="/static/map.bundle.js?v70"></script>
+<script src="/static/dashboard.bundle.js?v70"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */

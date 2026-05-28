@@ -413,6 +413,9 @@ function renderDash() {
   }
 
   updateDashFin();
+
+  // Mobile dashboard refresh
+  if (typeof initMobileDashboard === 'function' && window.innerWidth <= 768) initMobileDashboard();
 }
 
 
