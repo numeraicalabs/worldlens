@@ -97,8 +97,7 @@ class WSManager:
 
     async def connect(self, ws: WebSocket):
         try:
-            if ws.client_state.value == 0:  # CONNECTING
-                await ws.accept()
+            await ws.accept()
             self.connections.append(ws)
         except Exception as e:
             logger.debug("WS connect error: %s", e)

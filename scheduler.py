@@ -415,9 +415,13 @@ async def _poll_finance():
         async with get_db() as db:
             for asset in data:
                 await db.execute(
-                    """INSERT OR REPLACE INTO finance_cache
+                    """INSERT INTO finance_cache
                        (symbol, name, price, change_pct, change_abs, history, updated_at)
-                       VALUES (?,?,?,?,?,?,datetime('now'))""",
+                       VALUES (?,?,?,?,?,?,NOW())
+                       ON CONFLICT(symbol) DO UPDATE SET
+                       name=EXCLUDED.name, price=EXCLUDED.price,
+                       change_pct=EXCLUDED.change_pct, change_abs=EXCLUDED.change_abs,
+                       history=EXCLUDED.history, updated_at=NOW()""",
                     (
                         asset["symbol"], asset["name"],
                         asset["price"], asset["change_pct"],
@@ -452,7 +456,7 @@ async def _generate_daily_briefs():
             # Active users who logged in within the last 7 days
             async with db.execute(
                 "SELECT id FROM users WHERE is_active=1 "
-                "AND last_login > datetime('now','-7 days')"
+                "AND last_login > NOW() - INTERVAL '7 days'"
             ) as cur:
                 user_ids = [list(r.values())[0] for r in await cur.fetchall()]
 
@@ -1085,7 +1089,7 @@ async def _run_agent_digests():
         async with get_db() as db:
             async with db.execute(
                 "SELECT id FROM users WHERE is_active=1 "
-                "AND last_login > datetime('now','-7 days')"
+                "AND last_login > NOW() - INTERVAL '7 days'"
             ) as cur:
                 user_ids = [list(r.values())[0] for r in await cur.fetchall()]
 
