@@ -390,7 +390,7 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
     Main pipeline: event → opportunity score → trade ideas → persist.
     Returns None if event doesn't meet threshold (score < 45).
     """
-    event_id = event.get("id", "")
+    event_id = str(event.get("id", "") or "")
     if not event_id:
         return None
 
@@ -411,7 +411,7 @@ async def process_event_to_ideas(event: Dict, force: bool = False) -> Optional[D
     # Score the event
     opp_score = _compute_opp_score(event, fin_cache)
 
-    if opp_score < 45:
+    if opp_score < 30:
         return None  # Not tradable enough
 
     # Build base ideas (fast, rule-based)
