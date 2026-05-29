@@ -58,7 +58,7 @@ input,textarea,select{font-family:var(--fb);outline:none}
 
 /* ─── LOADER ─── */
 #loader{position:fixed;inset:0;background:var(--bg0);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .4s}
-#loader.out{opacity:0;pointer-events:none}
+#loader.out{opacity:0;pointer-events:none;transition:opacity .4s;visibility:hidden}
 .ll{font-family:var(--fh);font-size:28px;font-weight:800;background:linear-gradient(135deg,var(--b4),var(--cy));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .lb{width:180px;height:2px;background:var(--bg3);border-radius:1px;overflow:hidden}
 .lf{height:100%;background:linear-gradient(90deg,var(--b6),var(--cy));animation:lp 2s ease-out forwards}
@@ -9206,7 +9206,8 @@ body.landing-mode #landing {
 .lnav {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 9000;
+  pointer-events: auto !important;
   display: flex;
   align-items: center;
   justify-content: space-between;
