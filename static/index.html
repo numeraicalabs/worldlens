@@ -2,6 +2,40 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>/* WL error reporter — inline, runs before any bundle so it catches bundle crashes */
+(function(){
+  var sent={}, n=0, MAX=8;
+  function ver(){ var m=(document.querySelector('script[src*="core.bundle"]')||{}).src; m=m&&m.match(/\?v(\d+)/); return m?m[1]:''; }
+  function send(d){
+    try{
+      if(n>=MAX) return; var k=d.kind+'|'+d.msg+'|'+d.line; if(sent[k]) return; sent[k]=1; n++;
+      d.url=location.pathname+location.hash; d.v=ver();
+      var body=JSON.stringify(d);
+      if(navigator.sendBeacon){ navigator.sendBeacon('/api/monitoring/client-error', new Blob([body],{type:'application/json'})); }
+      else { fetch('/api/monitoring/client-error',{method:'POST',headers:{'Content-Type':'application/json'},body:body,keepalive:true}).catch(function(){}); }
+    }catch(e){}
+  }
+  window.__wlReport=send;
+  window.addEventListener('error',function(e){
+    var t=e.target;
+    if(t&&t!==window&&(t.src||t.href)){            /* failed <script>/<link> load */
+      var u=t.src||t.href; if(/bundle\./.test(u)) send({kind:'resource',msg:'Failed to load '+u.split('?')[0].split('/').pop(),src:u});
+      return;
+    }
+    send({kind:'error',msg:String(e.message||'error').slice(0,500),src:e.filename||'',line:e.lineno||0,col:e.colno||0,
+          stack:(e.error&&e.error.stack)?String(e.error.stack).slice(0,2000):''});
+  },true);
+  window.addEventListener('unhandledrejection',function(e){
+    var r=e.reason||{}; send({kind:'promise',msg:String(r.message||r).slice(0,500),stack:r.stack?String(r.stack).slice(0,2000):''});
+  });
+  /* Boot watchdog: if core never initialised, the app is dead for this user */
+  setTimeout(function(){
+    if(typeof window.showAuth!=='function'||typeof window.sv!=='function')
+      send({kind:'boot',msg:'BOOT_FAILURE: core not initialised (showAuth='+typeof window.showAuth+', sv='+typeof window.sv+')'});
+  },20000);
+})();
+</script>
+
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>World Lens — Global Intelligence Platform</title>
 
@@ -13,9 +47,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <!-- WorldLens Styles -->
-<link rel="stylesheet" href="/static/core.bundle.css?v78">
-<link rel="stylesheet" href="/static/dashboard.bundle.css?v78">
-<link rel="stylesheet" href="/static/finance.bundle.css?v78">
+<link rel="stylesheet" href="/static/core.bundle.css?v80">
+<link rel="stylesheet" href="/static/dashboard.bundle.css?v80">
+<link rel="stylesheet" href="/static/finance.bundle.css?v80">
 
 <!-- Leaflet JS (must load before app scripts) -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -4080,10 +4114,10 @@
 <!-- WorldLens Application Scripts (load order matters) -->
 <!-- WorldLens v21 — 4 consolidated bundles -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="/static/core.bundle.js?v78"></script>
-<script src="/static/finance.bundle.js?v78"></script>
-<script src="/static/map.bundle.js?v78"></script>
-<script src="/static/dashboard.bundle.js?v78"></script>
+<script src="/static/core.bundle.js?v80"></script>
+<script src="/static/finance.bundle.js?v80"></script>
+<script src="/static/map.bundle.js?v80"></script>
+<script src="/static/dashboard.bundle.js?v80"></script>
 
 <script>
 /* ── WORLDLENS v20: Clean UI Engine ─────────────────────────────────── */
