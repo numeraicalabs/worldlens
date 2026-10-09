@@ -15,6 +15,7 @@ Render env var names (exact, case-sensitive on Linux):
   GEMINI_API_KEY          → gemini_api_key
   ANTHROPIC_API_KEY       → anthropic_api_key
   GLOBAL_AI_PROVIDER      → global_ai_provider  (gemini|claude|none)
+  GEMINI_MODEL            → gemini_model        (optional override, else auto)
   SECRET_KEY              → secret_key
   DB_PATH                 → db_path
   ADMIN_EMAIL             → admin_email
@@ -54,6 +55,9 @@ class Settings(BaseSettings):
     gemini_api_key: str     = ""
     anthropic_api_key: str  = ""
     global_ai_provider: str = "gemini"   # gemini | claude | none
+    # Optional: force a specific Gemini model (e.g. "gemini-3.5-flash").
+    # Leave empty → the app auto-discovers the newest Flash model for the key.
+    gemini_model: str = ""
 
     # ── App ───────────────────────────────────────────────────────────
     admin_email: str    = "admin@worldlens.io"
@@ -120,9 +124,10 @@ def _preview(key: str) -> str:
     return f"***{k[-4:]}" if len(k) >= 4 else "***"
 
 _log.info(
-    "Config loaded — provider=%s  gemini=%s  claude=%s  db=%s",
+    "Config loaded — provider=%s  gemini=%s  claude=%s  model=%s  db=%s",
     settings.global_ai_provider,
     _preview(settings.gemini_api_key),
     _preview(settings.anthropic_api_key),
+    settings.gemini_model or "auto",
     settings.db_path,
 )

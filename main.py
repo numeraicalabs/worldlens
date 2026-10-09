@@ -32,6 +32,7 @@ from routers.brain import router as brain_router
 from routers.brain_agent import router as brain_agent_router
 from routers.knowledge_graph import router as kg_router
 from routers.jarvis import router as jarvis_router
+from routers.monitoring import router as monitoring_router
 from datetime import datetime
 from config import settings
 
@@ -324,6 +325,7 @@ app.add_middleware(
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(monitoring_router)   # client errors + AI status
 app.include_router(auth_router)
 app.include_router(events_router)
 app.include_router(finance_router)

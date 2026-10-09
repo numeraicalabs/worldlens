@@ -26,7 +26,6 @@ import logging
 import re
 from typing import Dict, List, Optional, Tuple
 from config import settings
-import aiosqlite as _aiosqlite
 
 logger = logging.getLogger(__name__)
 
@@ -34,32 +33,48 @@ _NO_AI_MSG = "Configure a free Google Gemini key in Admin → Settings to enable
 
 # ── Settings self-heal: reload from DB when in-memory key is missing ──
 
+_LAST_SETTINGS_CHECK = 0.0
+_SETTINGS_RECHECK_SEC = 60  # when no key is set, re-check DB at most once a minute
+
+
 async def _ensure_ai_settings() -> None:
-    """Reload AI provider + keys from DB if not already in memory.
-    Fixes: key saved by admin is in SQLite but lost from pydantic singleton
-    after restart on read-only filesystems (Render, Railway).
-    DB is hit at most once per worker — once a key is loaded it stays.
+    """Reload AI provider + keys from the app DB (Supabase PG, SQLite fallback)
+    when no key is in memory. Keys saved via Admin → Settings live in app_settings,
+    which on Render is in Supabase — NOT in the local SQLite file (wiped on deploy).
+    Throttled so a missing key doesn't hit the DB on every AI call.
     """
+    global _LAST_SETTINGS_CHECK
     if (settings.gemini_api_key or "").strip() or (settings.anthropic_api_key or "").strip():
         return
+    import time as _time
+    now = _time.time()
+    if now - _LAST_SETTINGS_CHECK < _SETTINGS_RECHECK_SEC:
+        return
+    _LAST_SETTINGS_CHECK = now
     try:
-        async with _aiosqlite.connect(settings.db_path) as _db:
+        from db import get_db
+        async with get_db() as _db:
             async with _db.execute(
                 "SELECT key, value FROM app_settings "
-                "WHERE key IN ('global_ai_provider','gemini_api_key','anthropic_api_key')"
+                "WHERE key IN ('global_ai_provider','gemini_api_key','anthropic_api_key','gemini_model')"
             ) as _cur:
-                for _key, _val in await _cur.fetchall():
-                    if _val:
-                        if _key == "global_ai_provider":
-                            settings.global_ai_provider = _val
-                        elif _key == "gemini_api_key":
-                            settings.gemini_api_key = _val
-                        elif _key == "anthropic_api_key":
-                            settings.anthropic_api_key = _val
+                rows = await _cur.fetchall()
+        for r in rows:
+            _key, _val = r["key"], (r["value"] or "").strip()
+            if not _val:
+                continue
+            if _key == "global_ai_provider":
+                settings.global_ai_provider = _val
+            elif _key == "gemini_api_key":
+                settings.gemini_api_key = _val
+            elif _key == "anthropic_api_key":
+                settings.anthropic_api_key = _val
+            elif _key == "gemini_model":
+                settings.gemini_model = _val
         if settings.gemini_api_key or settings.anthropic_api_key:
-            logger.info("AI settings reloaded from DB: provider=%s", settings.global_ai_provider)
+            logger.info("AI settings loaded from DB: provider=%s", settings.global_ai_provider)
     except Exception as _e:
-        logger.debug("_ensure_ai_settings DB read failed: %s", _e)
+        logger.warning("_ensure_ai_settings DB read failed: %s", _e)
 
 
 # ── Provider resolution ───────────────────────────────
@@ -105,12 +120,10 @@ async def ai_available_async() -> bool:
 
 
 async def _get_user_ai_keys(user_id: int) -> Tuple[str, str]:
-    """Load (gemini_key, anthropic_key) for a user from DB.
-    Returns empty strings if not set. Used so per-user AI calls
-    work even when no admin key is configured."""
+    """Load (gemini_key, anthropic_key) for a user from the app DB."""
     try:
-        async with _aiosqlite.connect(settings.db_path) as db:
-            db.row_factory = _aiosqlite.Row
+        from db import get_db
+        async with get_db() as db:
             async with db.execute(
                 "SELECT user_gemini_key, user_anthropic_key FROM users WHERE id=?",
                 (user_id,)
@@ -142,15 +155,78 @@ async def _call_claude(prompt: str, system: str = "", max_tokens: int = 400,
         return await _call_anthropic(prompt, system, max_tokens, api_key)
     return None
 
-# Models to try in order — gemini-2.5-flash is primary (free tier, April 2026)
-_GEMINI_MODELS = [
-    "gemini-2.5-flash-preview-04-17",  # Primary: April 2026 preview
-    "gemini-2.5-flash",                 # Alias
-    "gemini-2.0-flash",                 # Stable fallback
-    "gemini-1.5-flash",                 # Always available
+# ── Gemini model selection ─────────────────────────────────────────────
+# Google retires Flash models every few months (2.0-flash: Jun 2026,
+# 2.5-flash: Oct 2026). Instead of a hardcoded list we ask the API which
+# models this key can use and pick the newest general-purpose Flash.
+# Static list = fallback only if discovery fails. Override: GEMINI_MODEL env.
+_GEMINI_FALLBACK_MODELS = [
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
 ]
 _GEMINI_BASE  = "https://generativelanguage.googleapis.com/v1beta/models"
-_MAX_TOKENS_CAP = 8192   # Gemini 2.5 Flash supports up to 8192 output tokens
+_MAX_TOKENS_CAP = 8192
+_GEMINI_EXCLUDE = ("lite", "image", "tts", "audio", "live", "embedding",
+                   "vision", "thinking-exp", "native", "robotics", "computer")
+_GEMINI_DISCOVERED: Dict[str, Tuple[float, List[str]]] = {}   # key-suffix → (ts, models)
+_GEMINI_WORKING: Optional[str] = None
+_LAST_AI_ERROR: Dict[str, str] = {}
+
+
+def _version_key(name: str) -> Tuple:
+    """Sort key: stable before preview, then higher version first.
+    Previews have tighter rate limits and short shutdown notice."""
+    m = re.search(r"gemini-(\d+(?:\.\d+)?)", name)
+    ver = float(m.group(1)) if m else 0.0
+    is_preview = ("preview" in name) or ("exp" in name)
+    return (is_preview, -ver, len(name))
+
+
+async def _discover_gemini_models(client: "httpx.AsyncClient", key: str) -> List[str]:
+    import time as _time
+    ck = key[-8:]
+    cached = _GEMINI_DISCOVERED.get(ck)
+    if cached and _time.time() - cached[0] < 6 * 3600:
+        return cached[1]
+    found: List[str] = []
+    try:
+        resp = await client.get(f"{_GEMINI_BASE}?key={key}&pageSize=200", timeout=15)
+        if resp.status_code == 200:
+            for mdl in resp.json().get("models", []):
+                name = (mdl.get("name") or "").replace("models/", "")
+                methods = mdl.get("supportedGenerationMethods") or []
+                if "generateContent" not in methods or "flash" not in name:
+                    continue
+                if any(x in name for x in _GEMINI_EXCLUDE):
+                    continue
+                found.append(name)
+            found.sort(key=_version_key)
+        else:
+            _LAST_AI_ERROR["gemini_discovery"] = f"HTTP {resp.status_code}: {resp.text[:200]}"
+    except Exception as e:
+        _LAST_AI_ERROR["gemini_discovery"] = str(e)[:200]
+    if found:
+        _GEMINI_DISCOVERED[ck] = (_time.time(), found)
+        logger.info("Gemini models available: %s", ", ".join(found[:5]))
+    return found
+
+
+async def _gemini_model_order(client: "httpx.AsyncClient", key: str) -> List[str]:
+    order: List[str] = []
+    forced = (getattr(settings, "gemini_model", "") or "").strip()
+    if forced:
+        order.append(forced)
+    if _GEMINI_WORKING:
+        order.append(_GEMINI_WORKING)
+    order += (await _discover_gemini_models(client, key))[:4]
+    order += _GEMINI_FALLBACK_MODELS
+    seen, out = set(), []
+    for m in order:
+        if m and m not in seen:
+            seen.add(m); out.append(m)
+    return out
 
 
 async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) -> Optional[str]:
@@ -177,8 +253,9 @@ async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) 
     if system:
         body["system_instruction"] = {"parts": [{"text": system}]}
 
+    global _GEMINI_WORKING
     async with httpx.AsyncClient(timeout=90) as client:  # 90s for long reports
-        for model in _GEMINI_MODELS:
+        for model in await _gemini_model_order(client, key):
             _429_retried = False
             while True:
                 try:
@@ -190,7 +267,9 @@ async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) 
                     )
 
                     if resp.status_code == 404:
-                        logger.debug("Gemini model '%s' not found", model)
+                        logger.info("Gemini model '%s' not available — trying next", model)
+                        if _GEMINI_WORKING == model:
+                            _GEMINI_WORKING = None
                         break  # try next model
 
                     if resp.status_code == 503:
@@ -203,9 +282,12 @@ async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) 
                         except Exception:
                             err = resp.text[:300]
                         logger.warning("Gemini HTTP %d model=%s — %s", resp.status_code, model, err)
-                        if resp.status_code == 400:
-                            break  # model-specific, try next
-                        return None  # key problem
+                        _LAST_AI_ERROR["gemini"] = f"HTTP {resp.status_code} ({model}): {err}"[:300]
+                        key_problem = resp.status_code in (401, 403) or "api key" in str(err).lower() \
+                            or "permission" in str(err).lower()
+                        if key_problem:
+                            return None  # invalid/blocked key — other models won't help
+                        break  # model-specific, try next
 
                     if resp.status_code == 429:
                         if not _429_retried:
@@ -240,8 +322,10 @@ async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) 
                     try:
                         result = cand["content"]["parts"][0]["text"].strip()
                         if result:
-                            logger.debug("Gemini '%s' OK — %d chars (requested %d tokens)",
-                                         model, len(result), out_tokens)
+                            if _GEMINI_WORKING != model:
+                                logger.info("Gemini using model: %s", model)
+                            _GEMINI_WORKING = model
+                            _LAST_AI_ERROR.pop("gemini", None)
                             return result
                         break
                     except (KeyError, IndexError):
@@ -259,11 +343,19 @@ async def _call_gemini(prompt: str, system: str, max_tokens: int, api_key: str) 
                     break
 
     logger.warning("All Gemini models failed")
+    _LAST_AI_ERROR.setdefault("gemini", "all candidate models failed")
     return None
 
 
+# Was referenced but never defined → NameError on every Claude call.
+_ANTHROPIC_MODELS = [
+    "claude-haiku-5-5",    # fast + cheap, primary
+    "claude-sonnet-5-5",   # fallback
+]
+
+
 async def _call_anthropic(prompt: str, system: str, max_tokens: int, api_key: str) -> Optional[str]:
-    """Call Claude Haiku via Anthropic API."""
+    """Call Claude via Anthropic API."""
     body: dict = {
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
@@ -289,14 +381,17 @@ async def _call_anthropic(prompt: str, system: str, max_tokens: int, api_key: st
                     continue
                 if resp.status_code in (401, 403):
                     logger.warning("Anthropic API key error (HTTP %d) — check key in Admin → Settings", resp.status_code)
+                    _LAST_AI_ERROR["claude"] = f"HTTP {resp.status_code}: invalid or unauthorized key"
                     return None
                 if resp.status_code == 429:
                     logger.warning("Anthropic rate limit (HTTP 429)")
                     return None
                 if resp.status_code != 200:
                     logger.warning("Anthropic HTTP %d: %s", resp.status_code, resp.text[:200])
+                    _LAST_AI_ERROR["claude"] = f"HTTP {resp.status_code}: {resp.text[:200]}"
                     return None
                 data = resp.json()
+                _LAST_AI_ERROR.pop("claude", None)
                 content = data.get("content", [])
                 if not content:
                     logger.warning("Anthropic returned empty content")
@@ -312,6 +407,49 @@ async def _call_anthropic(prompt: str, system: str, max_tokens: int, api_key: st
                 return None
 
     return None
+
+_DIAG_CACHE: Dict[str, object] = {}
+
+
+async def ai_diagnostics(live_test: bool = False) -> Dict:
+    """Safe-to-expose AI status: provider, key source, model, last error. No secrets."""
+    import time as _time
+    await _ensure_ai_settings()
+    provider, key = _resolve_provider()
+    out: Dict = {
+        "provider": provider,
+        "configured": provider != "none" and bool(key),
+        "key_hint": (f"***{key[-4:]}" if key and len(key) >= 4 else None),
+        "key_source": ("env/db" if key else None),
+        "gemini_model_forced": (getattr(settings, "gemini_model", "") or None),
+        "gemini_model_in_use": _GEMINI_WORKING,
+        "gemini_models_discovered": None,
+        "last_errors": dict(_LAST_AI_ERROR),
+    }
+    if provider == "gemini" and key:
+        try:
+            async with httpx.AsyncClient(timeout=20) as c:
+                out["gemini_models_discovered"] = (await _discover_gemini_models(c, key))[:6]
+        except Exception as e:
+            out["gemini_models_discovered"] = f"error: {e}"
+    if live_test and out["configured"]:
+        cached = _DIAG_CACHE.get("live")
+        if cached and _time.time() - cached[0] < 60:
+            out["live_test"] = cached[1]
+        else:
+            t0 = _time.time()
+            txt = await _call_claude("Reply with exactly: OK", max_tokens=10)
+            res = {"ok": bool(txt), "reply": (txt or "")[:40],
+                   "latency_ms": int((_time.time() - t0) * 1000),
+                   "model": _GEMINI_WORKING if provider == "gemini" else _ANTHROPIC_MODELS[0]}
+            _DIAG_CACHE["live"] = (_time.time(), res)
+            out["live_test"] = res
+        out["last_errors"] = dict(_LAST_AI_ERROR)
+    if not out["configured"]:
+        out["hint"] = ("Set GEMINI_API_KEY on Render (Environment) or save a key in "
+                       "Admin → Settings. Free key: https://aistudio.google.com/app/apikey")
+    return out
+
 
 def _parse_json(text: str) -> Optional[Dict]:
     """Safely parse JSON from AI response, stripping markdown fences."""
