@@ -676,7 +676,7 @@ async function _refreshCurrentTickerHeader() {
 }
 
 function renderMktSidebar() {
-  var wlSyms = (G.watchlist || []).filter(function(w){return w.type==='asset';}).map(function(w){return w.value;});
+  var wlSyms = (Array.isArray(G.watchlist) ? G.watchlist : []).filter(function(w){return w.type==='asset';}).map(function(w){return w.value;});
   var wlAssets = MKT.allAssets.filter(function(a){ return wlSyms.indexOf(a.symbol) > -1; });
   var wlEl = el('mkt-wl-list');
   if (wlEl) wlEl.innerHTML = wlAssets.map(mktAssetRowHtml).join('') ||
@@ -2596,7 +2596,7 @@ function _drawCompareChart() {
 // ── Price alerts ──────────────────────────────────────────
 
 var PRICE_ALERTS = (function(){
-  try { return JSON.parse(localStorage.getItem('wl_price_alerts')||'[]'); } catch(e){ return []; }
+  try { return JSON.parse(_lsGet('wl_price_alerts')||'[]'); } catch(e){ return []; }
 })();
 var ALERT_DIR = 'above';
 
@@ -2638,7 +2638,7 @@ function savePriceAlert() {
     triggered: false,
   };
   PRICE_ALERTS.push(alert);
-  try { localStorage.setItem('wl_price_alerts', JSON.stringify(PRICE_ALERTS)); } catch(e){}
+  try { _lsSet('wl_price_alerts', JSON.stringify(PRICE_ALERTS)); } catch(e){}
   closePriceAlert();
   toast('🔔 Alert set: ' + MKT.symbol + ' ' + ALERT_DIR + ' ' + fmtP(MKT.symbol, price), 's');
   _checkPriceAlerts();
@@ -2656,7 +2656,7 @@ function _checkPriceAlerts() {
     }
   });
   if (triggered.length) {
-    try { localStorage.setItem('wl_price_alerts', JSON.stringify(PRICE_ALERTS)); } catch(e){}
+    try { _lsSet('wl_price_alerts', JSON.stringify(PRICE_ALERTS)); } catch(e){}
     triggered.forEach(function(a) {
       toast('🔔 ALERT: ' + a.symbol + ' is ' + a.dir + ' ' + fmtP(a.symbol, a.price) +
             (a.note ? ' — ' + a.note : ''), 's');

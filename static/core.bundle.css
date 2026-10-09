@@ -10025,8 +10025,11 @@ body.landing-mode #landing {
   to   { transform: translate(30px, 20px) scale(1.1); }
 }
 
-/* Ensure all landing content is above the glow */
-#landing > * { position: relative; z-index: 1; }
+/* Ensure all landing content is above the glow.
+   :not(#lcanvas) — the particle canvas must stay position:fixed, otherwise it
+   takes a full viewport of flow space and pushes the whole landing down. */
+#landing > *:not(#lcanvas) { position: relative; z-index: 1; }
+#landing > #lcanvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 
 /* Nav glassmorphism stronger */
 .lnav {
